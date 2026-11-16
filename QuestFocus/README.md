@@ -23,14 +23,18 @@ Requires **Questie**. TomTom is optional: if it is installed, its arrow is used.
 - If no quest mob nameplate is visible (too far away, nameplates off) or you are in combat, the macro targets by name. It skips corpses, but it can't detect tapped mobs this way; a red warning appears if the target is tapped.
 
 ### Panel
-- Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (your average time per kill), plus a progress bar.
+- Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (average time per kill, searching included), plus a progress bar.
 - Each objective shows its own estimated time left. Hover it for the details.
 - **Progress popup:** for a few seconds after an objective counter goes up, a small popup above the panel shows the new count and the time left.
 
 ### Time left estimate
-- The best source is your own pace on that objective, i.e. how fast its counter has been growing.
-- Without that, it uses your kill pace (time between your kills, taken from the "X dies, you gain N experience" messages; breaks over 5 min ignored) times the kills still needed. For loot objectives this uses the Questie drop rate: 10 items at 5% is about 200 kills.
-- A `?` means there is no kill data yet, so a default of 45 s per kill is used. Reset the pace on the Panel tab.
+Every source measures the **time between** two events, so the searching is counted too, not just the fight. A gap of 15 minutes or more counts as a break and is left out.
+1. **Your pace on that objective:** the time between two increases of its counter.
+2. **The time between your kills of that objective's mobs**, read from the "X dies, you gain N experience" messages. For loot objectives this is combined with the Questie drop rate: 10 items at 5% is about 200 kills.
+3. **Your general kill pace** (all mobs).
+4. **A default of 45 s per kill.** A `?` after the time means there is no data yet and this default is used.
+
+If you have been searching for longer than your average, that is counted too: the time left grows while you search. The **PACE** box shows the pace of the first open objective, e.g. `2m10s / kill`. Reset all of this on the Panel tab.
 
 ### What next? (no quest selected)
 With no quest selected, the panel suggests what to do next:

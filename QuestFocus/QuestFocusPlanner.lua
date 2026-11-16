@@ -9,7 +9,7 @@ local L = NS.L
 local state = NS.state
 
 local DEFAULT_KILL_TIME = 45   -- mp/kill, amig nincs sajat meres
-local MAX_GAP = 300            -- ennel hosszabb szunet nem szamit bele a tempoba
+local MAX_GAP = 900            -- ennel hosszabb (15 perc) kihagyas szunetnek szamit, nem keresesnek
 local ROUTE_LEN = 5
 local PICKUP_LEN = 3
 
@@ -17,11 +17,18 @@ local PICKUP_LEN = 3
 -- Kill tempo
 ---------------------------------------------------------------------------
 local lastKill, killSeen = nil, {}
+local mobKills = {} -- mob nev -> kill idopontok (a kereses ideje is benne van a kozokben)
 
-local function RecordKill(guid)
+local function RecordKill(guid, name)
     if not guid or killSeen[guid] then return end
     killSeen[guid] = true
     local now = GetTime()
+    if name and name ~= "" then
+        local t = mobKills[name] or {}
+        mobKills[name] = t
+        t[#t + 1] = now
+        while #t > 15 do table.remove(t, 1) end
+    end
     if lastKill then
         local dt = now - lastKill
         if dt > 1 and dt < MAX_GAP then
@@ -79,16 +86,40 @@ local function ScanProgress()
     end
 end
 
--- Atlagos ido / egyseg a sajat korabbi haladasbol (legalabb 2 ertelmes kozbol)
+-- Idopontok listajabol: atlagos koz (szunetek nelkul), kozok szama, utolso idopont.
+-- Ha az utolso ota mar tobb ido telt el, mint az atlag (most is keresed), az is beleszamit:
+-- a becsles lassu keresesnel menet kozben no.
+local function PaceFromTimes(times, minN)
+    if not times or #times < 2 then return end
+    local sum, n = 0, 0
+    for i = 2, #times do
+        local dt = times[i] - times[i - 1]
+        if dt > 0.5 and dt < MAX_GAP then sum, n = sum + dt, n + 1 end
+    end
+    if n < (minN or 2) then return end
+    local avg, last = sum / n, times[#times]
+    local since = GetTime() - last
+    if since > avg and since < MAX_GAP then avg = (sum + since) / (n + 1) end
+    return avg, n, since
+end
+
+-- Objective tempo: a quest szamlalo novekedesei kozti ido (kereses + kill + drop egyutt)
 local function ObjPace(key)
     local p = progress[key]
-    if not p or #p.hits < 3 then return end
-    local sum, n = 0, 0
-    for i = 2, #p.hits do
-        local dt = p.hits[i] - p.hits[i - 1]
-        if dt < MAX_GAP * 2 then sum, n = sum + dt, n + 1 end
+    return PaceFromTimes(p and p.hits, 2)
+end
+
+-- Mob tempo: az objective mobjainak killjei kozti ido (keresessel egyutt)
+local function MobPace(o)
+    local all = {}
+    for _, s in ipairs(o.sources or {}) do
+        if s.isNpc and s.name and mobKills[s.name] then
+            for _, t in ipairs(mobKills[s.name]) do all[#all + 1] = t end
+        end
     end
-    if n >= 2 then return sum / n, n end
+    if #all < 3 then return end
+    table.sort(all)
+    return PaceFromTimes(all, 2)
 end
 
 local function BestDropRate(o)
@@ -113,27 +144,49 @@ local function EtaSeconds(o)
     local c, n = tonumber(o.qo.Collected), tonumber(o.qo.Needed)
     if not (c and n) or n <= c then return end
     local remaining = n - c
-    local per = o.qid and ObjPace(ObjKey(o.qid, o.qo))
+    -- 1) a sajat haladasod ezen az objective-en (legpontosabb)
+    local per, _, since = nil, nil, nil
+    if o.qid then per, _, since = ObjPace(ObjKey(o.qid, o.qo)) end
     if per then
-        return remaining * per, { how = "pace", per = per, remaining = remaining }
+        -- a mostani egyseg mar 'since' ideje tart
+        local eta = (remaining - 1) * per + math.max(per - (since or 0), 0)
+        return eta, { how = "pace", per = per, remaining = remaining }
     end
-    local pace, guess = KillPace()
+    -- 2) ennek a mobnak a killjei kozti ido (keresessel), 3) altalanos kill tempo, 4) alap
+    local pace, guess, how = MobPace(o), false, "mob"
+    if not pace then pace, guess = KillPace(); how = "kills" end
     local t = o.qo.Type
     if t == "monster" or t == "killcredit" then
-        return remaining * pace, { how = "kills", kills = remaining, per = pace, guess = guess }
+        return remaining * pace, { how = how, kills = remaining, per = pace, guess = guess }
     elseif t == "item" then
         local rate = BestDropRate(o)
         if rate then
             local kills = math.ceil(remaining * 100 / math.min(rate, 100))
-            return kills * pace, { how = "kills", kills = kills, rate = rate, per = pace, guess = guess }
+            return kills * pace, { how = how, kills = kills, rate = rate, per = pace, guess = guess }
         end
     end
 end
 
-NS.PaceText = function()
+local function FmtSec(s)
+    s = math.floor(s + 0.5)
+    if s >= 60 then return ("%dm%02ds"):format(math.floor(s / 60), s % 60) end
+    return ("%ds"):format(s)
+end
+
+-- PACE doboz: a kijelolt quest elso hatralevo objective-jenek tempoja (keresessel egyutt)
+NS.PaceText = function(objectives)
+    for _, o in ipairs(objectives or {}) do
+        if not o.completed and not o.turnIn and o.qo then
+            local per = o.qid and ObjPace(ObjKey(o.qid, o.qo))
+            if per then return FmtSec(per) .. " / " .. L["each"] end
+            per = MobPace(o)
+            if per then return FmtSec(per) .. " / " .. L["kill"] end
+            break
+        end
+    end
     local pace, guess = KillPace()
     if guess then return "|cff808080" .. L["no data"] .. "|r" end
-    return ("%ds / kill"):format(pace + 0.5)
+    return FmtSec(pace) .. " / " .. L["kill"]
 end
 
 local function FormatTime(sec)
@@ -154,13 +207,14 @@ NS.EtaLine = function(o)
     if not sec then return end
     local txt = L["Time left: "] .. FormatTime(sec)
     if info.how == "pace" then
-        txt = txt .. (L[" (your pace: 1 per %ds)"]):format(info.per)
+        txt = txt .. (L[" (your pace on this: 1 every %s, searching included)"]):format(FmtSec(info.per))
     elseif info.rate then
-        txt = txt .. (L[" (~%d kills at %s%% drop, %ds/kill)"]):format(info.kills,
-            info.rate >= 10 and ("%d"):format(info.rate) or ("%.1f"):format(info.rate), info.per)
+        txt = txt .. (L[" (~%d kills at %s%% drop, %s/kill)"]):format(info.kills,
+            info.rate >= 10 and ("%d"):format(info.rate) or ("%.1f"):format(info.rate), FmtSec(info.per))
     else
-        txt = txt .. (L[" (%d kills, %ds/kill)"]):format(info.kills, info.per)
+        txt = txt .. (L[" (%d kills, %s/kill)"]):format(info.kills, FmtSec(info.per))
     end
+    if info.how == "mob" then txt = txt .. L[" - time between your kills of this mob, searching included"] end
     if info.guess then txt = txt .. L[" - estimated, no kill data yet"] end
     return txt
 end
@@ -551,7 +605,9 @@ ev:SetScript("OnEvent", function(_, event, arg1)
     if event == "CHAT_MSG_COMBAT_XP_GAIN" then
         -- Csak a kill XP szamit (quest leadas / felfedezes XP nem): a szoveg "dies"-t tartalmaz
         pcall(function()
-            if type(arg1) == "string" and arg1:find(" dies", 1, true) then RecordKill("xp" .. GetTime()) end
+            if type(arg1) == "string" and arg1:find(" dies", 1, true) then
+                RecordKill("xp" .. GetTime(), arg1:match("^(.-) dies"))
+            end
         end)
     elseif event == "QUEST_LOG_UPDATE" then
         -- A Questie a sajat esemenyere frissiti a Collected ertekeket: kicsit kesobb nezzuk
@@ -606,6 +662,7 @@ resetPace:SetText(L["Reset kill pace"])
 resetPace:SetScript("OnClick", function()
     QuestFocusDB.killPace, QuestFocusDB.killSamples = nil, nil
     wipe(progress)
+    wipe(mobKills)
     NS.Print(L["Kill pace reset."])
 end)
 NS.opt:HookScript("OnShow", function() cbSuggest.refresh(); cbToast.refresh() end)

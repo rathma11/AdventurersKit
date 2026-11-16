@@ -925,7 +925,7 @@ local function UpdateStats()
     end
     local total = not state.isComplete and NS.QuestEta and NS.QuestEta(objs)
     b[2].value:SetText(total or "-")
-    b[3].value:SetText(NS.PaceText and NS.PaceText() or "-")
+    b[3].value:SetText(NS.PaceText and NS.PaceText(objs) or "-")
     if state.isComplete then
         panel.sub:SetText(L["Ready to turn in"])
     else
