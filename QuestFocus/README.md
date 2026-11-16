@@ -47,7 +47,7 @@ Watched buffs (warning + reminder popup). An optional row of buttons under the p
 - **XP food:** drag the item in once on the Buffs tab.
 - **Weapon enchant:** sharpening stone, weightstone or oil, found by name. Clicking applies it to your main hand.
 
-Each button shows the time left on its buff. When the buff is missing, or about to run out, the button pulses red. "About to run out" is set per buff on the Buffs tab: by default 10 min for the sleeping bag and the weapon enchant, and 1 min for the XP food (so food only warns when it is missing or almost gone). You also get one warning on screen and in chat. The buff an item gives is learned the first time you use it from the button.
+Each button shows the time left on its buff. When the buff is missing, or about to run out, the button pulses red. "About to run out" is set per buff on the Buffs tab: by default 10 min for the sleeping bag, and 1 min for the XP food and the weapon enchant (so those only warn when missing or almost gone). You also get one warning on screen and in chat. The buff an item gives is learned the first time you use it from the button.
 
 **Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. The X hides that reminder until the buff is applied again. The popup disappears when combat starts, because the game does not allow it to stay up in combat. It uses the same spot as the progress popup: if a progress popup is showing (e.g. right after combat), the reminder waits until it fades.
 

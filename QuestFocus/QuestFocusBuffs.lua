@@ -12,7 +12,7 @@ local SLOTS = {
     { key = "rest",   label = L["Sleeping bag"], names = { L["Sleeping Bag"] }, spellId = 429959, stacks = 3, warn = 10 },
     { key = "food",   label = L["XP food"],      names = {}, warn = 1 },
     { key = "weapon", label = L["Weapon enchant"],
-      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 10 },
+      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
 }
 local BTN = 30
 
