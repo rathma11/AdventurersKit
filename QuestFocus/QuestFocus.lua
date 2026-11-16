@@ -899,8 +899,7 @@ grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 -- Fejlec es lablec elhelyezese; mode = "quest" (statisztikaval) vagy "list" (javaslatok).
 -- Visszaadja, honnan kezdodhet a tartalom (y).
 local function PanelChrome(mode, sectionText)
-    -- Varos modban (IsResting) nincs statisztika: ott nem harcolsz, kisebb a panel
-    local quest = mode == "quest" and not (NS.InCity and NS.InCity())
+    local quest = mode == "quest"
     panel.stats:SetShown(quest)
     panel.bar:SetShown(quest)
     local y = quest and -112 or -56
@@ -1059,6 +1058,24 @@ local function UpdateStats()
         end
     end
     local b = panel.statBoxes
+    -- Varos modban (IsResting) nem harcolsz: tavolsag / utazasi ido / legjobb mod (gyalog, HS, repules)
+    if NS.InCity and NS.InCity() then
+        b[1].label:SetText(L["DISTANCE"]); b[2].label:SetText(L["TRAVEL"]); b[3].label:SetText(L["BEST WAY"])
+        local r = state.waypoint and NS.TravelAdvice and NS.TravelAdvice(state.waypoint)
+        b[1].value:SetText(r and r.dist and ("%d yd"):format(r.dist) or "-")
+        local t = r and (r.bestTime or r.walk)
+        if t then
+            local m = math.floor(t / 60)
+            b[2].value:SetText(t < 60 and ("%ds"):format(t) or ("%dm %02ds"):format(m, t % 60))
+        else
+            b[2].value:SetText("-")
+        end
+        b[3].value:SetText(NS.BestWayText and NS.BestWayText(r) or "-")
+        panel.bar:SetValue(0)
+        panel.sub:SetText(state.isComplete and L["Ready to turn in"] or (L["%d / %d objectives"]):format(doneObj, nObj))
+        return
+    end
+    b[1].label:SetText(L["PROGRESS"]); b[2].label:SetText(L["TIME LEFT"]); b[3].label:SetText(L["PACE"])
     if state.isComplete then
         b[1].value:SetText("|cff33ff99" .. L["Done"] .. "|r")
         panel.bar:SetValue(1)
@@ -1680,6 +1697,11 @@ local function DebugLines()
     if not any then out[#out + 1] = L["  (none)"] end
     out[#out + 1] = "Macro:"
     for line in (state.lastBody or "-"):gmatch("[^\n]+") do out[#out + 1] = "  " .. line end
+    local h = QuestFocusDB.hearth
+    out[#out + 1] = (L["Hearthstone: %s | position learned: %s"]):format(
+        GetBindLocation and GetBindLocation() or "?",
+        (h and GetBindLocation and h.name == GetBindLocation()) and L["yes"]
+            or L["no (bind at an innkeeper or use your Hearthstone once)"])
     if NS.BuffDebugLines then
         out[#out + 1] = " "
         local ok, lines = pcall(NS.BuffDebugLines)

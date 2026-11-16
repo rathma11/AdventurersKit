@@ -51,7 +51,12 @@ When a quest you can pick up is within ~300 yards, a popup appears at the top ce
 Only quests between your level minus 2 and plus 10 are shown; this range also applies to the "Pick up nearby" list. Change the range or turn the popup off on the Panel tab. The length is a rough estimate, because Questie's data has no counts: about 8 kills per mob objective, 6 items per loot objective (with the drop rate), about 1 min for talk or delivery quests, all scaled by your kill pace.
 
 ### City mode
-In a city or an inn (where you get rested XP), quests don't pop up one by one. When you arrive, a single list shows every quest you can pick up within ~600 yards, up to 12. Each row has the level, the name, the estimated length and the distance, and a click puts a TomTom marker on the quest giver. The list refreshes while you walk around, and quests you have picked up drop off it. It closes when you leave; X hides it until the next city. `/qf city` opens it anywhere. In city mode the panel also hides the Progress / Time left / Pace boxes. Toggle it on the Panel tab.
+In a city or an inn (where you get rested XP), quests don't pop up one by one. When you arrive, a single list shows every quest you can pick up within ~600 yards, up to 12. Each row has the level, the name, the estimated length and the distance, and a click puts a TomTom marker on the quest giver. The list refreshes while you walk around, and quests you have picked up drop off it. It closes when you leave; X hides it until the next city. `/qf city` opens it anywhere. In city mode the panel boxes show **Distance** (yards to the marker), **Travel** (time at your current speed, like TomTom) and **Best way** (walk, Hearthstone or flight). Toggle it on the Panel tab.
+
+### Travel: Hearthstone and flight
+When a marker is placed, the addon compares walking with your Hearthstone and with flying. If one of them is clearly faster, it says so once in chat, e.g. "Faster: Hearthstone to Booty Bay (~2m instead of ~9m on foot)". The Hearthstone estimate includes the 10 s cast and any cooldown.
+- **Hearthstone position:** the game only gives the name of your bind location, not its coordinates. The addon learns the position when you bind at an innkeeper, or right after you arrive by Hearthstone. The Debug tab shows whether it is known.
+- **Flight:** uses the flight points you know, if the client provides them (`C_TaxiMap`). The flight time is estimated in a straight line.
 
 ### Buff reminders
 Watched buffs (warning + reminder popup). An optional row of buttons under the panel is **off by default**, because the buff frame already shows the timers; turn it on on the Buffs tab:
