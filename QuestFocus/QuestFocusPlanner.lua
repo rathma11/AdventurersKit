@@ -253,6 +253,9 @@ accent:SetColorTexture(0.95, 0.78, 0.40, 1)
 toast.label = toast:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 toast.label:SetPoint("TOPLEFT", 12, -7)
 toast.label:SetTextColor(0.95, 0.78, 0.40)
+toast.label:SetWidth(170)
+toast.label:SetJustifyH("LEFT")
+toast.label:SetWordWrap(false)
 toast.right = toast:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 toast.right:SetPoint("TOPRIGHT", -9, -7)
 toast.icon = toast:CreateTexture(nil, "ARTWORK")
@@ -267,17 +270,28 @@ toast.text:SetWordWrap(false)
 
 local TOAST_HOLD, TOAST_FADE = 3.5, 0.6
 NS.ToastFrame = toast -- a buff emlekezteto megvarja, amig ez eltunik
+local toastQueue = {} -- egyszerre tobb quest haladasa: egymas utan jonnek
 toast:SetScript("OnUpdate", function(self, dt)
     self.t = (self.t or 0) + dt
-    if self.t > TOAST_HOLD + TOAST_FADE then
+    local hold = #toastQueue > 0 and 2 or TOAST_HOLD -- ha var meg valami, rovidebben
+    if self.t > hold + TOAST_FADE then
         self:Hide()
-    elseif self.t > TOAST_HOLD then
-        self:SetAlpha(1 - (self.t - TOAST_HOLD) / TOAST_FADE)
+        local nxt = table.remove(toastQueue, 1)
+        if nxt then ShowToast(nxt[1], nxt[2], nxt[3], true) end
+    elseif self.t > hold then
+        self:SetAlpha(1 - (self.t - hold) / TOAST_FADE)
     end
 end)
 
-ShowToast = function(qid, title, o)
+ShowToast = function(qid, title, o, fromQueue)
     if QuestFocusDB.noToast then return end
+    -- Ha mar latszik egy (masik questhez), ez sorba all
+    if not fromQueue and toast:IsShown() and toast.qo ~= o then
+        for _, q in ipairs(toastQueue) do if q[3] == o then return end end
+        toastQueue[#toastQueue + 1] = { qid, title, o }
+        return
+    end
+    toast.qo = o
     -- A kijelolt quest objective-jeiben megvannak a forrasok is (drop rate-hez)
     local entry
     if state.questId == qid then
@@ -287,9 +301,10 @@ ShowToast = function(qid, title, o)
     local c, n = tonumber(o.Collected) or 0, tonumber(o.Needed) or 0
     local desc = tostring(o.Description or o.Text or "?")
     local done = n > 0 and c >= n
-    toast.label:SetText(done and L["OBJECTIVE COMPLETE"] or L["QUEST PROGRESS"])
+    toast.label:SetText((done and L["OBJECTIVE COMPLETE"] or L["QUEST PROGRESS"])
+        .. (title and ("  |cffd8c8a0" .. title .. "|r") or ""))
     local sec = not done and EtaSeconds(entry)
-    toast.right:SetText(sec and (FormatTime(sec) .. L[" left"]) or (title or ""))
+    toast.right:SetText(sec and (FormatTime(sec) .. L[" left"]) or "")
     toast.text:SetText((done and "|cff33ff99" or "|cffffffff") .. desc .. "|r  |cffffd100" .. ("%d/%d"):format(c, n) .. "|r")
     local tex = o.Type == "item" and o.Id and GetItemIcon and GetItemIcon(o.Id)
     toast.icon:SetTexture(tex or "Interface\\Icons\\Ability_Hunter_SniperShot")
