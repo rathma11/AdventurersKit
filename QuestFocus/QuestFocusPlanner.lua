@@ -239,7 +239,9 @@ ShowToast = function(qid, title, o)
     local tex = o.Type == "item" and o.Id and GetItemIcon and GetItemIcon(o.Id)
     toast.icon:SetTexture(tex or "Interface\\Icons\\Ability_Hunter_SniperShot")
     toast:ClearAllPoints()
-    if NS.panel:IsShown() then
+    if NS.BuffAlertFrame and NS.BuffAlertFrame:IsShown() then
+        toast:SetPoint("BOTTOMRIGHT", NS.BuffAlertFrame, "TOPRIGHT", 0, 4)
+    elseif NS.panel:IsShown() then
         toast:SetPoint("BOTTOMRIGHT", NS.panel, "TOPRIGHT", 0, 4)
     else
         toast:SetPoint("TOP", UIParent, "TOP", 0, -160)

@@ -45,6 +45,8 @@ A small row of buttons under the panel:
 
 Each button shows the time left on its buff. When the buff is missing, or has less than 10 minutes left (you can change this), the button pulses red. You also get one warning on screen and in chat. The buff an item gives is learned the first time you use it from the button.
 
+**Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. The X hides that reminder until the buff is applied again. The popup disappears when combat starts, because the game does not allow it to stay up in combat.
+
 ## Commands
 | Command | What it does |
 |---|---|

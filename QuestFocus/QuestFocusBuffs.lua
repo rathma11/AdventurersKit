@@ -273,7 +273,157 @@ bar:SetScript("OnUpdate", function(_, dt)
     Anchor() -- a panel mozgott / atmeretezodott (csak harcon kivul tesz barmit)
 end)
 
+---------------------------------------------------------------------------
+-- Buff figyelmezteto kisablak (harcon kivul): ikon gombbal, amivel fel is rakhato
+---------------------------------------------------------------------------
+local alert = CreateFrame("Frame", "QuestFocusBuffAlert", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+alert:SetSize(250, 40)
+alert:SetFrameStrata("MEDIUM")
+alert:Hide()
+if alert.SetBackdrop then
+    alert:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    alert:SetBackdropColor(0.06, 0.03, 0.03, 0.93)
+    alert:SetBackdropBorderColor(1, 0.55, 0.25, 0.95)
+end
+local aAccent = alert:CreateTexture(nil, "ARTWORK")
+aAccent:SetPoint("TOPLEFT", 4, -4)
+aAccent:SetPoint("BOTTOMLEFT", 4, 4)
+aAccent:SetWidth(2)
+aAccent:SetColorTexture(1, 0.55, 0.25, 1)
+alert.label = alert:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+alert.label:SetPoint("TOPLEFT", 12, -7)
+alert.label:SetTextColor(1, 0.6, 0.3)
+alert.label:SetText(L["BUFF REMINDER"])
+alert.hint = alert:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+alert.hint:SetPoint("TOPRIGHT", -26, -7)
+alert.hint:SetText(L["click an icon to apply"])
+local aClose = CreateFrame("Button", nil, alert, "UIPanelCloseButton")
+aClose:SetSize(20, 20)
+aClose:SetPoint("TOPRIGHT", -2, -2)
+
+local dismissed = {}   -- slot.key -> true: bezarta, amig a buff fel nem kerul ujra
+local alertRows = {}
+local ROW_H = 26
+for i, slot in ipairs(SLOTS) do
+    local b = CreateFrame("Button", "QuestFocusBuffAlertBtn" .. i, alert, "SecureActionButtonTemplate")
+    b:SetSize(22, 22)
+    b:RegisterForClicks("AnyUp", "AnyDown")
+    b.slot = slot
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.2)
+    b.text = alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.text:SetPoint("LEFT", b, "RIGHT", 8, 0)
+    b.text:SetPoint("RIGHT", alert, "RIGHT", -10, 0)
+    b.text:SetJustifyH("LEFT")
+    b.text:SetWordWrap(false)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        if self.itemId then GameTooltip:SetItemByID(self.itemId) end
+        GameTooltip:AddLine(slot.key == "weapon" and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:HookScript("PreClick", function(self)
+        if self.itemId and slot.key ~= "weapon" then StartLearning(self.itemId) end
+    end)
+    b:Hide()
+    alertRows[i] = b
+end
+
+aClose:SetScript("OnClick", function()
+    for _, b in ipairs(alertRows) do if b:IsShown() then dismissed[b.slot.key] = true end end
+    if not InCombatLockdown() then alert:Hide() end
+end)
+
+local function PlaceAlert()
+    alert:ClearAllPoints()
+    local p = NS.panel
+    local r, t = p:GetRight(), p:GetTop()
+    if p:IsShown() and r and t then
+        alert:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", r, t + 4)
+    else
+        alert:SetPoint("TOP", UIParent, "TOP", 0, -120)
+    end
+end
+
+-- Mely slotok kernek figyelmet: van item, es a buff hianyzik / hamarosan lejar
+local lastAlertKey
+local function UpdateAlert(auras)
+    if InCombatLockdown() then return end
+    if QuestFocusDB.noBuffAlert or QuestFocusDB.noBuffBar or UnitIsDeadOrGhost("player") then
+        if alert:IsShown() then alert:Hide() end
+        lastAlertKey = nil
+        return
+    end
+    local limit = Minutes() * 60
+    local need, key = {}, ""
+    for _, slot in ipairs(SLOTS) do
+        local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
+        local left = Remaining(slot, id, auras)
+        if left and (left == math.huge or left >= limit) then dismissed[slot.key] = nil end
+        if id and GetItemCount(id) > 0 and not dismissed[slot.key]
+            and (not left or (left ~= math.huge and left < limit)) then
+            need[#need + 1] = { slot = slot, id = id, left = left }
+            key = key .. slot.key .. id .. ";"
+        end
+    end
+    if #need == 0 then
+        if alert:IsShown() then alert:Hide() end
+        lastAlertKey = nil
+        return
+    end
+    -- Szovegek mindig frissulnek, a secure resz csak ha valtozott a lista
+    if key ~= lastAlertKey then
+        lastAlertKey = key
+        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide() end
+        for i, n in ipairs(need) do
+            local b = alertRows[i]
+            b.slot, b.itemId = n.slot, n.id
+            b.icon:SetTexture(GetItemIcon(n.id))
+            b:SetAttribute("type", "macro")
+            b:SetAttribute("macrotext", n.slot.key == "weapon"
+                and ("/use item:%d\n/use 16"):format(n.id) or ("/use item:%d"):format(n.id))
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
+            b:Show()
+            b.text:Show()
+        end
+        alert:SetHeight(26 + #need * ROW_H)
+        PlaceAlert()
+        if not alert:IsShown() then
+            alert:Show()
+            if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then PlaySound(SOUNDKIT.RAID_WARNING) end
+        end
+    end
+    for i, n in ipairs(need) do
+        local name = GetItemInfo(n.id) or n.slot.label
+        local state = n.left and ((L["%s left"]):format(FmtLeft(n.left))) or ("|cffff4444" .. L["missing"] .. "|r")
+        alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
+    end
+end
+NS.BuffAlertFrame = alert
+
+local alertElapsed = 0
+local alertTicker = CreateFrame("Frame")
+alertTicker:SetScript("OnUpdate", function(_, dt)
+    alertElapsed = alertElapsed + dt
+    if alertElapsed < 1 then return end
+    alertElapsed = 0
+    UpdateAlert(HelpfulAuras())
+    if alert:IsShown() and not InCombatLockdown() then PlaceAlert() end
+end)
+
 local ev = CreateFrame("Frame")
+ev:RegisterEvent("PLAYER_REGEN_DISABLED")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("BAG_UPDATE_DELAYED")
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -287,7 +437,11 @@ local function Soon()
     C_Timer.After(0.5, function() pending = false; Rebuild() end)
 end
 ev:SetScript("OnEvent", function(_, event, unit)
-    if event == "UNIT_AURA" then
+    if event == "PLAYER_REGEN_DISABLED" then
+        -- meg a lockdown elott: a secure gombos ablakot harcban nem lehetne eltuntetni
+        if alert:IsShown() then alert:Hide() end
+        lastAlertKey = nil
+    elseif event == "UNIT_AURA" then
         if unit ~= "player" then return end
         CheckLearning()
         Soon()
@@ -397,8 +551,15 @@ for i, slot in ipairs(SLOTS) do
     last = s
 end
 
+local cbAlert = NS.OptCheck(L["Reminder popup out of combat"],
+    L["When a buff is missing or about to run out, a small popup above the panel shows the item; click its icon to apply it. "]
+    .. L["The X hides it until that buff is applied again."],
+    function() return not QuestFocusDB.noBuffAlert end,
+    function(v) QuestFocusDB.noBuffAlert = not v; wipe(dismissed); lastAlertKey = nil end, page)
+cbAlert:SetPoint("TOPLEFT", last, "BOTTOMLEFT", -2, -14)
+
 page:SetScript("OnShow", function()
-    cbBar.refresh(); cbWarn.refresh()
+    cbBar.refresh(); cbWarn.refresh(); cbAlert.refresh()
     minBox:SetText(Minutes())
     for _, s in ipairs(slotUI) do s.refresh() end
 end)
