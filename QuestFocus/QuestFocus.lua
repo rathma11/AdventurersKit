@@ -409,7 +409,15 @@ local function BuildMacroBody(objectives, onlyIndex)
     if not turnIn and QuestFocusDB and QuestFocusDB.useSpell and spell and spell ~= "" then
         tail[#tail + 1] = "/cast [@target,harm,nodead] " .. spell
     end
-    if usePing then tail[#tail + 1] = PING_LINE end
+    -- Pingelni csak uj celpontra: ha a kivalasztott mob mar a targeted (vagy harcban a
+    -- mostani target jo quest mob), a ping kimarad, igy a macro spamelese nem pingel ujra
+    local onTarget
+    if pick and pick ~= "busy" then
+        onTarget = UnitIsUnit(pick, "target")
+    elseif not pick then
+        onTarget = GoodQuestUnit("target")
+    end
+    if usePing and not onTarget then tail[#tail + 1] = PING_LINE end
     local lines, seen = { CLEAR }, {}
     local len = #CLEAR + 1
     for _, t in ipairs(tail) do len = len + #t + 1 end
@@ -1202,6 +1210,8 @@ QF:SetScript("OnEvent", function(self, event, arg1)
             and not UnitIsDead("target") and UIErrorsFrame then
             UIErrorsFrame:AddMessage(L["QuestFocus: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
+        -- Target valtas: a ping sor ki/be (uj celpontra pingel, a mostanira nem)
+        if state.questId and not InCombatLockdown() then UpdateMacro() end
         return
     end
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then

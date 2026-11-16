@@ -62,7 +62,7 @@ Each button shows the time left on its buff. When the buff is missing, or about 
 | `/qf all` | macro for all remaining mobs |
 | `/qf mark` | place the marker again at the nearest spot |
 | `/qf arrow` | toggle the built-in arrow (not shown when TomTom is installed) |
-| `/qf ping` | toggle pinging the target in the macro (on by default; party members see it) |
+| `/qf ping` | toggle pinging the target in the macro (on by default; party members see it). It only pings a new target: spamming the macro on the mob you already have targeted does not ping again |
 | `/qf icon <iconname>` | custom macro icon (e.g. `/qf icon inv_misc_map_01`); `/qf icon` = back to automatic |
 | `/qf unmark` | remove the marker (TomTom + map pin + arrow) |
 | `/qf clear` | clear the selection and the marker |
