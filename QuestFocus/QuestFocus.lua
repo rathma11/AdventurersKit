@@ -671,6 +671,45 @@ panel.footer:SetWidth(260)
 
 panel.lines = {}
 
+-- A panel alja: elo allapot (kit targetel a macro, mennyire van messze a marker)
+local function MarkerDistance()
+    local w = state.waypoint
+    if not (w and w.wx) then return end
+    local pc, px, py = PlayerWorldPos()
+    if not pc or pc ~= w.wc then return end
+    return math.floor(math.sqrt((px - w.wx) ^ 2 + (py - w.wy) ^ 2) + 0.5)
+end
+
+local function FooterText()
+    local dist = MarkerDistance()
+    local distTxt = dist and ("|cff99ccff%d yd|r"):format(dist) or nil
+    local objs = state.objectives or {}
+    if objs[1] and objs[1].turnIn then
+        local name = objs[1].sources[1] and objs[1].sources[1].name or "?"
+        return ("|cffffff00Leadás:|r %s%s"):format(name, distTxt and (" - " .. distTxt) or "")
+    end
+    if (state.macroCount or 0) == 0 then
+        return "Nincs targetelhető mob (item / object gyűjtés)" .. (distTxt and (" - " .. distTxt) or "")
+    end
+    local u = state.pick
+    if u == "busy" then
+        return "|cffff9933A közeli mobok foglaltak|r (tapolt / halott)"
+    elseif u and UnitExists(u) then
+        return ("|cff33ff99Cél:|r %s"):format(UnitName(u) or "?")
+    elseif InCombatLockdown() then
+        return "Harcban: név szerint targetel"
+    end
+    return "Nincs mob a közelben" .. (distTxt and (" - marker: " .. distTxt) or "")
+end
+
+local footerElapsed = 0
+panel:HookScript("OnUpdate", function(_, dt)
+    footerElapsed = footerElapsed + dt
+    if footerElapsed < 0.5 then return end
+    footerElapsed = 0
+    if state.objectives and #state.objectives > 0 then panel.footer:SetText(FooterText()) end
+end)
+
 local SelectObjective -- forward
 
 local function GetLine(i)
@@ -738,10 +777,8 @@ local function Panel_Update()
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
     if #objs == 0 then
         panel.footer:SetText(QuestieAvailable() and "Nincs objective adat ehhez a questhez." or "Questie nincs betöltve.")
-    elseif state.macroCount > 0 then
-        panel.footer:SetText(("QFocus macro: %d mob"):format(state.macroCount))
     else
-        panel.footer:SetText("QFocus macro: nincs targetelhető mob")
+        panel.footer:SetText(FooterText())
     end
     panel.footer:ClearAllPoints()
     panel.footer:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y - 4)
