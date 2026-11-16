@@ -1499,256 +1499,12 @@ OpenOptions = function()
 end
 
 ---------------------------------------------------------------------------
--- Quest itemek lista a taska mellett (Bagnon inventory, vagy Blizzard taska)
+-- Kozos nevter a QuestFocusBags.lua szamara
 ---------------------------------------------------------------------------
-local ToggleBagList, RefreshBagList
-do
-    local QUEST_CLASS = (Enum and Enum.ItemClass and Enum.ItemClass.Questitem) or 12
-    local MAX_ROWS = 14
-    local list = CreateFrame("Frame", "QuestFocusBagList", UIParent, "BackdropTemplate")
-    list:SetSize(250, 40)
-    list:SetFrameStrata("HIGH")
-    list:SetClampedToScreen(true)
-    list:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 14,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    list:SetBackdropColor(0, 0, 0, 0.85)
-    list:Hide()
-    list.title = list:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    list.title:SetPoint("TOPLEFT", 10, -8)
-    list.title:SetText("Quest itemek")
-    list.rows = {}
-    local anchorFrame
-
-    local function ContainerSlots(bag)
-        if C_Container and C_Container.GetContainerNumSlots then return C_Container.GetContainerNumSlots(bag) end
-        return GetContainerNumSlots and GetContainerNumSlots(bag) or 0
-    end
-
-    local function ContainerItem(bag, slot)
-        if C_Container and C_Container.GetContainerItemInfo then
-            local i = C_Container.GetContainerItemInfo(bag, slot)
-            if i then return i.itemID, i.stackCount, i.iconFileID, i.hyperlink end
-        elseif GetContainerItemInfo then
-            local tex, count, _, _, _, _, link, _, _, id = GetContainerItemInfo(bag, slot)
-            return id, count, tex, link
-        end
-    end
-
-    local function ContainerQuestInfo(bag, slot)
-        if C_Container and C_Container.GetContainerItemQuestInfo then
-            local i = C_Container.GetContainerItemQuestInfo(bag, slot)
-            if i then return i.isQuestItem, i.questID, i.isActive end
-        elseif GetContainerItemQuestInfo then
-            return GetContainerItemQuestInfo(bag, slot)
-        end
-    end
-
-    -- itemId -> { {qid, title, text}, ... } a quest log alapjan (Questie objective + hasznalando itemek)
-    local function QuestNeeds()
-        local needs = {}
-        local function add(itemId, qid, title, text)
-            needs[itemId] = needs[itemId] or {}
-            table.insert(needs[itemId], { qid = qid, title = title, text = text })
-        end
-        for i = 1, NumLogEntries() do
-            local title, isHeader, qid, done = GetLogEntry(i)
-            if not isHeader and qid and qid > 0 then
-                local q = GetQuestieQuest(qid)
-                if q then
-                    for _, o in pairs(q.Objectives or {}) do
-                        if type(o) == "table" and o.Type == "item" and o.Id then
-                            local prog = (type(o.Collected) == "number" and type(o.Needed) == "number")
-                                and ("%d/%d"):format(o.Collected, o.Needed) or nil
-                            add(o.Id, qid, title, done and "kész, leadni" or (prog or "kell"))
-                        end
-                    end
-                    local used = {}
-                    for _, id in pairs(q.requiredSourceItems or {}) do used[id] = true end
-                    if q.sourceItemId and q.sourceItemId > 0 then used[q.sourceItemId] = true end
-                    for id in pairs(used) do
-                        if not needs[id] then add(id, qid, title, "használd / vidd") end
-                    end
-                end
-            end
-        end
-        return needs
-    end
-
-    local function GetRow(i)
-        local r = list.rows[i]
-        if r then return r end
-        r = CreateFrame("Button", nil, list)
-        r:SetSize(234, 30)
-        r.icon = r:CreateTexture(nil, "ARTWORK")
-        r.icon:SetSize(24, 24)
-        r.icon:SetPoint("LEFT", 2, 0)
-        r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 6, 0)
-        r.name:SetWidth(200)
-        r.name:SetJustifyH("LEFT")
-        r.name:SetWordWrap(false)
-        r.sub = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
-        r.sub:SetWidth(200)
-        r.sub:SetJustifyH("LEFT")
-        r.sub:SetWordWrap(false)
-        local hl = r:CreateTexture(nil, "HIGHLIGHT")
-        hl:SetAllPoints()
-        hl:SetColorTexture(1, 1, 1, 0.08)
-        r:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-            if self.bag then GameTooltip:SetBagItem(self.bag, self.slot) end
-            for _, n in ipairs(self.needs or {}) do
-                GameTooltip:AddLine(("%s: %s"):format(n.title or "?", n.text), 1, 0.82, 0, true)
-            end
-            if self.needs and self.needs[1] then
-                GameTooltip:AddLine("Klikk: quest kijelölése (QFocus marker + macro)", 0.5, 0.5, 0.5)
-            end
-            GameTooltip:Show()
-        end)
-        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        r:SetScript("OnClick", function(self)
-            local n = self.needs and self.needs[1]
-            if n then
-                local title, done = FindQuestInLog(n.qid)
-                SelectQuest(n.qid, title or n.title, done, true)
-            end
-        end)
-        list.rows[i] = r
-        return r
-    end
-
-    RefreshBagList = function()
-        if not list:IsShown() and not (anchorFrame and anchorFrame:IsShown()) then return end
-        local needs = QuestNeeds()
-        local items, seen = {}, {}
-        for bag = 0, (NUM_BAG_SLOTS or 4) do
-            for slot = 1, ContainerSlots(bag) do
-                local id, count, icon, link = ContainerItem(bag, slot)
-                if id then
-                    local isQ, startQ, active = ContainerQuestInfo(bag, slot)
-                    local classID = select(6, GetItemInfoInstant(id))
-                    local need = needs[id]
-                    local starts = startQ and startQ > 0 and not active
-                    if need or starts or isQ or classID == QUEST_CLASS then
-                        local e = seen[id]
-                        if e then
-                            e.count = e.count + (count or 1)
-                        else
-                            e = { id = id, count = count or 1, icon = icon, link = link, bag = bag, slot = slot,
-                                needs = need, starts = starts }
-                            seen[id] = e
-                            items[#items + 1] = e
-                        end
-                    end
-                end
-            end
-        end
-        -- Sorrend: aktiv questhez kell > questet indit > felesleges
-        local function rank(e) return e.needs and 1 or (e.starts and 2 or 3) end
-        table.sort(items, function(a, b)
-            if rank(a) ~= rank(b) then return rank(a) < rank(b) end
-            return (a.needs and a.needs[1].title or "") < (b.needs and b.needs[1].title or "")
-        end)
-
-        local y = -26
-        for i, e in ipairs(items) do
-            if i > MAX_ROWS then break end
-            local r = GetRow(i)
-            r.bag, r.slot, r.needs = e.bag, e.slot, e.needs
-            r.icon:SetTexture(e.icon)
-            local name = (e.link and e.link:match("%[(.-)%]")) or GetItemInfo(e.id) or ("item " .. e.id)
-            r.name:SetText(e.count > 1 and ("%s |cffaaaaaax%d|r"):format(name, e.count) or name)
-            if e.needs then
-                local n = e.needs[1]
-                local more = #e.needs > 1 and (" |cffaaaaaa+%d|r"):format(#e.needs - 1) or ""
-                r.sub:SetText(("%s |cffffffff%s|r%s"):format(n.title or "?", n.text, more))
-                r.sub:SetTextColor(1, 0.82, 0)
-            elseif e.starts then
-                r.sub:SetText("Questet indít! (jobb klikk a táskában)")
-                r.sub:SetTextColor(0.3, 1, 0.3)
-            else
-                r.sub:SetText("Nincs hozzá aktív quest (eladható / eldobható?)")
-                r.sub:SetTextColor(0.6, 0.6, 0.6)
-            end
-            r:ClearAllPoints()
-            r:SetPoint("TOPLEFT", list, "TOPLEFT", 8, y)
-            r:Show()
-            y = y - 32
-        end
-        local shown = math.min(#items, MAX_ROWS)
-        for i = shown + 1, #list.rows do list.rows[i]:Hide() end
-        if #items > MAX_ROWS then
-            list.title:SetText(("Quest itemek (%d, első %d)"):format(#items, MAX_ROWS))
-        else
-            list.title:SetText(("Quest itemek (%d)"):format(#items))
-        end
-        list:SetHeight(-y + 8)
-        if #items == 0 or QuestFocusDB.noBagList then list:Hide() return end
-        if anchorFrame and anchorFrame:IsShown() then
-            list:ClearAllPoints()
-            list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
-            list:Show()
-        end
-    end
-
-    local function Attach(frame)
-        if not frame or frame.qfBagHooked then return end
-        frame.qfBagHooked = true
-        frame:HookScript("OnShow", function(self) anchorFrame = self; RefreshBagList() end)
-        frame:HookScript("OnHide", function(self) if anchorFrame == self then list:Hide() end end)
-        if frame:IsShown() then anchorFrame = frame; RefreshBagList() end
-    end
-
-    local function HookBags()
-        local B = _G.Bagnon or _G.BagBrother
-        if B and B.Frames and B.Frames.Show then
-            hooksecurefunc(B.Frames, "Show", function(self, id)
-                if id == "inventory" then
-                    local f = self:Get(id)
-                    if f and f.HookScript then Attach(f) end
-                end
-            end)
-            local f = B.Frames:Get("inventory")
-            if f and f.HookScript then Attach(f) end
-        end
-        -- Blizzard taskak (ha nincs Bagnon, vagy az ki van kapcsolva)
-        for _, name in ipairs({ "ContainerFrameCombinedBags", "ContainerFrame1" }) do
-            if _G[name] then Attach(_G[name]) end
-        end
-    end
-
-    local ev = CreateFrame("Frame")
-    ev:RegisterEvent("PLAYER_LOGIN")
-    ev:RegisterEvent("BAG_UPDATE_DELAYED")
-    ev:RegisterEvent("QUEST_LOG_UPDATE")
-    local pending
-    ev:SetScript("OnEvent", function(_, event)
-        if event == "PLAYER_LOGIN" then HookBags() return end
-        if pending then return end
-        pending = true
-        C_Timer.After(0.3, function() pending = false; RefreshBagList() end)
-    end)
-
-    ToggleBagList = function()
-        QuestFocusDB.noBagList = not QuestFocusDB.noBagList
-        if QuestFocusDB.noBagList then list:Hide() else RefreshBagList() end
-        Print("Quest item lista a táska mellett: %s", QuestFocusDB.noBagList and "ki" or "be")
-    end
-
-    -- Kapcsolo a beallitasokban
-    local cbBag = OptCheck("Quest item lista a táska mellett",
-        "Ha nyitva a táska (Bagnon vagy Blizzard), mellette listázza a quest itemeket: melyik questhez kellenek, "
-        .. "melyik indít questet, és melyik felesleges. Klikk egy sorra: a quest kijelölése.",
-        function() return not QuestFocusDB.noBagList end,
-        function(v) QuestFocusDB.noBagList = not v; if v then RefreshBagList() else list:Hide() end end)
-    cbBag:SetPoint("TOPLEFT", optNote, "BOTTOMLEFT", -2, -12)
-    opt:HookScript("OnShow", function() cbBag.refresh() end)
-end
+local NS = select(2, ...)
+NS.Print, NS.state, NS.GetQuestieQuest = Print, state, GetQuestieQuest
+NS.NumLogEntries, NS.GetLogEntry, NS.FindQuestInLog = NumLogEntries, GetLogEntry, FindQuestInLog
+NS.SelectQuest, NS.OptCheck, NS.opt, NS.optNote, NS.panel = SelectQuest, OptCheck, opt, optNote, panel
 
 SLASH_QUESTFOCUS1 = "/qf"
 SLASH_QUESTFOCUS2 = "/questfocus"
@@ -1762,7 +1518,9 @@ SlashCmdList.QUESTFOCUS = function(msg)
     elseif msg == "zone" then
         ToggleZoneFocus()
     elseif msg == "bags" then
-        ToggleBagList()
+        if NS.ToggleBagList then NS.ToggleBagList() end
+    elseif msg == "junk" then
+        if NS.DiscardLeftovers then NS.DiscardLeftovers() end
     elseif msg == "minimap" then
         QuestFocusDB.hideMinimap = not QuestFocusDB.hideMinimap
         UpdateMinimapButton()
@@ -1831,6 +1589,7 @@ SlashCmdList.QUESTFOCUS = function(msg)
         Print("  /qf zone - zóna fókusz ki/be (csak az aktuális zóna questjei a trackerben)")
         Print("  /qf minimap - minimap gomb ki/be")
         Print("  /qf bags - quest item lista a táska mellett ki/be")
+        Print("  /qf junk - nem eladható, felesleges quest itemek eldobása (egyenként rákérdez)")
         Print("  /qf debug - diagnosztika a chatbe")
         Print("  /qf spell <név> - tap spell a macroba; /qf spell - törlés; /qf spell off - kikapcsolás")
         Print("  /qf next - következő objective (marker + macro)")

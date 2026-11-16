@@ -6,3 +6,4 @@
 ## SavedVariables: QuestFocusDB
 
 QuestFocus.lua
+QuestFocusBags.lua

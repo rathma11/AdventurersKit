@@ -1,0 +1,607 @@
+-- QuestFocus: quest itemek a taskaban
+--  * lista a taska mellett (melyik questhez kell, mennyi felesleges, mi van a bankban)
+--  * Bagnon slotok szinezese (kell / kesz / questet indit / felesleges)
+--  * hasznalhato quest item gomb a QuestFocus panel mellett (+ billentyu)
+--  * nem eladhato, felesleges quest itemek eldobasa (egyenkent rakerdez)
+
+local _, NS = ...
+local Print, state = NS.Print, NS.state
+
+local QUEST_CLASS = (Enum and Enum.ItemClass and Enum.ItemClass.Questitem) or 12
+local MAX_ROWS = 14
+local COLORS = {
+    need     = { 1, 0.82, 0 },     -- aktiv questhez kell
+    done     = { 0.2, 1, 0.2 },    -- megvan / kesz quest, leadashoz kell
+    starts   = { 0.3, 0.9, 1 },    -- questet indit
+    leftover = { 0.55, 0.55, 0.55 }, -- nincs hozza aktiv quest
+}
+
+BINDING_HEADER_QUESTFOCUS = "QuestFocus"
+_G["BINDING_NAME_CLICK QuestFocusUseItem:LeftButton"] = "Kijelölt quest itemjének használata"
+
+---------------------------------------------------------------------------
+-- Container API (classic es modern)
+---------------------------------------------------------------------------
+local function ContainerSlots(bag)
+    if C_Container and C_Container.GetContainerNumSlots then return C_Container.GetContainerNumSlots(bag) end
+    return GetContainerNumSlots and GetContainerNumSlots(bag) or 0
+end
+
+-- itemID, count, icon, link, noValue
+local function ContainerItem(bag, slot)
+    if C_Container and C_Container.GetContainerItemInfo then
+        local i = C_Container.GetContainerItemInfo(bag, slot)
+        if i then return i.itemID, i.stackCount, i.iconFileID, i.hyperlink, i.hasNoValue end
+    elseif GetContainerItemInfo then
+        local tex, count, _, _, _, _, link, _, noValue, id = GetContainerItemInfo(bag, slot)
+        return id, count, tex, link, noValue
+    end
+end
+
+local function ContainerQuestInfo(bag, slot)
+    if C_Container and C_Container.GetContainerItemQuestInfo then
+        local i = C_Container.GetContainerItemQuestInfo(bag, slot)
+        if i then return i.isQuestItem, i.questID, i.isActive end
+    elseif GetContainerItemQuestInfo then
+        return GetContainerItemQuestInfo(bag, slot)
+    end
+end
+
+local function PickupItem(bag, slot)
+    if C_Container and C_Container.PickupContainerItem then C_Container.PickupContainerItem(bag, slot)
+    elseif PickupContainerItem then PickupContainerItem(bag, slot) end
+end
+
+local function SellPriceZero(id, noValue)
+    if noValue ~= nil then return noValue and true or false end
+    local price = select(11, GetItemInfo(id))
+    return price == 0
+end
+
+local function Bags()
+    local B = _G.BagBrother
+    if not (B and B.Frames) then B = _G.Bagnon end
+    if B and B.Frames then return B end
+end
+
+---------------------------------------------------------------------------
+-- Adatgyujtes
+---------------------------------------------------------------------------
+-- itemId -> { {qid, title, text, needed, done, use}, ... }
+local function QuestNeeds()
+    local needs = {}
+    local function add(itemId, e)
+        needs[itemId] = needs[itemId] or {}
+        table.insert(needs[itemId], e)
+    end
+    for i = 1, NS.NumLogEntries() do
+        local title, isHeader, qid, done = NS.GetLogEntry(i)
+        if not isHeader and qid and qid > 0 then
+            local q = NS.GetQuestieQuest(qid)
+            if q then
+                local objItems = {}
+                for _, o in pairs(q.Objectives or {}) do
+                    if type(o) == "table" and o.Type == "item" and o.Id then
+                        objItems[o.Id] = true
+                        add(o.Id, {
+                            qid = qid, title = title, done = done or o.Completed,
+                            collected = tonumber(o.Collected), needed = tonumber(o.Needed),
+                        })
+                    end
+                end
+                local used = {}
+                for _, id in pairs(q.requiredSourceItems or {}) do used[id] = true end
+                if tonumber(q.sourceItemId) and q.sourceItemId > 0 then used[q.sourceItemId] = true end
+                for id in pairs(used) do
+                    if not objItems[id] then add(id, { qid = qid, title = title, done = done, use = true }) end
+                end
+            end
+        end
+    end
+    return needs
+end
+
+-- BagBrother cache: a bank tartalma (akkor is, ha nem vagy a banknal)
+local function BankCounts()
+    local B = Bags()
+    local cache = B and B.player and B.player.cache
+    local counts = {}
+    if type(cache) ~= "table" then return counts end
+    local lastInv = B.NumBags or NUM_BAG_SLOTS or 4
+    for bag, data in pairs(cache) do
+        if type(bag) == "number" and (bag < 0 or bag > lastInv) and type(data) == "table"
+            and type(data.items) == "table" and bag ~= -2 then -- -2: kulcstarto
+            for _, str in pairs(data.items) do
+                if type(str) == "string" then
+                    local id = tonumber(str:match("^(%d+)"))
+                    if id then counts[id] = (counts[id] or 0) + (tonumber(str:match(";(%d+)$")) or 1) end
+                end
+            end
+        end
+    end
+    return counts
+end
+
+local scan = { items = {}, status = {}, leftovers = {}, bankOnly = {} }
+
+local function Scan()
+    local needs, bank = QuestNeeds(), BankCounts()
+    local items, seen, status, leftovers = {}, {}, {}, {}
+    for bag = 0, (NUM_BAG_SLOTS or 4) do
+        for slot = 1, ContainerSlots(bag) do
+            local id, count, icon, link, noValue = ContainerItem(bag, slot)
+            if id then
+                local isQ, startQ, active = ContainerQuestInfo(bag, slot)
+                local classID = select(6, GetItemInfoInstant(id))
+                local need = needs[id]
+                local starts = startQ and startQ > 0 and not active
+                if need or starts or isQ or classID == QUEST_CLASS then
+                    local e = seen[id]
+                    if e then
+                        e.count = e.count + (count or 1)
+                        e.slots[#e.slots + 1] = { bag, slot }
+                    else
+                        e = { id = id, count = count or 1, icon = icon, link = link, bag = bag, slot = slot,
+                            slots = { { bag, slot } }, needs = need, starts = starts,
+                            noValue = SellPriceZero(id, noValue), bank = bank[id] }
+                        seen[id] = e
+                        items[#items + 1] = e
+                    end
+                end
+            end
+        end
+    end
+    for _, e in ipairs(items) do
+        if e.needs then
+            local allDone = true
+            for _, n in ipairs(e.needs) do if not n.done then allDone = false end end
+            e.kind = allDone and "done" or "need"
+            local n = e.needs[1]
+            if n.needed and e.count > n.needed then e.surplus = e.count - n.needed end
+        elseif e.starts then
+            e.kind = "starts"
+        else
+            e.kind = "leftover"
+            if e.noValue then leftovers[#leftovers + 1] = e end
+        end
+        status[e.id] = e.kind
+    end
+    -- Bankban levo, de aktiv questhez kello itemek, amik nincsenek a taskaban
+    local bankOnly = {}
+    for id, list in pairs(needs) do
+        if not seen[id] and bank[id] then
+            local n = list[1]
+            if not n.done then
+                bankOnly[#bankOnly + 1] = { id = id, count = bank[id], needs = list, kind = "bank",
+                    icon = select(5, GetItemInfoInstant(id)) }
+            end
+        end
+    end
+    local function rank(e) return e.kind == "need" and 1 or e.kind == "done" and 2 or e.kind == "starts" and 3 or 4 end
+    table.sort(items, function(a, b)
+        if rank(a) ~= rank(b) then return rank(a) < rank(b) end
+        return (a.needs and a.needs[1].title or "") < (b.needs and b.needs[1].title or "")
+    end)
+    scan.items, scan.status, scan.leftovers, scan.bankOnly = items, status, leftovers, bankOnly
+    return scan
+end
+
+---------------------------------------------------------------------------
+-- Bagnon slotok szinezese
+---------------------------------------------------------------------------
+local lastStatusKey
+local function StatusKey(status)
+    local t = {}
+    for id, k in pairs(status) do t[#t + 1] = id .. k end
+    table.sort(t)
+    return table.concat(t, ",")
+end
+
+local function HookBagnonItems()
+    local B = Bags()
+    if not (B and B.Item and B.Item.UpdateBorder) or B.qfItemHooked then return end
+    B.qfItemHooked = true
+    hooksecurefunc(B.Item, "UpdateBorder", function(self)
+        if QuestFocusDB.noBagGlow then return end
+        local id = self.info and self.info.itemID
+        local kind = id and self.searched and scan.status[id]
+        if not kind then return end
+        local c = COLORS[kind]
+        if self.IconBorder then
+            self.IconBorder:SetVertexColor(c[1], c[2], c[3])
+            self.IconBorder:Show()
+        end
+        if self.IconGlow then
+            self.IconGlow:SetVertexColor(c[1], c[2], c[3], (B.sets and B.sets.glowAlpha) or 0.5)
+            self.IconGlow:Show()
+        end
+    end)
+end
+
+local function MaybeRefreshBagnon()
+    local key = StatusKey(scan.status)
+    if key == lastStatusKey then return end
+    lastStatusKey = key
+    local B = Bags()
+    if B and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+end
+
+---------------------------------------------------------------------------
+-- Lista a taska mellett
+---------------------------------------------------------------------------
+local list = CreateFrame("Frame", "QuestFocusBagList", UIParent, "BackdropTemplate")
+list:SetSize(260, 40)
+list:SetFrameStrata("HIGH")
+list:SetClampedToScreen(true)
+list:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+})
+list:SetBackdropColor(0, 0, 0, 0.85)
+list:Hide()
+list.title = list:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+list.title:SetPoint("TOPLEFT", 10, -8)
+list.rows = {}
+local anchorFrame
+
+local junkBtn = CreateFrame("Button", nil, list, "UIPanelButtonTemplate")
+junkBtn:SetSize(240, 20)
+junkBtn:Hide()
+
+local function GetRow(i)
+    local r = list.rows[i]
+    if r then return r end
+    r = CreateFrame("Button", nil, list)
+    r:SetSize(244, 30)
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(24, 24)
+    r.icon:SetPoint("LEFT", 2, 0)
+    r.border = r:CreateTexture(nil, "BACKGROUND")
+    r.border:SetPoint("TOPLEFT", r.icon, -2, 2)
+    r.border:SetPoint("BOTTOMRIGHT", r.icon, 2, -2)
+    r.border:SetColorTexture(1, 1, 1, 0)
+    r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 6, 0)
+    r.name:SetWidth(210)
+    r.name:SetJustifyH("LEFT")
+    r.name:SetWordWrap(false)
+    r.sub = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
+    r.sub:SetWidth(210)
+    r.sub:SetJustifyH("LEFT")
+    r.sub:SetWordWrap(false)
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    r:SetScript("OnEnter", function(self)
+        local e = self.entry
+        if not e then return end
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        if e.bag then GameTooltip:SetBagItem(e.bag, e.slot) else GameTooltip:SetItemByID(e.id) end
+        for _, n in ipairs(e.needs or {}) do
+            local prog = n.needed and (" %d/%d"):format(n.collected or 0, n.needed) or ""
+            GameTooltip:AddLine(("%s%s%s"):format(n.title or "?", prog, n.done and " (kész)" or ""), 1, 0.82, 0, true)
+        end
+        if e.surplus then GameTooltip:AddLine(("%d db felesleges (többet hordasz, mint kell)"):format(e.surplus), 0.6, 0.6, 0.6) end
+        if e.bank then GameTooltip:AddLine(("A bankban is van: %d db"):format(e.bank), 0.6, 0.8, 1) end
+        if e.kind == "leftover" then
+            GameTooltip:AddLine(e.noValue and "Nem eladható: a /qf junk eldobhatja" or "Eladható a vendornál", 0.6, 0.6, 0.6)
+        end
+        if e.needs then GameTooltip:AddLine("Klikk: quest kijelölése (QFocus marker + macro)", 0.5, 0.5, 0.5) end
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r:SetScript("OnClick", function(self)
+        local n = self.entry and self.entry.needs and self.entry.needs[1]
+        if n then
+            local title, done = NS.FindQuestInLog(n.qid)
+            NS.SelectQuest(n.qid, title or n.title, done, true)
+        end
+    end)
+    list.rows[i] = r
+    return r
+end
+
+local function RowText(e)
+    local c = COLORS[e.kind] or COLORS.need
+    if e.kind == "bank" then
+        local n = e.needs[1]
+        return ("|cff99ccffBANKBAN|r %s"):format(n.title or "?"), c
+    end
+    if e.needs then
+        local n = e.needs[1]
+        local prog = n.use and "használd / vidd" or (n.done and "kész, leadni")
+            or (n.needed and ("%d/%d"):format(n.collected or 0, n.needed)) or "kell"
+        local extra = ""
+        if e.surplus then extra = extra .. (" |cffaaaaaa+%d felesleges|r"):format(e.surplus) end
+        if #e.needs > 1 then extra = extra .. (" |cffaaaaaa(+%d quest)|r"):format(#e.needs - 1) end
+        return ("%s |cffffffff%s|r%s"):format(n.title or "?", prog, extra), COLORS.need
+    end
+    if e.kind == "starts" then return "Questet indít! (jobb klikk a táskában)", c end
+    return e.noValue and "Nincs aktív quest, nem eladható (/qf junk)" or "Nincs aktív quest, eladható", c
+end
+
+local function RefreshBagList()
+    Scan()
+    MaybeRefreshBagnon()
+    if not (anchorFrame and anchorFrame:IsShown()) or QuestFocusDB.noBagList then list:Hide() return end
+
+    local rows = {}
+    for _, e in ipairs(scan.items) do rows[#rows + 1] = e end
+    for _, e in ipairs(scan.bankOnly) do rows[#rows + 1] = e end
+
+    local y = -26
+    for i, e in ipairs(rows) do
+        if i > MAX_ROWS then break end
+        local r = GetRow(i)
+        r.entry = e
+        r.icon:SetTexture(e.icon or 134400)
+        r.icon:SetDesaturated(e.kind == "bank")
+        local c = COLORS[e.kind] or COLORS.need
+        r.border:SetColorTexture(c[1], c[2], c[3], 0.9)
+        local name = (e.link and e.link:match("%[(.-)%]")) or GetItemInfo(e.id) or ("item " .. e.id)
+        local cnt = e.count and e.count > 1 and (" |cffaaaaaax%d|r"):format(e.count) or ""
+        local bank = (e.bank and e.kind ~= "bank") and (" |cff99ccff+%d bank|r"):format(e.bank) or ""
+        r.name:SetText(name .. cnt .. bank)
+        local text, col = RowText(e)
+        r.sub:SetText(text)
+        r.sub:SetTextColor(col[1], col[2], col[3])
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", list, "TOPLEFT", 8, y)
+        r:Show()
+        y = y - 32
+    end
+    local shown = math.min(#rows, MAX_ROWS)
+    for i = shown + 1, #list.rows do list.rows[i]:Hide() end
+    list.title:SetText(#rows > MAX_ROWS and ("Quest itemek (%d, első %d)"):format(#rows, MAX_ROWS)
+        or ("Quest itemek (%d)"):format(#rows))
+
+    if #scan.leftovers > 0 then
+        junkBtn:SetText(("Felesleges, nem eladható eldobása (%d)"):format(#scan.leftovers))
+        junkBtn:ClearAllPoints()
+        junkBtn:SetPoint("TOPLEFT", list, "TOPLEFT", 10, y - 2)
+        junkBtn:Show()
+        y = y - 26
+    else
+        junkBtn:Hide()
+    end
+
+    list:SetHeight(-y + 8)
+    if #rows == 0 then list:Hide() return end
+    list:ClearAllPoints()
+    list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
+    list:Show()
+end
+
+---------------------------------------------------------------------------
+-- Felesleges, nem eladhato quest itemek eldobasa (egyenkent megerositessel)
+---------------------------------------------------------------------------
+local junkQueue
+local function NextJunk()
+    if not junkQueue or #junkQueue == 0 then
+        junkQueue = nil
+        return
+    end
+    local e = table.remove(junkQueue, 1)
+    local name = (e.link and e.link:match("%[(.-)%]")) or GetItemInfo(e.id) or ("item " .. e.id)
+    StaticPopup_Show("QUESTFOCUS_DISCARD", ("%s x%d"):format(name, e.count), nil, e)
+end
+
+StaticPopupDialogs["QUESTFOCUS_DISCARD"] = {
+    text = "Eldobod ezt a quest itemet?\n\n|cffffffff%s|r\n\nNincs hozzá aktív quest és nem eladható. Ha egy még fel nem vett "
+        .. "quest kéri majd, újra kell szerezned.",
+    button1 = "Eldobás",
+    button2 = "Kihagyás",
+    OnAccept = function(_, e)
+        if InCombatLockdown() then Print("Harcban nem dobok el semmit.") return end
+        for _, s in ipairs(e.slots) do
+            local id = ContainerItem(s[1], s[2])
+            if id == e.id then -- ellenorzes: meg mindig ugyanaz az item van ott
+                ClearCursor()
+                PickupItem(s[1], s[2])
+                if CursorHasItem() then DeleteCursorItem() end
+            end
+        end
+        Print("Eldobva: %s", e.link or e.id)
+        C_Timer.After(0.3, NextJunk)
+    end,
+    OnCancel = function(_, _, reason)
+        if reason == "clicked" then C_Timer.After(0.1, NextJunk) else junkQueue = nil end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+local function DiscardLeftovers()
+    Scan()
+    if #scan.leftovers == 0 then Print("Nincs felesleges, nem eladható quest item.") return end
+    junkQueue = {}
+    for _, e in ipairs(scan.leftovers) do junkQueue[#junkQueue + 1] = e end
+    Print("%d felesleges quest item, egyenként rákérdezek.", #junkQueue)
+    NextJunk()
+end
+NS.DiscardLeftovers = DiscardLeftovers
+junkBtn:SetScript("OnClick", DiscardLeftovers)
+
+---------------------------------------------------------------------------
+-- Hasznalhato quest item gomb a panel mellett
+---------------------------------------------------------------------------
+local useBtn = CreateFrame("Button", "QuestFocusUseItem", UIParent, "SecureActionButtonTemplate")
+useBtn:SetSize(36, 36)
+useBtn:RegisterForClicks("AnyUp", "AnyDown")
+useBtn:SetAttribute("type", "item")
+useBtn:Hide()
+useBtn.icon = useBtn:CreateTexture(nil, "ARTWORK")
+useBtn.icon:SetAllPoints()
+useBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+useBtn.count = useBtn:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+useBtn.count:SetPoint("BOTTOMRIGHT", -2, 2)
+useBtn.cd = CreateFrame("Cooldown", nil, useBtn, "CooldownFrameTemplate")
+useBtn.cd:SetAllPoints()
+useBtn.key = useBtn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmallGray")
+useBtn.key:SetPoint("TOPRIGHT", -2, -2)
+useBtn:SetScript("OnEnter", function(self)
+    if not self.itemId then return end
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetItemByID(self.itemId)
+    GameTooltip:AddLine("QuestFocus: a kijelölt quest itemje", 0.2, 1, 0.6)
+    if not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
+        GameTooltip:AddLine("Billentyű: Options > Keybindings > AddOns > QuestFocus", 0.5, 0.5, 0.5)
+    end
+    GameTooltip:Show()
+end)
+useBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+local function ItemHasUse(id)
+    if C_Item and C_Item.GetItemSpell then return C_Item.GetItemSpell(id) ~= nil end
+    return GetItemSpell and GetItemSpell(id) ~= nil
+end
+
+-- A kijelolt quest hasznalhato itemje (amibol van a taskaban)
+local function UsableQuestItem()
+    local qid = state.questId
+    if not qid then return end
+    local q = NS.GetQuestieQuest(qid)
+    if not q then return end
+    local cands = {}
+    if tonumber(q.sourceItemId) and q.sourceItemId > 0 then cands[#cands + 1] = q.sourceItemId end
+    for _, id in pairs(q.requiredSourceItems or {}) do cands[#cands + 1] = id end
+    for _, o in pairs(q.Objectives or {}) do
+        if type(o) == "table" and o.Type == "item" and o.Id then cands[#cands + 1] = o.Id end
+    end
+    for _, id in ipairs(cands) do
+        if GetItemCount(id) > 0 and ItemHasUse(id) then return id end
+    end
+end
+
+local function UpdateUseButton()
+    if InCombatLockdown() then return end
+    local id = (not QuestFocusDB.noUseButton) and UsableQuestItem() or nil
+    local panel = NS.panel
+    if not id or not (panel and panel:IsShown()) then
+        if useBtn:IsShown() then useBtn:Hide() end
+        useBtn.itemId = nil
+        return
+    end
+    if useBtn.itemId ~= id then
+        useBtn.itemId = id
+        useBtn:SetAttribute("item", "item:" .. id)
+        useBtn.icon:SetTexture(select(5, GetItemInfoInstant(id)))
+    end
+    local n = GetItemCount(id)
+    useBtn.count:SetText(n > 1 and n or "")
+    local key = GetBindingKey("CLICK QuestFocusUseItem:LeftButton")
+    useBtn.key:SetText(key and GetBindingText and GetBindingText(key, true) or (key or ""))
+    useBtn:ClearAllPoints()
+    useBtn:SetPoint("TOPRIGHT", panel, "TOPLEFT", -4, 0)
+    useBtn:Show()
+end
+
+local cdElapsed = 0
+local ticker = CreateFrame("Frame")
+local lastQuest, lastPanelShown
+ticker:SetScript("OnUpdate", function(_, dt)
+    cdElapsed = cdElapsed + dt
+    if cdElapsed < 0.5 then return end
+    cdElapsed = 0
+    local shown = NS.panel and NS.panel:IsShown()
+    if state.questId ~= lastQuest or shown ~= lastPanelShown then
+        lastQuest, lastPanelShown = state.questId, shown
+        UpdateUseButton()
+    end
+    if useBtn:IsShown() and useBtn.itemId then
+        local getCD = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+        local start, dur = getCD and getCD(useBtn.itemId)
+        if start and dur then useBtn.cd:SetCooldown(start, dur) end
+    end
+end)
+
+---------------------------------------------------------------------------
+-- Taska ablakok figyelese
+---------------------------------------------------------------------------
+local function Attach(frame)
+    if not frame or not frame.HookScript or frame.qfBagHooked then return end
+    frame.qfBagHooked = true
+    frame:HookScript("OnShow", function(self) anchorFrame = self; RefreshBagList() end)
+    frame:HookScript("OnHide", function(self) if anchorFrame == self then list:Hide() end end)
+    if frame:IsShown() then anchorFrame = frame; RefreshBagList() end
+end
+
+local function HookBags()
+    local B = Bags()
+    if B then
+        hooksecurefunc(B.Frames, "Show", function(self, id)
+            if id == "inventory" then Attach(self:Get(id)) end
+        end)
+        Attach(B.Frames:Get("inventory"))
+        HookBagnonItems()
+    end
+    for _, name in ipairs({ "ContainerFrameCombinedBags", "ContainerFrame1" }) do
+        if _G[name] then Attach(_G[name]) end
+    end
+end
+
+local ev = CreateFrame("Frame")
+ev:RegisterEvent("PLAYER_LOGIN")
+ev:RegisterEvent("BAG_UPDATE_DELAYED")
+ev:RegisterEvent("QUEST_LOG_UPDATE")
+ev:RegisterEvent("PLAYER_REGEN_ENABLED")
+ev:RegisterEvent("UPDATE_BINDINGS")
+local pending
+ev:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_LOGIN" then
+        HookBags()
+        C_Timer.After(3, function() Scan(); MaybeRefreshBagnon(); UpdateUseButton() end)
+        return
+    end
+    if event == "PLAYER_REGEN_ENABLED" or event == "UPDATE_BINDINGS" then UpdateUseButton() return end
+    if pending then return end
+    pending = true
+    C_Timer.After(0.3, function()
+        pending = false
+        RefreshBagList()
+        UpdateUseButton()
+    end)
+end)
+
+NS.ToggleBagList = function()
+    QuestFocusDB.noBagList = not QuestFocusDB.noBagList
+    RefreshBagList()
+    Print("Quest item lista a táska mellett: %s", QuestFocusDB.noBagList and "ki" or "be")
+end
+
+---------------------------------------------------------------------------
+-- Kapcsolok a beallitasokban
+---------------------------------------------------------------------------
+local cbBag = NS.OptCheck("Quest item lista a táska mellett",
+    "Ha nyitva a táska (Bagnon vagy Blizzard), mellette listázza a quest itemeket: melyik questhez kellenek, "
+    .. "mennyi felesleges, mi van a bankban, melyik indít questet. Klikk egy sorra: a quest kijelölése.",
+    function() return not QuestFocusDB.noBagList end,
+    function(v) QuestFocusDB.noBagList = not v; RefreshBagList() end)
+cbBag:SetPoint("TOPLEFT", NS.optNote, "BOTTOMLEFT", -2, -12)
+
+local cbGlow = NS.OptCheck("Quest itemek színezése a Bagnonban",
+    "Sárga: aktív questhez kell. Zöld: megvan / leadáshoz kell. Kék: questet indít. Szürke: nincs hozzá aktív quest.",
+    function() return not QuestFocusDB.noBagGlow end,
+    function(v)
+        QuestFocusDB.noBagGlow = not v
+        lastStatusKey = nil
+        local B = Bags()
+        if B and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+    end)
+cbGlow:SetPoint("TOPLEFT", cbBag, "BOTTOMLEFT", 0, -6)
+
+local cbUse = NS.OptCheck("Quest item gomb a panel mellett",
+    "Ha a kijelölt questhez használható item kell (pl. mobra dobni), egy gomb jelenik meg a QuestFocus panel bal oldalán. "
+    .. "Billentyűt is köthetsz rá: Options > Keybindings > AddOns > QuestFocus.",
+    function() return not QuestFocusDB.noUseButton end,
+    function(v) QuestFocusDB.noUseButton = not v; UpdateUseButton() end)
+cbUse:SetPoint("TOPLEFT", cbGlow, "BOTTOMLEFT", 0, -6)
+
+NS.opt:HookScript("OnShow", function()
+    cbBag.refresh(); cbGlow.refresh(); cbUse.refresh()
+end)

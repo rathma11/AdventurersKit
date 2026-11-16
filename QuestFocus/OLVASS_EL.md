@@ -25,6 +25,7 @@ Kell hozzá: **Questie**. A TomTom nem kötelező: ha fent van, annak a nyilát 
 | `/qf zone` | zóna fókusz ki/be: csak az aktuális zóna questjei maradnak a Questie trackerben |
 | `/qf minimap` | minimap gomb ki/be |
 | `/qf bags` | quest item lista a táska mellett ki/be |
+| `/qf junk` | nem eladható, felesleges quest itemek eldobása (egyenként rákérdez) |
 | `/qf debug` | diagnosztika a chatbe |
 | `/qf spell <név>` | tap spell a macroba (pl. `/qf spell Moonfire`); `/qf spell` = törlés, `/qf spell off` = kikapcsolás |
 | `/qf next` | következő objective (marker + macro); érdemes erre is egy macrót csinálni |
@@ -42,13 +43,21 @@ Kell hozzá: **Questie**. A TomTom nem kötelező: ha fent van, annak a nyilát 
 - **Minimap gomb:** bal klikk megnyitja a beállításokat, jobb klikk a zóna fókuszt kapcsolja. Húzással áthelyezhető.
 - **Zóna fókusz:** csak az aktuális zóna questjei (és a kijelölt QFocus quest) maradnak a Questie trackerben, a többit kiveszi. Zónaváltáskor automatikusan követ. Kikapcsoláskor minden visszakerül úgy, ahogy volt. A zónát a quest log fejléce alapján dönti el. Összecsukott fejléc alatti questeket nem lát.
 
-## Quest item lista a táska mellett
-Ha nyitva a táska (Bagnon vagy a sima Blizzard táska), a bal oldalán megjelenik egy lista a quest itemekről:
-- **sárga:** melyik questhez kell, és hol tartasz (pl. 5/7), vagy „kész, leadni”;
-- **zöld:** questet indít (jobb klikk rá a táskában);
-- **szürke:** nincs hozzá aktív quest, valószínűleg eladható vagy eldobható.
+## Quest itemek
+**Lista a táska mellett.** Ha nyitva a táska (Bagnon vagy a sima Blizzard táska), a bal oldalán megjelenik egy lista a quest itemekről. A sorok színe:
+- **sárga:** aktív questhez kell, és hol tartasz (pl. 5/7). Ha többet hordasz, mint kell, kiírja: „+2 felesleges”;
+- **zöld:** megvan, a quest kész, leadáshoz kell;
+- **kék:** questet indít (jobb klikk rá a táskában);
+- **szürke:** nincs hozzá aktív quest;
+- **BANKBAN:** egy aktív questhez kell, és a bankban van (a Bagnon/BagBrother utolsó banki mentése alapján). Ha a táskában is van, a név mellett látszik: „+N bank”.
 
 Egérrel fölé állva látod az item tooltipjét, klikkre a quest kijelölődik (marker + QFocus macro). Kikapcsolás: `/qf bags` vagy a beállításokban.
+
+**Színezés a Bagnonban.** A quest itemek slotjainak kerete ugyanilyen színű (sárga, zöld, kék, szürke). Kikapcsolható a beállításokban.
+
+**Quest item gomb.** Ha a kijelölt questhez használható item kell (pl. mobra dobni vagy egy helyen használni), a QuestFocus panel bal oldalán megjelenik egy gomb vele. Billentyűt is köthetsz rá: Options → Keybindings → AddOns → QuestFocus. A gomb harc közben is működik, de csak harcon kívül tud másik itemre váltani.
+
+**Felesleges quest itemek eldobása.** A lista alján megjelenik egy gomb (vagy `/qf junk`), ha van olyan quest item, amihez nincs aktív quest **és nem eladható**. Egyenként rákérdez mindegyikre (Eldobás / Kihagyás). Az eladható quest itemekhez nem nyúl.
 
 ## Beállítások (opcionális)
 Esc → Options → AddOns → **QuestFocus**, vagy `/qf options`. Alapból minden új opció ki van kapcsolva.
