@@ -1,9 +1,10 @@
 ## Interface: 16001
 ## Title: QuestFocus
-## Notes: Quest celpont macro (QFocus), marker es tooltip a Questie adataibol
+## Notes: Quest target macro (QFocus), markers, tooltips and quest item tools based on Questie data
 ## Version: 0.1.0
 ## OptionalDeps: Questie, TomTom, Bagnon
 ## SavedVariables: QuestFocusDB
 
+Locales.lua
 QuestFocus.lua
 QuestFocusBags.lua

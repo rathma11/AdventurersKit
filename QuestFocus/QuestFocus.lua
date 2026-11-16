@@ -2,7 +2,8 @@
 -- Quest kijelolesre: QFocus target macro, marker (waypoint + nyil), tooltip.
 -- Az adatokat (mobok, itemek, spawn helyek, leado NPC) a Questie-bol veszi.
 
-local ADDON_NAME = ...
+local ADDON_NAME, NS = ...
+local L = NS.L
 local MACRO_NAME = "QFocus"
 local ICON_FALLBACK = 134400 -- INV_Misc_QuestionMark
 local ICON_HUNT = "Ability_Hunter_SniperShot"   -- celkereszt: mobok
@@ -112,7 +113,7 @@ local function CollectTargets(quest, isComplete)
         end
         if #sources > 0 then
             result[1] = {
-                desc = "Leadás: " .. table.concat(names, ", "),
+                desc = L["Turn in: "] .. table.concat(names, ", "),
                 completed = false,
                 turnIn = true,
                 sources = sources,
@@ -182,12 +183,12 @@ local function ItemSourceLines(entry, limit)
     for _, s in ipairs(objs) do
         if n >= limit then break end
         n = n + 1
-        lines[#lines + 1] = { "Felvehetö: " .. (s.name or "?") .. " (földön / tárgyban)", 0.6, 1, 0.6 }
+        lines[#lines + 1] = { L["Pick up: "] .. (s.name or "?") .. L[" (on the ground / in an object)"], 0.6, 1, 0.6 }
     end
     for _, s in ipairs(mobs) do
         if n >= limit then break end
         n = n + 1
-        local txt = "Dropol: " .. (s.name or "?")
+        local txt = L["Dropped by: "] .. (s.name or "?")
         local npc = GetNPC(s.id)
         if npc and type(npc.minLevel) == "number" then
             local maxL = type(npc.maxLevel) == "number" and npc.maxLevel or npc.minLevel
@@ -211,7 +212,7 @@ local function ItemSourceLines(entry, limit)
                     local npc = GetNPC(src.Id)
                     if npc then
                         n = n + 1
-                        lines[#lines + 1] = { "Vásárolható: " .. (npc.name or "?"), 1, 0.9, 0.3 }
+                        lines[#lines + 1] = { L["Sold by: "] .. (npc.name or "?"), 1, 0.9, 0.3 }
                     end
                 end
             end
@@ -219,7 +220,7 @@ local function ItemSourceLines(entry, limit)
     end
     local total = #objs + #mobs
     if total > limit then
-        lines[#lines + 1] = { ("+%d további forrás"):format(total - limit), 0.6, 0.6, 0.6 }
+        lines[#lines + 1] = { (L["+%d more sources"]):format(total - limit), 0.6, 0.6, 0.6 }
     end
     return lines
 end
@@ -393,7 +394,7 @@ local function BuildMacroBody(objectives, onlyIndex)
     local CLEAR, DEADCLR = "/cleartarget", "/cleartarget [dead]"
     local pick = useNP and state.pick or nil
     if pick == "busy" then
-        CLEAR = '/run UIErrorsFrame:AddMessage("QuestFocus: a közeli quest mobok foglaltak",1,.6,.2)'
+        CLEAR = '/run UIErrorsFrame:AddMessage("QuestFocus: nearby quest mobs are taken",1,.6,.2)'
     elseif pick then
         CLEAR = "/target " .. pick
     end
@@ -433,7 +434,7 @@ local function BuildMacroBody(objectives, onlyIndex)
         end
     end
     if n == 0 then
-        return '/run print("QuestFocus: nincs targetelheto mob")', 0
+        return '/run print("QuestFocus: no targetable mob")', 0
     end
     for _, t in ipairs(tail) do lines[#lines + 1] = t end
     return table.concat(lines, "\n"), n
@@ -465,7 +466,7 @@ end
 
 local function ApplyMacro(body)
     if InCombatLockdown() then
-        if not state.pendingBody then Print("Harcban vagy, a QFocus macro harc után frissül.") end
+        if not state.pendingBody then Print(L["You are in combat, the QFocus macro will update after combat."]) end
         state.pendingBody = body
         return
     end
@@ -476,11 +477,11 @@ local function ApplyMacro(body)
     else
         local numAccount = GetNumMacros()
         if numAccount >= (MAX_ACCOUNT_MACROS or 120) then
-            Print("Nincs hely új account macronak, töröld valamelyiket.")
+            Print(L["No room for a new account macro, delete one first."])
             return
         end
         CreateMacro(MACRO_NAME, CurrentIcon(), body, nil)
-        Print("Létrehoztam a |cffffff00%s|r macrot. Nyisd meg a /macro ablakot és húzd fel az actionbarra.", MACRO_NAME)
+        Print(L["Created the |cffffff00%s|r macro. Open /macro and drag it to your action bar."], MACRO_NAME)
     end
     state.lastBody = body
     state.lastIcon = CurrentIcon()
@@ -536,7 +537,7 @@ arrow:SetScript("OnUpdate", function(self, elapsed)
     if dist < 10 then
         self.tex:SetRotation(0)
         self.tex:SetVertexColor(0.2, 1, 0.2)
-        self.text:SetText((w.title or "?") .. "\n|cff33ff33Megérkeztél|r")
+        self.text:SetText((w.title or "?") .. L["\n|cff33ff33You have arrived|r"])
         return
     end
     local facing = GetPlayerFacing() or 0
@@ -614,16 +615,16 @@ local function MarkObjective(i)
         for _, s in ipairs(o.sources) do sources[#sources + 1] = s end
     end
     if #sources == 0 then
-        Print("Nincs ismert hely ehhez: %s", state.title or "?")
+        Print(L["No known location for: %s"], state.title or "?")
         return
     end
     local p, dist = FindNearest(sources)
     if not p then
-        Print("Nem találok koordinátát (lehet, hogy instance-ben van).")
+        Print(L["No coordinates found (it may be inside an instance)."])
         return
     end
     SetWaypoint(p, p.name or state.title)
-    Print("Marker: |cffffff00%s|r - %s %.1f, %.1f%s", p.name or "?", ZoneName(p.map), p.x, p.y,
+    Print(L["Marker: |cffffff00%s|r - %s %.1f, %.1f%s"], p.name or "?", ZoneName(p.map), p.x, p.y,
         dist and (" (%d yd)"):format(dist) or "")
 end
 
@@ -662,7 +663,7 @@ close:SetPoint("TOPRIGHT", 0, 0)
 close:SetScript("OnClick", function()
     QuestFocusDB.hidePanel = true
     panel:Hide()
-    Print("Panel elrejtve. Visszajön, ha questre kattintasz, vagy: /qf")
+    Print(L["Panel hidden. It comes back when you click a quest, or: /qf"])
 end)
 
 panel.footer = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -686,20 +687,20 @@ local function FooterText()
     local objs = state.objectives or {}
     if objs[1] and objs[1].turnIn then
         local name = objs[1].sources[1] and objs[1].sources[1].name or "?"
-        return ("|cffffff00Leadás:|r %s%s"):format(name, distTxt and (" - " .. distTxt) or "")
+        return (L["|cffffff00Turn in:|r %s%s"]):format(name, distTxt and (" - " .. distTxt) or "")
     end
     if (state.macroCount or 0) == 0 then
-        return "Nincs targetelhetö mob (item / object gyüjtés)" .. (distTxt and (" - " .. distTxt) or "")
+        return L["No targetable mob (item / object gathering)"] .. (distTxt and (" - " .. distTxt) or "")
     end
     local u = state.pick
     if u == "busy" then
-        return "|cffff9933A közeli mobok foglaltak|r (tapolt / halott)"
+        return L["|cffff9933Nearby mobs are taken|r (tapped / dead)"]
     elseif u and UnitExists(u) then
-        return ("|cff33ff99Cél:|r %s"):format(UnitName(u) or "?")
+        return (L["|cff33ff99Target:|r %s"]):format(UnitName(u) or "?")
     elseif InCombatLockdown() then
-        return "Harcban: név szerint targetel"
+        return L["In combat: targeting by name"]
     end
-    return "Nincs mob a közelben" .. (distTxt and (" - marker: " .. distTxt) or "")
+    return L["No mob nearby"] .. (distTxt and (L[" - marker: "] .. distTxt) or "")
 end
 
 local footerElapsed = 0
@@ -743,11 +744,11 @@ local function GetLine(i)
         end
         local p, dist = FindNearest(o.sources)
         if p then
-            GameTooltip:AddLine(("Legközelebb: %s %.1f, %.1f%s"):format(ZoneName(p.map), p.x, p.y,
+            GameTooltip:AddLine((L["Nearest: %s %.1f, %.1f%s"]):format(ZoneName(p.map), p.x, p.y,
                 dist and (" (%d yd)"):format(dist) or ""), 0.6, 0.8, 1)
         end
-        GameTooltip:AddLine("Bal klikk: marker + macro csak erre", 0.5, 0.5, 0.5)
-        GameTooltip:AddLine("Jobb klikk: macro az összes hátralévöre", 0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Left click: marker + macro for this only"], 0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Right click: macro for all remaining"], 0.5, 0.5, 0.5)
         GameTooltip:Show()
     end)
     line:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -776,7 +777,7 @@ local function Panel_Update()
     end
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
     if #objs == 0 then
-        panel.footer:SetText(QuestieAvailable() and "Nincs objective adat ehhez a questhez." or "Questie nincs betöltve.")
+        panel.footer:SetText(QuestieAvailable() and L["No objective data for this quest."] or L["Questie is not loaded."])
     else
         panel.footer:SetText(FooterText())
     end
@@ -809,7 +810,7 @@ end
 local function SelectQuest(questId, title, isComplete, mark)
     if not questId or questId == 0 then return end
     if not QuestieAvailable() then
-        Print("A Questie nincs betöltve, enélkül nem tudom, hol vannak a mobok.")
+        Print(L["Questie is not loaded, without it I don't know where the mobs are."])
     end
     -- Egy kattintasra tobb hook is lefuthat (gomb + C_QuestLog): csak egyszer jeloljunk
     local now = GetTime()
@@ -834,7 +835,7 @@ local function ClearQuest()
     QuestFocusDB.lastQuest = nil
     state.macroCount = 0
     wipe(targetNames)
-    local body = '/run print("QuestFocus: nincs kijelolt quest")'
+    local body = '/run print("QuestFocus: no quest selected")'
     if body ~= state.lastBody or CurrentIcon() ~= state.lastIcon then ApplyMacro(body) end
 end
 
@@ -872,13 +873,13 @@ local function AddQuestTooltip(tooltip, questId, isComplete)
                 for _, l in ipairs(ItemSourceLines(o, 3)) do
                     tooltip:AddLine("  " .. l[1], l[2], l[3], l[4])
                 end
-                if where ~= "" then tooltip:AddLine("  Legközelebb: " .. where, 0.6, 0.8, 1) end
+                if where ~= "" then tooltip:AddLine(L["  Nearest: "] .. where, 0.6, 0.8, 1) end
             else
                 tooltip:AddDoubleLine("  " .. table.concat(names, ", "), where, 1, 1, 1, 0.6, 0.8, 1)
             end
         end
     end
-    tooltip:AddLine("Kattintás: marker + QFocus macro", 0.5, 0.5, 0.5)
+    tooltip:AddLine(L["Click: marker + QFocus macro"], 0.5, 0.5, 0.5)
     tooltip:Show()
 end
 
@@ -964,7 +965,7 @@ local function ScheduleRefresh()
             -- Leadva vagy abandon: marker es kijeloles torlese
             local old = state.title
             ClearQuest()
-            Print("|cffffff00%s|r eltünt a logból, a markert töröltem.", old or "Quest")
+            Print(L["|cffffff00%s|r left the quest log, marker removed."], old or "Quest")
             return
         end
         local becameComplete = done and not state.isComplete
@@ -973,7 +974,7 @@ local function ScheduleRefresh()
         state.title, state.isComplete = title, done and true or false
         Refresh(not becameComplete)
         if becameComplete then
-            Print("|cffffff00%s|r kész, a marker a leadó NPC-re került.", title)
+            Print(L["|cffffff00%s|r is complete, marker moved to the turn-in NPC."], title)
             MarkObjective(nil)
             return
         end
@@ -987,7 +988,7 @@ local function ScheduleRefresh()
             UpdateMacro()
             Panel_Update()
             if state.waypoint or state.tomtomUid then
-                Print("Objective kész, a marker a következö célra került.")
+                Print(L["Objective complete, marker moved to the next target."])
                 MarkObjective(nil)
             end
         end
@@ -1009,7 +1010,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_TARGET_CHANGED" then
         if UnitExists("target") and targetNames[UnitName("target") or ""] and TapDenied("target")
             and not UnitIsDead("target") and UIErrorsFrame then
-            UIErrorsFrame:AddMessage("QuestFocus: ezt a mobot már más tapolta", 1, 0.3, 0.3)
+            UIErrorsFrame:AddMessage(L["QuestFocus: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
         return
     end
@@ -1018,7 +1019,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         InstallHooks()
         if not _G.QuestieLoader then
-            Print("|cffff5555A Questie nem található.|r Telepítsd, enélkül nem müködik.")
+            Print(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])
         end
         -- Utolso kijelolt quest visszaallitasa, ha a Questie mar betoltott
         C_Timer.After(8, function()
@@ -1108,7 +1109,7 @@ local function ZoneFocusOff(silent)
         if log[qid] and IsTracked(qid, log[qid].index) then Untrack(qid, log[qid].index) end
     end
     QuestFocusDB.zoneFocus = nil
-    if not silent then Print("Zóna fókusz ki: a korábbi questek visszakerültek a trackerbe.") end
+    if not silent then Print(L["Zone focus off: previous quests are back in the tracker."]) end
 end
 
 local function ZoneFocusOn()
@@ -1128,7 +1129,7 @@ local function ZoneFocusOn()
         end
     end
     QuestFocusDB.zoneFocus = zf
-    Print("Zóna fókusz: |cffffff00%s|r (%d quest marad, %d elrejtve). Kikapcsolás: ugyanaz a gomb / /qf zone",
+    Print(L["Zone focus: |cffffff00%s|r (%d quests kept, %d hidden). Turn off: same button / /qf zone"],
         zone or "?", kept, hidden)
 end
 
@@ -1155,25 +1156,25 @@ local function DebugLines()
     local names = {}
     for k in pairs(targetNames) do names[#names + 1] = k end
     local u = state.pick
-    out[#out + 1] = ("Quest: %s (%s)"):format(state.title or "-", tostring(state.questId or "-"))
-    out[#out + 1] = ("Nameplate mód: %s"):format(NameplatesUsable() and "be" or "ki (V gomb)")
-    out[#out + 1] = ("Keresett mobok: %s"):format(#names > 0 and table.concat(names, ", ") or "-")
-    out[#out + 1] = ("Kiválasztott: %s"):format(u == "busy" and "mind foglalt" or
-        (u and ((UnitName(u) or "?") .. " (" .. u .. ")") or "nincs (név szerinti tartalék)"))
-    out[#out + 1] = ("Harcban: %s"):format(InCombatLockdown() and "igen (a macro ilyenkor nem frissül)" or "nem")
-    out[#out + 1] = ("Zóna fókusz: %s"):format(QuestFocusDB.zoneFocus and (QuestFocusDB.zoneFocus.zone or "?") or "ki")
-    out[#out + 1] = "Látható quest mob nameplate-ek:"
+    out[#out + 1] = (L["Quest: %s (%s)"]):format(state.title or "-", tostring(state.questId or "-"))
+    out[#out + 1] = (L["Nameplate mode: %s"]):format(NameplatesUsable() and L["on"] or L["off (V key)"])
+    out[#out + 1] = (L["Wanted mobs: %s"]):format(#names > 0 and table.concat(names, ", ") or "-")
+    out[#out + 1] = (L["Picked: %s"]):format(u == "busy" and L["all taken"] or
+        (u and ((UnitName(u) or "?") .. " (" .. u .. ")") or L["none (fallback by name)"]))
+    out[#out + 1] = (L["In combat: %s"]):format(InCombatLockdown() and L["yes (the macro can't update now)"] or L["no"])
+    out[#out + 1] = (L["Zone focus: %s"]):format(QuestFocusDB.zoneFocus and (QuestFocusDB.zoneFocus.zone or "?") or L["off"])
+    out[#out + 1] = L["Visible quest mob nameplates:"]
     local any
     for i = 1, 40 do
         local nu = "nameplate" .. i
         if UnitExists(nu) and targetNames[UnitName(nu) or ""] then
             any = true
-            out[#out + 1] = ("  %s: %s  halott=%s tapolt=%s támadható=%s harcban=%s"):format(nu, UnitName(nu),
+            out[#out + 1] = (L["  %s: %s  dead=%s tapped=%s attackable=%s inCombat=%s"]):format(nu, UnitName(nu),
                 tostring(UnitIsDead(nu)), tostring(TapDenied(nu)), tostring(UnitCanAttack("player", nu)),
                 tostring(UnitAffectingCombat(nu)))
         end
     end
-    if not any then out[#out + 1] = "  (nincs)" end
+    if not any then out[#out + 1] = L["  (none)"] end
     out[#out + 1] = "Macro:"
     for line in (state.lastBody or "-"):gmatch("[^\n]+") do out[#out + 1] = "  " .. line end
     return out
@@ -1229,7 +1230,7 @@ end
 
 local optTitle = OptLabel(opt, "QuestFocus", "GameFontNormalLarge")
 optTitle:SetPoint("TOPLEFT", 16, -16)
-local optSub = OptLabel(opt, "QFocus macro és marker beállítások. Minden opcionális.", "GameFontHighlightSmall")
+local optSub = OptLabel(opt, L["QFocus macro and marker settings. Everything is optional."], "GameFontHighlightSmall")
 optSub:SetPoint("TOPLEFT", optTitle, "BOTTOMLEFT", 0, -6)
 
 -- Fulek: Beallitasok / Debug
@@ -1247,7 +1248,7 @@ local function SelectTab(i)
         t.page:SetShown(n == i)
     end
 end
-for i, def in ipairs({ { "Beállítások", pageMain }, { "Debug", pageDebug } }) do
+for i, def in ipairs({ { L["Settings"], pageMain }, { "Debug", pageDebug } }) do
     local t = CreateFrame("Button", nil, opt, "UIPanelButtonTemplate")
     t:SetSize(110, 22)
     t:SetText(def[1])
@@ -1259,9 +1260,9 @@ end
 opt.pageMain = pageMain
 
 -- Spell a tapeleshez
-local cbSpell = OptCheck("Spell a macroban (tapelés)",
-    "Ha be van kapcsolva, a QFocus macro a target után el is süti a kiválasztott spellt a mobra. "
-    .. "Leadásnál (barátságos NPC) nem castol.",
+local cbSpell = OptCheck(L["Spell in the macro (tagging)"],
+    L["When enabled, the QFocus macro also casts the chosen spell on the mob after targeting it. "]
+    .. L["It does not cast at turn-in (friendly NPC)."],
     function() return QuestFocusDB.useSpell end,
     function(v) QuestFocusDB.useSpell = v; RebuildMacro() end)
 cbSpell:SetPoint("TOPLEFT", pageMain, "TOPLEFT", -2, 0)
@@ -1281,7 +1282,7 @@ local spellBox = CreateFrame("EditBox", nil, pageMain, "InputBoxTemplate")
 spellBox:SetSize(200, 20)
 spellBox:SetAutoFocus(false)
 spellBox:SetPoint("LEFT", spellSlot, "RIGHT", 14, 6)
-local spellHint = OptLabel(pageMain,"Húzz ide egy spellt a spellbookból (P), vagy írd be a nevét + Enter. Jobb klikk: törlés.",
+local spellHint = OptLabel(pageMain,L["Drag a spell here from your spellbook (P), or type its name + Enter. Right click: clear."],
     "GameFontDisableSmall")
 spellHint:SetPoint("TOPLEFT", spellBox, "BOTTOMLEFT", -4, -4)
 spellHint:SetWidth(360)
@@ -1299,7 +1300,7 @@ local function SetSpell(name)
     if name and not QuestFocusDB.useSpell then QuestFocusDB.useSpell = true; cbSpell.refresh() end
     RefreshSpellUI()
     RebuildMacro()
-    Print(name and ("Tap spell: |cffffff00%s|r"):format(name) or "Tap spell törölve.")
+    Print(name and (L["Tag spell: |cffffff00%s|r"]):format(name) or L["Tag spell cleared."])
 end
 
 local function SpellFromCursor()
@@ -1326,19 +1327,19 @@ spellBox:SetScript("OnEnterPressed", function(self) SetSpell(self:GetText()); se
 spellBox:SetScript("OnEscapePressed", function(self) RefreshSpellUI(); self:ClearFocus() end)
 
 local cbAttack = OptCheck("Autoattack (/startattack)",
-    "A target után automatikus támadás is indul (melee / wand / íj).",
+    L["Also starts auto attack after targeting (melee / wand / bow)."],
     function() return QuestFocusDB.startAttack end,
     function(v) QuestFocusDB.startAttack = v; RebuildMacro() end)
 cbAttack:SetPoint("TOPLEFT", spellSlot, "BOTTOMLEFT", -26, -28)
 
-local cbPing = OptCheck("Ping a targetre",
-    "A macro a végén pingeli a targetet (Z-s ping rendszer), partyban a többiek is látják.",
+local cbPing = OptCheck(L["Ping the target"],
+    L["The macro pings the target at the end (ping system); party members see it too."],
     function() return not QuestFocusDB.noPing end,
     function(v) QuestFocusDB.noPing = not v; RebuildMacro() end)
 cbPing:SetPoint("TOPLEFT", cbAttack, "BOTTOMLEFT", 0, -6)
 
-local cbArrow = OptCheck("Saját nyíl",
-    "Nyíl a marker felé (TomTom mellett nem jelenik meg, akkor a TomTom nyila mutat).",
+local cbArrow = OptCheck(L["Own arrow"],
+    L["Arrow pointing to the marker (hidden when TomTom is installed, TomTom's arrow is used instead)."],
     function() return not QuestFocusDB.noArrow end,
     function(v)
         QuestFocusDB.noArrow = not v
@@ -1407,10 +1408,10 @@ mmBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetText("QuestFocus", 0.2, 1, 0.6)
     if state.title then GameTooltip:AddLine("Quest: " .. state.title, 1, 1, 1) end
     local zf = QuestFocusDB and QuestFocusDB.zoneFocus
-    GameTooltip:AddLine("Zóna fókusz: " .. (zf and (zf.zone or "?") or "ki"), 1, 0.82, 0)
-    GameTooltip:AddLine("Bal klikk: beállítások", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine("Jobb klikk: zóna fókusz ki/be", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine("Húzd: áthelyezés", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Zone focus: "] .. (zf and (zf.zone or "?") or L["off"]), 1, 0.82, 0)
+    GameTooltip:AddLine(L["Left click: settings"], 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Right click: zone focus on/off"], 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Drag: move"], 0.6, 0.6, 0.6)
     GameTooltip:Show()
 end)
 mmBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1419,23 +1420,23 @@ mmBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 local zoneBtn = CreateFrame("Button", nil, pageMain, "UIPanelButtonTemplate")
 zoneBtn:SetSize(220, 24)
 zoneBtn:SetPoint("TOPLEFT", cbArrow, "BOTTOMLEFT", 4, -14)
-local zoneHint = OptLabel(pageMain, "Csak az aktuális zóna questjei maradnak a Questie trackerben (a kijelölt QFocus quest is). "
-    .. "Zónaváltáskor követ, kikapcsolva minden visszakerül. Minimapon: jobb klikk.", "GameFontDisableSmall")
+local zoneHint = OptLabel(pageMain, L["Only quests of the current zone stay in the Questie tracker (plus the selected QFocus quest). "]
+    .. L["Follows you when you change zones; turning it off restores everything. Minimap: right click."], "GameFontDisableSmall")
 zoneHint:SetPoint("TOPLEFT", zoneBtn, "BOTTOMLEFT", 0, -4)
 zoneHint:SetWidth(420)
 local function RefreshZoneBtn()
     local zf = QuestFocusDB.zoneFocus
-    zoneBtn:SetText(zf and ("Zóna fókusz KI (" .. (zf.zone or "?") .. ")") or "Fókusz erre a zónára")
+    zoneBtn:SetText(zf and (L["Zone focus OFF ("] .. (zf.zone or "?") .. ")") or L["Focus on this zone"])
 end
 zoneBtn:SetScript("OnClick", function() ToggleZoneFocus(); RefreshZoneBtn() end)
 
-local cbMinimap = OptCheck("Minimap gomb",
-    "Bal klikk: beállítások, jobb klikk: zóna fókusz. Húzással áthelyezhetö.",
+local cbMinimap = OptCheck(L["Minimap button"],
+    L["Left click: settings, right click: zone focus. Drag to move."],
     function() return not QuestFocusDB.hideMinimap end,
     function(v) QuestFocusDB.hideMinimap = not v; UpdateMinimapButton() end)
 cbMinimap:SetPoint("TOPLEFT", zoneHint, "BOTTOMLEFT", -6, -14)
 
-local optNote = OptLabel(pageMain, "Harc közben a macro nem módosítható, a változás harc után érvényesül.",
+local optNote = OptLabel(pageMain, L["The macro can't be changed in combat; changes apply after combat."],
     "GameFontDisableSmall")
 optNote:SetPoint("TOPLEFT", cbMinimap, "BOTTOMLEFT", 2, -16)
 
@@ -1458,14 +1459,14 @@ end
 local dbgRefresh = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
 dbgRefresh:SetSize(100, 22)
 dbgRefresh:SetPoint("TOPLEFT")
-dbgRefresh:SetText("Frissítés")
+dbgRefresh:SetText(L["Refresh"])
 dbgRefresh:SetScript("OnClick", RefreshDebug)
 local dbgChat = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
 dbgChat:SetSize(120, 22)
 dbgChat:SetPoint("LEFT", dbgRefresh, "RIGHT", 6, 0)
-dbgChat:SetText("Chatbe írás")
+dbgChat:SetText(L["Print to chat"])
 dbgChat:SetScript("OnClick", function() for _, l in ipairs(DebugLines()) do Print(l) end end)
-local dbgLive = OptLabel(pageDebug, "Élö: 0,5 mp-enként frissül, amíg nyitva van.", "GameFontDisableSmall")
+local dbgLive = OptLabel(pageDebug, L["Live: refreshes every 0.5 s while open."], "GameFontDisableSmall")
 dbgLive:SetPoint("LEFT", dbgChat, "RIGHT", 10, 0)
 local dbgElapsed = 0
 pageDebug:SetScript("OnShow", RefreshDebug)
@@ -1489,7 +1490,7 @@ elseif InterfaceOptions_AddCategory then
 end
 
 OpenOptions = function()
-    if InCombatLockdown() then Print("Harc után nyisd meg.") return end
+    if InCombatLockdown() then Print(L["Open it after combat."]) return end
     if optCategory and Settings and Settings.OpenToCategory then
         Settings.OpenToCategory(optCategory:GetID())
     elseif InterfaceOptionsFrame_OpenToCategory then
@@ -1501,7 +1502,6 @@ end
 ---------------------------------------------------------------------------
 -- Kozos nevter a QuestFocusBags.lua szamara
 ---------------------------------------------------------------------------
-local NS = select(2, ...)
 NS.Print, NS.state, NS.GetQuestieQuest = Print, state, GetQuestieQuest
 NS.NumLogEntries, NS.GetLogEntry, NS.FindQuestInLog = NumLogEntries, GetLogEntry, FindQuestInLog
 NS.SelectQuest, NS.OptCheck, NS.opt, NS.optNote, NS.panel = SelectQuest, OptCheck, opt, optNote, panel
@@ -1524,23 +1524,23 @@ SlashCmdList.QUESTFOCUS = function(msg)
     elseif msg == "minimap" then
         QuestFocusDB.hideMinimap = not QuestFocusDB.hideMinimap
         UpdateMinimapButton()
-        Print("Minimap gomb: %s", QuestFocusDB.hideMinimap and "ki" or "be")
+        Print(L["Minimap button: %s"], QuestFocusDB.hideMinimap and L["off"] or L["on"])
     elseif msg == "spell" or msg:match("^spell%s") then
         local name = raw:match("^%S+%s+(.+)$")
         if name and name:lower() == "off" then
             QuestFocusDB.useSpell = false
             RebuildMacro()
-            Print("Tap spell kikapcsolva.")
+            Print(L["Tag spell disabled."])
         else
             SetSpell(name)
         end
     elseif msg == "" then
         QuestFocusDB.hidePanel = panel:IsShown()
-        if not state.questId then Print("Válassz ki egy questet a quest logban (L).") end
+        if not state.questId then Print(L["Select a quest in the quest log (L)."]) end
         Panel_Update()
     elseif msg == "next" then
         local objs = state.objectives or {}
-        if #objs == 0 then Print("Nincs kijelölt quest.") return end
+        if #objs == 0 then Print(L["No quest selected."]) return end
         local i = state.objIndex or 0
         for _ = 1, #objs do
             i = i % #objs + 1
@@ -1553,11 +1553,11 @@ SlashCmdList.QUESTFOCUS = function(msg)
         MarkObjective(state.objIndex)
     elseif msg == "arrow" then
         QuestFocusDB.noArrow = not QuestFocusDB.noArrow
-        Print("Saját nyíl: %s", QuestFocusDB.noArrow and "ki" or "be")
+        Print(L["Own arrow: %s"], QuestFocusDB.noArrow and L["off"] or L["on"])
         if QuestFocusDB.noArrow then arrow:Hide() elseif state.waypoint and UseOwnArrow() then arrow:Show() end
     elseif msg == "ping" then
         QuestFocusDB.noPing = not QuestFocusDB.noPing
-        Print("Ping a QFocus macroban: %s", QuestFocusDB.noPing and "ki" or "be")
+        Print(L["Ping in the QFocus macro: %s"], QuestFocusDB.noPing and L["off"] or L["on"])
         state.lastBody = nil
         if state.questId then UpdateMacro() Panel_Update() end
     elseif msg == "icon" or msg:match("^icon%s") then
@@ -1565,40 +1565,40 @@ SlashCmdList.QUESTFOCUS = function(msg)
         if name then
             local id = IconId(name)
             if id == ICON_FALLBACK then
-                Print("Nem találom ezt az ikont: %s (pl. ability_hunter_snipershot)", name)
+                Print(L["Icon not found: %s (e.g. ability_hunter_snipershot)"], name)
                 return
             end
             QuestFocusDB.icon = name
-            Print("QFocus ikon: |T%d:16|t %s", id, name)
+            Print(L["QFocus icon: |T%d:16|t %s"], id, name)
         else
             QuestFocusDB.icon = nil
-            Print("QFocus ikon: automatikus (célkereszt / levél leadásnál)")
+            Print(L["QFocus icon: automatic (crosshair / letter at turn-in)"])
         end
         state.lastIcon = nil
         if not InCombatLockdown() then ApplyMacro(state.lastBody or BuildMacroBody(state.objectives, state.objIndex)) end
     elseif msg == "unmark" then
         ClearWaypoint()
-        Print("Marker törölve.")
+        Print(L["Marker removed."])
     elseif msg == "clear" then
         ClearQuest()
-        Print("Kijelölés törölve.")
+        Print(L["Selection cleared."])
     else
-        Print("Parancsok:")
-        Print("  /qf - panel ki/be")
-        Print("  /qf options - beállítások (tap spell, autoattack, ping, nyíl, debug fül)")
-        Print("  /qf zone - zóna fókusz ki/be (csak az aktuális zóna questjei a trackerben)")
-        Print("  /qf minimap - minimap gomb ki/be")
-        Print("  /qf bags - quest item lista a táska mellett ki/be")
-        Print("  /qf junk - nem eladható, felesleges quest itemek eldobása (egyenként rákérdez)")
-        Print("  /qf debug - diagnosztika a chatbe")
-        Print("  /qf spell <név> - tap spell a macroba; /qf spell - törlés; /qf spell off - kikapcsolás")
-        Print("  /qf next - következö objective (marker + macro)")
-        Print("  /qf all - macro az összes hátralévö objective mobjára")
-        Print("  /qf mark - marker újra a legközelebbi helyre")
-        Print("  /qf arrow - saját nyíl ki/be")
-        Print("  /qf ping - ping a targetre a macroban ki/be")
-        Print("  /qf icon <ikonnév> - saját ikon; /qf icon - automatikus")
-        Print("  /qf unmark - marker törlése")
-        Print("  /qf clear - kijelölés + marker törlése")
+        Print(L["Commands:"])
+        Print(L["  /qf - toggle panel"])
+        Print(L["  /qf options - settings (tag spell, auto attack, ping, arrow, debug tab)"])
+        Print(L["  /qf zone - toggle zone focus (only current zone quests in the tracker)"])
+        Print(L["  /qf minimap - toggle minimap button"])
+        Print(L["  /qf bags - toggle quest item list next to the bags"])
+        Print(L["  /qf junk - destroy unsellable leftover quest items (asks one by one)"])
+        Print(L["  /qf debug - diagnostics to chat"])
+        Print(L["  /qf spell <name> - tag spell in the macro; /qf spell - clear; /qf spell off - disable"])
+        Print(L["  /qf next - next objective (marker + macro)"])
+        Print(L["  /qf all - macro for mobs of all remaining objectives"])
+        Print(L["  /qf mark - re-place the marker at the nearest spot"])
+        Print(L["  /qf arrow - toggle own arrow"])
+        Print(L["  /qf ping - toggle target ping in the macro"])
+        Print(L["  /qf icon <iconname> - custom icon; /qf icon - automatic"])
+        Print(L["  /qf unmark - remove marker"])
+        Print(L["  /qf clear - clear selection + marker"])
     end
 end

@@ -5,6 +5,7 @@
 --  * nem eladhato, felesleges quest itemek eldobasa (egyenkent rakerdez)
 
 local _, NS = ...
+local L = NS.L
 local Print, state = NS.Print, NS.state
 
 local QUEST_CLASS = (Enum and Enum.ItemClass and Enum.ItemClass.Questitem) or 12
@@ -17,7 +18,7 @@ local COLORS = {
 }
 
 BINDING_HEADER_QUESTFOCUS = "QuestFocus"
-_G["BINDING_NAME_CLICK QuestFocusUseItem:LeftButton"] = "Kijelölt quest itemjének használata"
+_G["BINDING_NAME_CLICK QuestFocusUseItem:LeftButton"] = L["Use the selected quest's item"]
 
 ---------------------------------------------------------------------------
 -- Container API (classic es modern)
@@ -263,7 +264,7 @@ collapseBtn:SetScript("OnClick", function()
 end)
 collapseBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText(QuestFocusDB.bagListCollapsed and "Lista kinyitása" or "Lista összecsukása", 1, 1, 1)
+    GameTooltip:SetText(QuestFocusDB.bagListCollapsed and L["Expand list"] or L["Collapse list"], 1, 1, 1)
     GameTooltip:Show()
 end)
 collapseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -311,14 +312,14 @@ local function GetRow(i)
         if e.bag then GameTooltip:SetBagItem(e.bag, e.slot) else GameTooltip:SetItemByID(e.id) end
         for _, n in ipairs(e.needs or {}) do
             local prog = n.needed and (" %d/%d"):format(n.collected or 0, n.needed) or ""
-            GameTooltip:AddLine(("%s%s%s"):format(n.title or "?", prog, n.done and " (kész)" or ""), 1, 0.82, 0, true)
+            GameTooltip:AddLine(("%s%s%s"):format(n.title or "?", prog, n.done and L[" (complete)"] or ""), 1, 0.82, 0, true)
         end
-        if e.surplus then GameTooltip:AddLine(("%d db felesleges (többet hordasz, mint kell)"):format(e.surplus), 0.6, 0.6, 0.6) end
-        if e.bank then GameTooltip:AddLine(("A bankban is van: %d db"):format(e.bank), 0.6, 0.8, 1) end
+        if e.surplus then GameTooltip:AddLine((L["%d surplus (you carry more than needed)"]):format(e.surplus), 0.6, 0.6, 0.6) end
+        if e.bank then GameTooltip:AddLine((L["Also in the bank: %d"]):format(e.bank), 0.6, 0.8, 1) end
         if e.kind == "leftover" then
-            GameTooltip:AddLine(e.noValue and "Nem eladható: a /qf junk eldobhatja" or "Eladható a vendornál", 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(e.noValue and L["Unsellable: /qf junk can destroy it"] or L["Can be sold to a vendor"], 0.6, 0.6, 0.6)
         end
-        if e.needs then GameTooltip:AddLine("Klikk: quest kijelölése (QFocus marker + macro)", 0.5, 0.5, 0.5) end
+        if e.needs then GameTooltip:AddLine(L["Click: select the quest (QFocus marker + macro)"], 0.5, 0.5, 0.5) end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -337,19 +338,19 @@ local function RowText(e)
     local c = COLORS[e.kind] or COLORS.need
     if e.kind == "bank" then
         local n = e.needs[1]
-        return ("|cff99ccffBANKBAN|r %s"):format(n.title or "?"), c
+        return (L["|cff99ccffIN BANK|r %s"]):format(n.title or "?"), c
     end
     if e.needs then
         local n = e.needs[1]
-        local prog = n.use and "használd / vidd" or (n.done and "kész, leadni")
-            or (n.needed and ("%d/%d"):format(n.collected or 0, n.needed)) or "kell"
+        local prog = n.use and L["use / carry"] or (n.done and L["complete, turn in"])
+            or (n.needed and ("%d/%d"):format(n.collected or 0, n.needed)) or L["needed"]
         local extra = ""
-        if e.surplus then extra = extra .. (" |cffaaaaaa+%d felesleges|r"):format(e.surplus) end
+        if e.surplus then extra = extra .. (L[" |cffaaaaaa+%d surplus|r"]):format(e.surplus) end
         if #e.needs > 1 then extra = extra .. (" |cffaaaaaa(+%d quest)|r"):format(#e.needs - 1) end
         return ("%s |cffffffff%s|r%s"):format(n.title or "?", prog, extra), COLORS.need
     end
-    if e.kind == "starts" then return "Questet indít! (jobb klikk a táskában)", c end
-    return e.noValue and "Nincs aktív quest, nem eladható (/qf junk)" or "Nincs aktív quest, eladható", c
+    if e.kind == "starts" then return L["Starts a quest! (right click it in the bag)"], c end
+    return e.noValue and L["No active quest, unsellable (/qf junk)"] or L["No active quest, sellable"], c
 end
 
 RefreshBagList = function()
@@ -362,7 +363,7 @@ RefreshBagList = function()
     for _, e in ipairs(scan.bankOnly) do rows[#rows + 1] = e end
     if #rows == 0 then list:Hide() return end
 
-    list.title:SetText(("Quest itemek (%d)"):format(#rows))
+    list.title:SetText((L["Quest items (%d)"]):format(#rows))
     UpdateCollapseIcon()
     list:ClearAllPoints()
     list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
@@ -386,7 +387,7 @@ RefreshBagList = function()
         r.border:SetColorTexture(c[1], c[2], c[3], 0.9)
         local name = (e.link and e.link:match("%[(.-)%]")) or GetItemInfo(e.id) or ("item " .. e.id)
         local cnt = e.count and e.count > 1 and (" |cffaaaaaax%d|r"):format(e.count) or ""
-        local bank = (e.bank and e.kind ~= "bank") and (" |cff99ccff+%d bank|r"):format(e.bank) or ""
+        local bank = (e.bank and e.kind ~= "bank") and (L[" |cff99ccff+%d bank|r"]):format(e.bank) or ""
         r.name:SetText(name .. cnt .. bank)
         local text, col = RowText(e)
         r.sub:SetText(text)
@@ -402,7 +403,7 @@ RefreshBagList = function()
 
     local junkH = 0
     if #scan.leftovers > 0 then
-        junkBtn:SetText(("Felesleges, nem eladható eldobása (%d)"):format(#scan.leftovers))
+        junkBtn:SetText((L["Destroy unsellable leftovers (%d)"]):format(#scan.leftovers))
         junkBtn:ClearAllPoints()
         junkBtn:SetPoint("BOTTOMLEFT", list, "BOTTOMLEFT", 10, 8)
         junkBtn:Show()
@@ -440,12 +441,12 @@ local function NextJunk()
 end
 
 StaticPopupDialogs["QUESTFOCUS_DISCARD"] = {
-    text = "Eldobod ezt a quest itemet?\n\n|cffffffff%s|r\n\nNincs hozzá aktív quest és nem eladható. Ha egy még fel nem vett "
-        .. "quest kéri majd, újra kell szerezned.",
-    button1 = "Eldobás",
-    button2 = "Kihagyás",
+    text = L["Destroy this quest item?\n\n|cffffffff%s|r\n\nNo active quest needs it and it can't be sold. If a quest you haven't picked up yet "]
+        .. L["asks for it later, you will have to get it again."],
+    button1 = L["Destroy"],
+    button2 = L["Skip"],
     OnAccept = function(_, e)
-        if InCombatLockdown() then Print("Harcban nem dobok el semmit.") return end
+        if InCombatLockdown() then Print(L["Not destroying anything in combat."]) return end
         for _, s in ipairs(e.slots) do
             local id = ContainerItem(s[1], s[2])
             if id == e.id then -- ellenorzes: meg mindig ugyanaz az item van ott
@@ -454,7 +455,7 @@ StaticPopupDialogs["QUESTFOCUS_DISCARD"] = {
                 if CursorHasItem() then DeleteCursorItem() end
             end
         end
-        Print("Eldobva: %s", e.link or e.id)
+        Print(L["Destroyed: %s"], e.link or e.id)
         C_Timer.After(0.3, NextJunk)
     end,
     OnCancel = function(_, _, reason)
@@ -468,10 +469,10 @@ StaticPopupDialogs["QUESTFOCUS_DISCARD"] = {
 
 local function DiscardLeftovers()
     Scan()
-    if #scan.leftovers == 0 then Print("Nincs felesleges, nem eladható quest item.") return end
+    if #scan.leftovers == 0 then Print(L["No unsellable leftover quest items."]) return end
     junkQueue = {}
     for _, e in ipairs(scan.leftovers) do junkQueue[#junkQueue + 1] = e end
-    Print("%d felesleges quest item, egyenként rákérdezek.", #junkQueue)
+    Print(L["%d leftover quest items, I'll ask one by one."], #junkQueue)
     NextJunk()
 end
 NS.DiscardLeftovers = DiscardLeftovers
@@ -498,9 +499,9 @@ useBtn:SetScript("OnEnter", function(self)
     if not self.itemId then return end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetItemByID(self.itemId)
-    GameTooltip:AddLine("QuestFocus: a kijelölt quest itemje", 0.2, 1, 0.6)
+    GameTooltip:AddLine(L["QuestFocus: item of the selected quest"], 0.2, 1, 0.6)
     if not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
-        GameTooltip:AddLine("Billentyü: Options > Keybindings > AddOns > QuestFocus", 0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Key: Options > Keybindings > AddOns > QuestFocus"], 0.5, 0.5, 0.5)
     end
     GameTooltip:Show()
 end)
@@ -621,21 +622,21 @@ end)
 NS.ToggleBagList = function()
     QuestFocusDB.noBagList = not QuestFocusDB.noBagList
     RefreshBagList()
-    Print("Quest item lista a táska mellett: %s", QuestFocusDB.noBagList and "ki" or "be")
+    Print(L["Quest item list next to the bags: %s"], QuestFocusDB.noBagList and L["off"] or L["on"])
 end
 
 ---------------------------------------------------------------------------
 -- Kapcsolok a beallitasokban
 ---------------------------------------------------------------------------
-local cbBag = NS.OptCheck("Quest item lista a táska mellett",
-    "Ha nyitva a táska (Bagnon vagy Blizzard), mellette listázza a quest itemeket: melyik questhez kellenek, "
-    .. "mennyi felesleges, mi van a bankban, melyik indít questet. Klikk egy sorra: a quest kijelölése.",
+local cbBag = NS.OptCheck(L["Quest item list next to the bags"],
+    L["While your bags are open (Bagnon or Blizzard), lists your quest items next to them: which quest needs them, "]
+    .. L["how many are surplus, what is in the bank, which ones start a quest. Click a row to select the quest."],
     function() return not QuestFocusDB.noBagList end,
     function(v) QuestFocusDB.noBagList = not v; RefreshBagList() end)
 cbBag:SetPoint("TOPLEFT", NS.optNote, "BOTTOMLEFT", -2, -12)
 
-local cbGlow = NS.OptCheck("Quest itemek színezése a Bagnonban",
-    "Sárga: aktív questhez kell. Zöld: megvan / leadáshoz kell. Kék: questet indít. Szürke: nincs hozzá aktív quest.",
+local cbGlow = NS.OptCheck(L["Color quest items in Bagnon"],
+    L["Yellow: needed for an active quest. Green: done / needed for turn-in. Blue: starts a quest. Grey: no active quest."],
     function() return not QuestFocusDB.noBagGlow end,
     function(v)
         QuestFocusDB.noBagGlow = not v
@@ -645,9 +646,9 @@ local cbGlow = NS.OptCheck("Quest itemek színezése a Bagnonban",
     end)
 cbGlow:SetPoint("TOPLEFT", cbBag, "BOTTOMLEFT", 0, -6)
 
-local cbUse = NS.OptCheck("Quest item gomb a panel mellett",
-    "Ha a kijelölt questhez használható item kell (pl. mobra dobni), egy gomb jelenik meg a QuestFocus panel bal oldalán. "
-    .. "Billentyüt is köthetsz rá: Options > Keybindings > AddOns > QuestFocus.",
+local cbUse = NS.OptCheck(L["Quest item button next to the panel"],
+    L["If the selected quest needs a usable item (e.g. to throw at a mob), a button appears left of the QuestFocus panel. "]
+    .. L["You can bind a key to it: Options > Keybindings > AddOns > QuestFocus."],
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; UpdateUseButton() end)
 cbUse:SetPoint("TOPLEFT", cbGlow, "BOTTOMLEFT", 0, -6)
