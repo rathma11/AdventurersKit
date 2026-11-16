@@ -38,7 +38,7 @@ With no quest selected, the panel suggests what to do next:
 - **Pick up nearby:** the 3 nearest quests you can pick up, from Questie's available quests, with completed quests filtered out. They are colored by difficulty. Click one to put a marker on the quest giver.
 
 ### Buff reminders
-A small row of buttons under the panel:
+Watched buffs (warning + reminder popup). An optional row of buttons under the panel is **off by default**, because the buff frame already shows the timers; turn it on on the Buffs tab:
 - **Sleeping bag:** found in your bags by name. The buff is spell 429959 and needs **3 stacks**. The button shows the stacks (e.g. `54m 2/3`), and fewer than 3 counts as low, the same as an expiring buff.
 - **XP food:** drag the item in once on the Buffs tab.
 - **Weapon enchant:** sharpening stone, weightstone or oil, found by name. Clicking applies it to your main hand.

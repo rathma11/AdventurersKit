@@ -246,7 +246,8 @@ end
 local function Rebuild()
     if InCombatLockdown() then bar.dirty = true return end
     bar.dirty = nil
-    if QuestFocusDB.noBuffBar then bar:Hide() return end
+    -- A gombsor alapbol ki van kapcsolva (a buff idok ugyis latszanak a buff kereten)
+    if not QuestFocusDB.showBuffBar then bar:Hide() return end
     local x, auras = 0, HelpfulAuras()
     for _, b in ipairs(buttons) do
         local slot = b.slot
@@ -282,6 +283,30 @@ NS.RebuildBuffBar = Rebuild
 
 -- Idok + figyelmeztetes (harcban is mehet, nem secure)
 local warned = {}
+
+-- Egyszer szolunk (kepernyo + chat), amikor egy buff a kuszob ala esik. A gombsortol fuggetlen.
+local function CheckWarnings(auras)
+    if QuestFocusDB.noBuffWarn then return end
+    for _, slot in ipairs(SLOTS) do
+        local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
+        local canFix = id and GetItemCount(id) > 0
+        local limit = Minutes(slot) * 60
+        local left = Remaining(slot, id, auras)
+        local key = slot.key
+        if left and left ~= math.huge and left < limit and left > 0 then
+            if not warned[key] and canFix then
+                warned[key] = true
+                local msg = (L["%s expires in %d min"]):format(slot.label, math.max(1, math.ceil(left / 60)))
+                if UIErrorsFrame then UIErrorsFrame:AddMessage("QuestFocus: " .. msg, 1, 0.6, 0.2) end
+                Print(msg)
+            end
+        elseif left and left >= limit then
+            warned[key] = nil
+        end
+    end
+end
+
+-- Gombsor idok + pulzalas (csak ha be van kapcsolva es latszik)
 local function Tick()
     if not bar:IsShown() then return end
     local auras = HelpfulAuras()
@@ -297,18 +322,6 @@ local function Tick()
             b.warn:SetShown(low and canFix)
             b.warn:SetAlpha(pulse + 0.2)
             b.icon:SetDesaturated(not left)
-            -- Egyszer szolunk: amikor a limit ala esik (ha volt buff)
-            local key = slot.key
-            if left and left ~= math.huge and left < limit and left > 0 then
-                if not warned[key] and canFix and not QuestFocusDB.noBuffWarn then
-                    warned[key] = true
-                    local msg = (L["%s expires in %d min"]):format(slot.label, math.ceil(left / 60))
-                    if UIErrorsFrame then UIErrorsFrame:AddMessage("QuestFocus: " .. msg, 1, 0.6, 0.2) end
-                    Print(msg)
-                end
-            elseif left and left >= limit then
-                warned[key] = nil
-            end
         end
     end
 end
@@ -409,7 +422,7 @@ end
 local lastAlertKey
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end
-    if QuestFocusDB.noBuffAlert or QuestFocusDB.noBuffBar or UnitIsDeadOrGhost("player") then
+    if QuestFocusDB.noBuffAlert or UnitIsDeadOrGhost("player") then
         if alert:IsShown() then alert:Hide() end
         lastAlertKey = nil
         return
@@ -476,7 +489,9 @@ alertTicker:SetScript("OnUpdate", function(_, dt)
     alertElapsed = alertElapsed + dt
     if alertElapsed < 1 then return end
     alertElapsed = 0
-    UpdateAlert(HelpfulAuras())
+    local auras = HelpfulAuras()
+    CheckWarnings(auras)
+    UpdateAlert(auras)
     if alert:IsShown() and not InCombatLockdown() then PlaceAlert() end
 end)
 
@@ -519,10 +534,11 @@ end)
 ---------------------------------------------------------------------------
 local page = NS.AddOptionsTab(L["Buffs"])
 
-local cbBar = NS.OptCheck(L["Buff reminder buttons under the panel"],
-    L["Sleeping bag, XP food and weapon enchant buttons with the time left. Click to use the item."],
-    function() return not QuestFocusDB.noBuffBar end,
-    function(v) QuestFocusDB.noBuffBar = not v; Rebuild() end, page)
+local cbBar = NS.OptCheck(L["Buff buttons under the panel (off by default)"],
+    L["Sleeping bag, XP food and weapon enchant buttons with the time left. Click to use the item. "]
+    .. L["Off by default: the buff frame already shows the timers; the reminder popup works without these."],
+    function() return QuestFocusDB.showBuffBar end,
+    function(v) QuestFocusDB.showBuffBar = v; Rebuild() end, page)
 cbBar:SetPoint("TOPLEFT", page, "TOPLEFT", -2, 0)
 
 local cbWarn = NS.OptCheck(L["Warn before a buff expires"],
