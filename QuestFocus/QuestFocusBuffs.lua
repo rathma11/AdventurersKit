@@ -16,6 +16,58 @@ local SLOTS = {
 }
 local BTN = 30
 
+-- Class buffok: 'spells' = a buff nevei (barmelyik eleg, a "Greater ..." is), 'cast' = amit
+-- feltehetunk magunkra. 'permanent': nem jar le (aura / aspect), csak a hianya szamit.
+-- Alapbol azt teszi fel, amit legutobb rajtad latott, kulonben az elso ismert spellt.
+local CLASS_BUFFS = {
+    PALADIN = {
+        { key = "c_blessing", label = L["Blessing"], warn = 1,
+          cast = { "Blessing of Might", "Blessing of Wisdom", "Blessing of Kings", "Blessing of Sanctuary",
+                   "Blessing of Salvation", "Blessing of Light" },
+          spells = { "Blessing of Might", "Blessing of Wisdom", "Blessing of Kings", "Blessing of Sanctuary",
+                     "Blessing of Salvation", "Blessing of Light", "Greater Blessing of Might",
+                     "Greater Blessing of Wisdom", "Greater Blessing of Kings", "Greater Blessing of Sanctuary",
+                     "Greater Blessing of Salvation", "Greater Blessing of Light" } },
+        { key = "c_aura", label = L["Aura"], permanent = true,
+          spells = { "Devotion Aura", "Retribution Aura", "Concentration Aura", "Sanctity Aura",
+                     "Shadow Resistance Aura", "Frost Resistance Aura", "Fire Resistance Aura" } },
+    },
+    MAGE = {
+        { key = "c_int", label = L["Arcane Intellect"], warn = 1, cast = { "Arcane Intellect" },
+          spells = { "Arcane Intellect", "Arcane Brilliance" } },
+        { key = "c_armor", label = L["Armor"], warn = 1,
+          spells = { "Ice Armor", "Frost Armor", "Mage Armor", "Molten Armor" } },
+    },
+    PRIEST = {
+        { key = "c_fort", label = L["Fortitude"], warn = 1, cast = { "Power Word: Fortitude" },
+          spells = { "Power Word: Fortitude", "Prayer of Fortitude" } },
+        { key = "c_inner", label = L["Inner Fire"], warn = 1, spells = { "Inner Fire" } },
+    },
+    DRUID = {
+        { key = "c_motw", label = L["Mark of the Wild"], warn = 1, cast = { "Mark of the Wild" },
+          spells = { "Mark of the Wild", "Gift of the Wild" } },
+        { key = "c_thorns", label = L["Thorns"], warn = 1, spells = { "Thorns" } },
+    },
+    WARLOCK = {
+        { key = "c_armor", label = L["Demon Armor"], warn = 1, spells = { "Fel Armor", "Demon Armor", "Demon Skin" } },
+    },
+    HUNTER = {
+        { key = "c_aspect", label = L["Aspect"], permanent = true,
+          spells = { "Aspect of the Hawk", "Aspect of the Monkey", "Aspect of the Cheetah", "Aspect of the Pack",
+                     "Aspect of the Wild", "Aspect of the Beast", "Aspect of the Viper", "Aspect of the Dragonhawk" } },
+        { key = "c_trueshot", label = L["Trueshot Aura"], permanent = true, spells = { "Trueshot Aura" } },
+    },
+    SHAMAN = {
+        { key = "c_shield", label = L["Shield"], warn = 1, spells = { "Lightning Shield", "Water Shield", "Earth Shield" } },
+    },
+}
+local _, PLAYER_CLASS = UnitClass("player")
+for _, s in ipairs(CLASS_BUFFS[PLAYER_CLASS] or {}) do
+    s.names = {}
+    s.isClass = true
+    SLOTS[#SLOTS + 1] = s
+end
+
 local function DB()
     QuestFocusDB.buffItems = QuestFocusDB.buffItems or {}
     QuestFocusDB.buffLearn = QuestFocusDB.buffLearn or {}
@@ -100,6 +152,19 @@ end
 
 -- Hatralevo mp (nil = nincs buff, math.huge = nem jar le), masodik ertek: stackek szama
 local function Remaining(slot, itemId, auras)
+    if slot.isClass then
+        for _, name in ipairs(slot.spells) do
+            local a = auras[name]
+            if a then
+                -- megjegyezzuk, melyiket hasznalod (ezt tesszuk fel legkozelebb)
+                QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
+                QuestFocusDB.classSeen[slot.key] = name
+                if slot.permanent or a.expires == 0 then return math.huge end
+                return a.expires - GetTime()
+            end
+        end
+        return
+    end
     if slot.spellId then
         local a = auraById[slot.spellId]
         if a then
@@ -130,6 +195,78 @@ local function Remaining(slot, itemId, auras)
             if a.expires == 0 then return math.huge end
             return a.expires - GetTime()
         end
+    end
+end
+
+-- Class spell: ismeri-e a karakter (a spellbookban van-e)
+local function SpellKnown(name)
+    if not name then return false end
+    local ok, info = pcall(function()
+        if C_Spell and C_Spell.GetSpellInfo then return C_Spell.GetSpellInfo(name) end
+        return (GetSpellInfo(name))
+    end)
+    return ok and info ~= nil
+end
+
+local function SpellIconOf(name)
+    local ok, tex = pcall(function()
+        if C_Spell and C_Spell.GetSpellTexture then return C_Spell.GetSpellTexture(name) end
+        return GetSpellTexture(name)
+    end)
+    return ok and tex or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+-- Melyik spellt tegyuk fel: beallitott > legutobb rajtad latott > az elso ismert
+local function SlotSpell(slot)
+    local castable = slot.cast or slot.spells
+    local function ok(name)
+        if not name or not SpellKnown(name) then return false end
+        for _, c in ipairs(castable) do if c == name then return true end end
+        return false
+    end
+    local pref = QuestFocusDB.classPref and QuestFocusDB.classPref[slot.key]
+    if ok(pref) then return pref end
+    local seen = QuestFocusDB.classSeen and QuestFocusDB.classSeen[slot.key]
+    if seen then seen = seen:gsub("^Greater ", "") end
+    if ok(seen) then return seen end
+    for _, c in ipairs(castable) do if SpellKnown(c) then return c end end
+end
+
+-- Mivel lehet "megjavitani" a slotot: { kind = "item", id } vagy { kind = "spell", name }
+local function Action(slot)
+    if DB()["noBuff_" .. slot.key] then return end
+    if slot.isClass then
+        local name = SlotSpell(slot)
+        if name then return { kind = "spell", name = name } end
+        return
+    end
+    local id = FindItem(slot)
+    if id and GetItemCount(id) > 0 then return { kind = "item", id = id } end
+end
+
+local function ActionIcon(a)
+    if a.kind == "spell" then return SpellIconOf(a.name) end
+    return GetItemIcon(a.id)
+end
+
+local function ActionName(a, slot)
+    if a.kind == "spell" then return a.name end
+    return GetItemInfo(a.id) or slot.label
+end
+
+-- Secure gomb beallitasa (csak harcon kivul hivjuk)
+local function SetupSecure(b, slot, a)
+    if a.kind == "spell" then
+        b:SetAttribute("type", "spell")
+        b:SetAttribute("spell", a.name)
+        b:SetAttribute("unit", "player")
+        b:SetAttribute("macrotext", nil)
+    else
+        b:SetAttribute("type", "macro")
+        b:SetAttribute("spell", nil)
+        b:SetAttribute("unit", nil)
+        b:SetAttribute("macrotext", slot.key == "weapon"
+            and ("/use item:%d\n/use 16"):format(a.id) or ("/use item:%d"):format(a.id))
     end
 end
 
@@ -255,7 +392,9 @@ local function Rebuild()
         local count = id and GetItemCount(id) or 0
         b.itemId = id
         local active = Remaining(slot, id, auras)
-        if (id and count > 0) or active then
+        if slot.isClass then
+            b:Hide() -- a gombsorban csak az itemek; class buff a kisablakban
+        elseif (id and count > 0) or active then
             b.icon:SetTexture(id and GetItemIcon(id) or "Interface\\Icons\\INV_Misc_QuestionMark")
             b.count:SetText(count > 1 and count or "")
             if id and count > 0 then
@@ -288,10 +427,10 @@ local warned = {}
 local function CheckWarnings(auras)
     if QuestFocusDB.noBuffWarn then return end
     for _, slot in ipairs(SLOTS) do
-        local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
-        local canFix = id and GetItemCount(id) > 0
+        local a = Action(slot)
+        local canFix = a ~= nil
         local limit = Minutes(slot) * 60
-        local left = Remaining(slot, id, auras)
+        local left = Remaining(slot, a and a.id, auras)
         local key = slot.key
         if left and left ~= math.huge and left < limit and left > 0 then
             if not warned[key] and canFix then
@@ -390,13 +529,20 @@ for i, slot in ipairs(SLOTS) do
     b.text:SetWordWrap(false)
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        if self.itemId then GameTooltip:SetItemByID(self.itemId) end
-        GameTooltip:AddLine(slot.key == "weapon" and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
+        local s = self.slot or slot
+        if self.spellName then
+            GameTooltip:SetText(self.spellName, 1, 1, 1)
+            GameTooltip:AddLine(L["Click: cast it on yourself"], 0.5, 0.5, 0.5)
+        else
+            if self.itemId then GameTooltip:SetItemByID(self.itemId) end
+            GameTooltip:AddLine(s.key == "weapon" and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
+        end
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:HookScript("PreClick", function(self)
-        if self.itemId and slot.key ~= "weapon" then StartLearning(self.itemId) end
+        local s = self.slot or slot
+        if self.itemId and s.key ~= "weapon" and not s.isClass then StartLearning(self.itemId) end
     end)
     b:Hide()
     alertRows[i] = b
@@ -430,14 +576,14 @@ local function UpdateAlert(auras)
     local need, key = {}, ""
     for _, slot in ipairs(SLOTS) do
         local limit = Minutes(slot) * 60
-        local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
-        local left, stacks = Remaining(slot, id, auras)
+        local a = Action(slot)
+        local left, stacks = Remaining(slot, a and a.id, auras)
         local short = ShortStacks(slot, stacks)
         if left and (left == math.huge or left >= limit) and not short then dismissed[slot.key] = nil end
-        if id and GetItemCount(id) > 0 and not dismissed[slot.key]
+        if a and not dismissed[slot.key]
             and (not left or (left ~= math.huge and left < limit) or short) then
-            need[#need + 1] = { slot = slot, id = id, left = left, stacks = stacks }
-            key = key .. slot.key .. id .. ";"
+            need[#need + 1] = { slot = slot, action = a, left = left, stacks = stacks }
+            key = key .. slot.key .. tostring(a.id or a.name) .. ";"
         end
     end
     if #need == 0 then
@@ -464,11 +610,9 @@ local function UpdateAlert(auras)
         for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide() end
         for i, n in ipairs(need) do
             local b = alertRows[i]
-            b.slot, b.itemId = n.slot, n.id
-            b.icon:SetTexture(GetItemIcon(n.id))
-            b:SetAttribute("type", "macro")
-            b:SetAttribute("macrotext", n.slot.key == "weapon"
-                and ("/use item:%d\n/use 16"):format(n.id) or ("/use item:%d"):format(n.id))
+            b.slot, b.itemId, b.spellName = n.slot, n.action.id, n.action.name
+            b.icon:SetTexture(ActionIcon(n.action))
+            SetupSecure(b, n.slot, n.action)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
             b:Show()
@@ -482,7 +626,7 @@ local function UpdateAlert(auras)
         end
     end
     for i, n in ipairs(need) do
-        local name = GetItemInfo(n.id) or n.slot.label
+        local name = ActionName(n.action, n.slot)
         local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
             .. StackText(n.slot, n.stacks)
         alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
@@ -722,7 +866,8 @@ hint:SetJustifyH("LEFT")
 hint:SetText(L["Items: drag one from your bags onto a slot. Right click: automatic / none. "]
     .. L["Sleeping bag and weapon enchant are found by name if no item is set; XP food must be dragged in once. "]
     .. L["The buff an item gives is learned the first time you use it from the button. "]
-    .. L["The number box: warn this many minutes before the buff runs out (Enter to save)."])
+    .. L["The number box: warn this many minutes before the buff runs out (Enter to save). "]
+    .. L["Class buffs: by default the one you last had on is cast; drag a spell from your spellbook (P) onto the slot to choose."])
 
 local slotUI = {}
 local last = hint
@@ -765,6 +910,15 @@ for i, slot in ipairs(SLOTS) do
         s.min:SetText(Minutes(slot))
         local db = DB()
         local off = db["noBuff_" .. slot.key]
+        if slot.isClass then
+            local pref = db.classPref and db.classPref[slot.key]
+            local name = not off and SlotSpell(slot)
+            s.icon:SetTexture(name and SpellIconOf(name) or "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+            local mode = off and L["off"] or (pref and L["set"] or L["automatic"])
+            s.text:SetText(("%s: |cffffff00%s|r  |cff808080(%s)|r"):format(slot.label,
+                name or (off and "-" or L["not known"]), mode))
+            return
+        end
         local set = db.buffItems[slot.key]
         local id = not off and FindItem(slot)
         s.icon:SetTexture(id and GetItemIcon(id) or "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
@@ -773,7 +927,24 @@ for i, slot in ipairs(SLOTS) do
         s.text:SetText(("%s: |cffffff00%s|r  |cff808080(%s)|r"):format(slot.label, name or "-", mode))
     end
     local function FromCursor()
-        local kind, itemId = GetCursorInfo()
+        local kind, itemId, _, spellID = GetCursorInfo()
+        if slot.isClass then
+            -- class slotra spellt huzhatsz a spellbookbol (P): azt teszi fel
+            if kind ~= "spell" then return end
+            local ok, name = pcall(function()
+                if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(spellID) end
+                return (GetSpellInfo(spellID))
+            end)
+            ClearCursor()
+            if ok and name then
+                QuestFocusDB.classPref = QuestFocusDB.classPref or {}
+                QuestFocusDB.classPref[slot.key] = name
+                DB()["noBuff_" .. slot.key] = nil
+                lastAlertKey = nil
+            end
+            s.refresh()
+            return
+        end
         if kind ~= "item" then return end
         ClearCursor()
         DB().buffItems[slot.key] = itemId
@@ -786,7 +957,10 @@ for i, slot in ipairs(SLOTS) do
         if button == "RightButton" then
             local db = DB()
             -- jobb klikk: beallitott -> automatikus -> kikapcsolva -> automatikus
-            if db.buffItems[slot.key] then
+            lastAlertKey = nil
+            if slot.isClass and db.classPref and db.classPref[slot.key] then
+                db.classPref[slot.key] = nil
+            elseif db.buffItems[slot.key] then
                 db.buffItems[slot.key] = nil
             else
                 db["noBuff_" .. slot.key] = not db["noBuff_" .. slot.key] or nil

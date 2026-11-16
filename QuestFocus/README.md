@@ -53,6 +53,17 @@ Watched buffs (warning + reminder popup). An optional row of buttons under the p
 
 Each button shows the time left on its buff. When the buff is missing, or about to run out, the button pulses red. "About to run out" is set per buff on the Buffs tab: by default 10 min for the sleeping bag, and 1 min for the XP food and the weapon enchant (so those only warn when missing or almost gone). You also get one warning on screen and in chat. The buff an item gives is learned the first time you use it from the button.
 
+**Class buffs.** Your class's own buffs are watched too, and clicking the icon casts the buff on you:
+- **Paladin:** Blessing (any, Greater too) and Aura.
+- **Mage:** Arcane Intellect and armor.
+- **Priest:** Fortitude and Inner Fire.
+- **Druid:** Mark of the Wild and Thorns.
+- **Warlock:** Demon Skin / Armor.
+- **Hunter:** Aspect and Trueshot Aura.
+- **Shaman:** Lightning / Water Shield.
+
+By default it casts the one you last had on (e.g. Blessing of Might). To choose, drag a spell from your spellbook onto its slot on the Buffs tab. Auras and aspects only count when they are missing. Timed buffs warn 1 min before they run out (you can change this).
+
 **Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. The X hides that reminder until the buff is applied again. The popup disappears when combat starts, because the game does not allow it to stay up in combat. It uses the same spot as the progress popup: if a progress popup is showing (e.g. right after combat), the reminder waits until it fades.
 
 ## Commands
