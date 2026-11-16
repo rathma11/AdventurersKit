@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: QuestFocus
+## Notes: Quest celpont macro (QFocus), marker es tooltip a Questie adataibol
+## Version: 0.1.0
+## OptionalDeps: Questie, TomTom
+## SavedVariables: QuestFocusDB
+
+QuestFocus.lua
