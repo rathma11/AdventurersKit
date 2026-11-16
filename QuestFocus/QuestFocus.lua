@@ -1267,7 +1267,15 @@ QF:SetScript("OnEvent", function(self, event, arg1)
             UIErrorsFrame:AddMessage(L["QuestFocus: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
         -- Target valtas: a ping sor ki/be (uj celpontra pingel, a mostanira nem)
-        if state.questId and not InCombatLockdown() then UpdateMacro() end
+        -- Kesleltetve! A /target sor meg a macro futasa KOZBEN valtja ki ezt az esemenyt;
+        -- ha azonnal atirnank a macrot, a hatralevo sorai (a ping) mar nem futnanak le.
+        if state.questId and not state.targetRebuildPending then
+            state.targetRebuildPending = true
+            C_Timer.After(0.5, function()
+                state.targetRebuildPending = nil
+                if state.questId and not InCombatLockdown() then UpdateMacro() end
+            end)
+        end
         return
     end
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
