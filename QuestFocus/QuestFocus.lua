@@ -893,8 +893,24 @@ local function FooterText()
     local distTxt = dist and ("|cff99ccff%d yd|r"):format(dist) or nil
     local objs = state.objectives or {}
     if objs[1] and objs[1].turnIn then
-        local name = objs[1].sources[1] and objs[1].sources[1].name or "?"
-        return (L["|cffffff00Turn in:|r %s%s"]):format(name, distTxt and (" - " .. distTxt) or "")
+        -- A leado NPC neve mar ott van az objective sorban: itt csak hogy mit csinal a macro
+        local _, d = FindNearest(objs[1].sources)
+        local npcTxt = d and ("|cff99ccff%d yd|r"):format(d) or nil
+        local far = not d or d > 100
+        if not (far and state.extra and #state.extra > 0) then
+            return L["Macro: targets the turn-in NPC"] .. (npcTxt and (" - " .. npcTxt) or "")
+        end
+        -- messze az NPC, a macro a kozeli quest mobokat targeteli
+        local u = state.pick
+        local mob
+        if u == "busy" then
+            mob = L["|cffff9933Nearby mobs are taken|r"]
+        elseif u and UnitExists(u) then
+            mob = (L["|cff33ff99Target:|r %s"]):format(UnitName(u) or "?")
+        else
+            mob = L["No mob nearby"]
+        end
+        return mob .. (npcTxt and (L[" - turn-in "] .. npcTxt) or "")
     end
     if (state.macroCount or 0) == 0 then
         return L["No targetable mob (item / object gathering)"] .. (distTxt and (" - " .. distTxt) or "")
