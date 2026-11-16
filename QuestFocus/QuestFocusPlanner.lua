@@ -546,13 +546,16 @@ ev:RegisterEvent("PLAYER_LOGIN")
 local scanPending = false
 ev:SetScript("OnEvent", function(_, event)
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local _, sub, _, srcGUID, _, _, _, dstGUID = CombatLogGetCurrentEventInfo()
-        if sub == "PARTY_KILL" and (srcGUID == UnitGUID("player") or srcGUID == UnitGUID("pet")) then
-            RecordKill(dstGUID)
-        elseif sub == "UNIT_DIED" and dstGUID and dstGUID == UnitGUID("target")
-            and UnitIsTapDenied and not UnitIsTapDenied("target") and UnitCanAttack("player", "target") then
-            RecordKill(dstGUID)
-        end
+        -- Ezen a kliensen harcban egyes ertekek "secret"-ek lehetnek: vedetten
+        pcall(function()
+            local _, sub, _, srcGUID, _, _, _, dstGUID = CombatLogGetCurrentEventInfo()
+            if sub == "PARTY_KILL" and (srcGUID == UnitGUID("player") or srcGUID == UnitGUID("pet")) then
+                RecordKill(dstGUID)
+            elseif sub == "UNIT_DIED" and dstGUID and dstGUID == UnitGUID("target")
+                and UnitIsTapDenied and not UnitIsTapDenied("target") and UnitCanAttack("player", "target") then
+                RecordKill(dstGUID)
+            end
+        end)
     elseif event == "QUEST_LOG_UPDATE" then
         -- A Questie a sajat esemenyere frissiti a Collected ertekeket: kicsit kesobb nezzuk
         if scanPending then return end

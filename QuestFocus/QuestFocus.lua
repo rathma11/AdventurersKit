@@ -1359,6 +1359,13 @@ local function DebugLines()
     if not any then out[#out + 1] = L["  (none)"] end
     out[#out + 1] = "Macro:"
     for line in (state.lastBody or "-"):gmatch("[^\n]+") do out[#out + 1] = "  " .. line end
+    local errs = NS.errors or {}
+    out[#out + 1] = " "
+    out[#out + 1] = (L["|cffff5555Lua errors: %d|r"]):format(#errs)
+    for _, e in ipairs(errs) do
+        out[#out + 1] = ("  [%s] x%d  %s"):format(e.time, e.count, e.msg)
+        for line in (e.stack or ""):gmatch("[^\n]+") do out[#out + 1] = "      |cff808080" .. line .. "|r" end
+    end
     return out
 end
 
@@ -1640,7 +1647,7 @@ optNote:SetPoint("TOPLEFT", cbMinimap, "BOTTOMLEFT", 2, -16)
 
 -- Debug ful
 local dbgScroll = CreateFrame("ScrollFrame", nil, pageDebug, "UIPanelScrollFrameTemplate")
-dbgScroll:SetPoint("TOPLEFT", 0, -30)
+dbgScroll:SetPoint("TOPLEFT", 0, -60)
 dbgScroll:SetPoint("BOTTOMRIGHT", -26, 0)
 local dbgChild = CreateFrame("Frame", nil, dbgScroll)
 dbgChild:SetSize(560, 400)
@@ -1666,8 +1673,20 @@ dbgChat:SetText(L["Print to chat"])
 dbgChat:SetScript("OnClick", function() for _, l in ipairs(DebugLines()) do Print(l) end end)
 local dbgLive = OptLabel(pageDebug, L["Live: refreshes every 0.5 s while open."], "GameFontDisableSmall")
 dbgLive:SetPoint("LEFT", dbgChat, "RIGHT", 10, 0)
+
+local cbErrors = OptCheck(L["Lua error popup for QuestFocus errors"],
+    L["Off: QuestFocus errors don't open the error window, they are only listed here (and one line in chat). "]
+    .. L["On: the normal Lua error window shows them too. Other addons are not affected."],
+    function() return QuestFocusDB.showErrors end,
+    function(v) QuestFocusDB.showErrors = v end, pageDebug)
+cbErrors:SetPoint("TOPLEFT", dbgRefresh, "BOTTOMLEFT", -2, -4)
+local dbgClear = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
+dbgClear:SetSize(110, 22)
+dbgClear:SetPoint("LEFT", cbErrors.label, "RIGHT", 16, 0)
+dbgClear:SetText(L["Clear errors"])
+dbgClear:SetScript("OnClick", function() wipe(NS.errors); RefreshDebug() end)
 local dbgElapsed = 0
-pageDebug:SetScript("OnShow", RefreshDebug)
+pageDebug:SetScript("OnShow", function() cbErrors.refresh(); RefreshDebug() end)
 pageDebug:SetScript("OnUpdate", function(_, dt)
     dbgElapsed = dbgElapsed + dt
     if dbgElapsed > 0.5 then dbgElapsed = 0; RefreshDebug() end

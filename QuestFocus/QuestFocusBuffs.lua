@@ -58,28 +58,47 @@ local function ItemSpell(id)
     if ok then return name, spellId end
 end
 
-local function HelpfulAuras()
+-- Ezen a kliensen harcban az aurak "secret" ertekek: addon nem olvashatja (hibat dob).
+-- Ezert csak harcon kivul olvasunk, harcban a legutobbi eredmeny (abszolut lejarati idok) megy.
+local auraCache = {}
+local function ReadAuras()
     local out = {}
     for i = 1, 40 do
-        local name, _, _, _, duration, expires
+        local ok, name, duration, expires, _
         if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-            local a = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+            local a
+            ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+            if not ok then return nil end
             if not a then break end
-            name, duration, expires = a.name, a.duration, a.expirationTime
+            ok = pcall(function() name, duration, expires = a.name, a.duration, a.expirationTime end)
+            if not ok then return nil end
         else
-            name, _, _, _, duration, expires = UnitAura("player", i, "HELPFUL")
+            ok, name, _, _, _, duration, expires = pcall(UnitAura, "player", i, "HELPFUL")
+            if not ok then return nil end
             if not name then break end
         end
-        out[name] = { duration = duration or 0, expires = expires or 0 }
+        if type(name) == "string" then
+            out[name] = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0 }
+        end
     end
     return out
+end
+
+local function HelpfulAuras()
+    if InCombatLockdown() then return auraCache end
+    local ok, fresh = pcall(ReadAuras)
+    if ok and fresh then auraCache = fresh end
+    return auraCache
 end
 
 -- Hatralevo mp (nil = nincs buff, math.huge = nem jar le)
 local function Remaining(slot, itemId, auras)
     if slot.key == "weapon" then
-        local has, ms = GetWeaponEnchantInfo()
-        if has then return (ms or 0) / 1000 end
+        local ok, has, ms = pcall(GetWeaponEnchantInfo)
+        if ok and has then
+            local okN, sec = pcall(function() return (ms or 0) / 1000 end)
+            if okN then return sec end
+        end
         return
     end
     local names = {}
