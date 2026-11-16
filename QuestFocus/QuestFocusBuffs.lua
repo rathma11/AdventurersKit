@@ -531,10 +531,171 @@ ev:SetScript("OnEvent", function(_, event, unit)
         if bar.dirty then Rebuild() end
     elseif event == "PLAYER_LOGIN" then
         C_Timer.After(3, Rebuild)
+        -- XP kaja valaszto: ha nincs beallitva (a panel betoltese utan)
+        C_Timer.After(12, function() if NS.MaybePromptFood then NS.MaybePromptFood() end end)
     else
         Soon()
     end
 end)
+
+---------------------------------------------------------------------------
+-- XP kaja valaszto: ha nincs beallitva, listazza a taskaban levo jelolteket
+-- (amiknek a leirasaban "experience" / "XP" van elol, utana a tobbi etel/ital)
+---------------------------------------------------------------------------
+local scanTip = CreateFrame("GameTooltip", "QuestFocusScanTip", nil, "GameTooltipTemplate")
+local function TooltipText(bag, slot)
+    local ok = pcall(function()
+        scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+        scanTip:ClearLines()
+        scanTip:SetBagItem(bag, slot)
+    end)
+    if not ok then return "" end
+    local parts = {}
+    for i = 1, scanTip:NumLines() do
+        local fs = _G["QuestFocusScanTipTextLeft" .. i]
+        local txt = fs and fs:GetText()
+        if txt then parts[#parts + 1] = txt end
+    end
+    scanTip:Hide()
+    return table.concat(parts, "\n")
+end
+
+local function FoodCandidates()
+    local xp, other, seen = {}, {}, {}
+    for bag = 0, 4 do
+        for s = 1, (GetSlots(bag) or 0) do
+            local id = GetItemID(bag, s)
+            if id and not seen[id] then
+                seen[id] = true
+                local _, _, _, _, _, classID, subID = GetItemInfoInstant(id)
+                local tip = TooltipText(bag, s):lower()
+                local isXP = tip:find("experience", 1, true) or tip:find("%f[%w]xp%f[%W]")
+                if isXP and classID == 0 then
+                    xp[#xp + 1] = id
+                elseif classID == 0 and subID == 5 then -- Consumable > Food & Drink
+                    other[#other + 1] = id
+                end
+            end
+        end
+    end
+    return xp, other
+end
+
+local picker = CreateFrame("Frame", "QuestFocusFoodPicker", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+picker:SetSize(280, 80)
+picker:SetPoint("CENTER", UIParent, "CENTER", 0, 140)
+picker:SetFrameStrata("DIALOG")
+picker:EnableMouse(true)
+picker:SetMovable(true)
+picker:RegisterForDrag("LeftButton")
+picker:SetScript("OnDragStart", picker.StartMoving)
+picker:SetScript("OnDragStop", picker.StopMovingOrSizing)
+picker:Hide()
+if picker.SetBackdrop then
+    picker:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 16, edgeSize = 20,
+        insets = { left = 5, right = 5, top = 5, bottom = 5 },
+    })
+    picker:SetBackdropColor(0.04, 0.04, 0.06, 0.95)
+    picker:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
+end
+picker.title = picker:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+picker.title:SetPoint("TOPLEFT", 14, -12)
+picker.title:SetText(L["Choose your XP food"])
+picker.sub = picker:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+picker.sub:SetPoint("TOPLEFT", picker.title, "BOTTOMLEFT", 0, -3)
+picker.sub:SetText(L["Click the one that gives the XP buff."])
+local pClose = CreateFrame("Button", nil, picker, "UIPanelCloseButton")
+pClose:SetSize(24, 24)
+pClose:SetPoint("TOPRIGHT", -4, -4)
+pClose:SetScript("OnClick", function() picker:Hide() end)
+local pNever = CreateFrame("Button", nil, picker, "UIPanelButtonTemplate")
+pNever:SetSize(110, 20)
+pNever:SetText(L["Don't ask again"])
+pNever:SetScript("OnClick", function() QuestFocusDB.noFoodPrompt = true; picker:Hide() end)
+picker.empty = picker:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+picker.empty:SetText(L["No food found in your bags."])
+
+local pickRows = {}
+local function PickRow(i)
+    local r = pickRows[i]
+    if r then return r end
+    r = CreateFrame("Button", nil, picker)
+    r:SetSize(250, 22)
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(20, 20)
+    r.icon:SetPoint("LEFT")
+    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.text:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+    r.text:SetPoint("RIGHT")
+    r.text:SetJustifyH("LEFT")
+    r.text:SetWordWrap(false)
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.1)
+    r:SetScript("OnClick", function(self)
+        DB().buffItems.food = self.itemId
+        DB().noBuff_food = nil
+        picker:Hide()
+        Print((L["XP food set: %s"]):format(GetItemInfo(self.itemId) or self.itemId))
+        lastAlertKey = nil
+        Rebuild()
+        if NS.RefreshBuffOptions then NS.RefreshBuffOptions() end
+    end)
+    r:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetItemByID(self.itemId)
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    pickRows[i] = r
+    return r
+end
+
+local function ShowFoodPicker()
+    local xp, other = FoodCandidates()
+    for _, r in ipairs(pickRows) do r:Hide() end
+    local y, n = -44, 0
+    local function add(id, isXP)
+        if n >= 10 then return end
+        n = n + 1
+        local r = PickRow(n)
+        r.itemId = id
+        r.icon:SetTexture(GetItemIcon(id))
+        local count = GetItemCount(id)
+        r.text:SetText(((isXP and "|cff33ff99XP|r  " or "") .. (GetItemInfo(id) or ("item " .. id)))
+            .. (count > 1 and ("  |cff808080x" .. count .. "|r") or ""))
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", picker, "TOPLEFT", 14, y)
+        r:Show()
+        y = y - 24
+    end
+    for _, id in ipairs(xp) do add(id, true) end
+    for _, id in ipairs(other) do add(id, false) end
+    picker.empty:SetShown(n == 0)
+    if n == 0 then
+        picker.empty:ClearAllPoints()
+        picker.empty:SetPoint("TOPLEFT", 14, y)
+        y = y - 20
+    end
+    pNever:ClearAllPoints()
+    pNever:SetPoint("TOPRIGHT", picker, "TOPRIGHT", -14, y - 6)
+    picker:SetHeight(-y + 40)
+    picker:Show()
+end
+NS.ShowFoodPicker = ShowFoodPicker
+
+-- Bejelentkezes utan egyszer felajanljuk, ha nincs XP kaja beallitva, de van etel a taskaban
+local function MaybePromptFood()
+    if InCombatLockdown() or QuestFocusDB.noFoodPrompt or DB().buffItems.food or DB().noBuff_food then return end
+    local xp, other = FoodCandidates()
+    if #xp + #other == 0 then return end
+    ShowFoodPicker()
+end
+NS.MaybePromptFood = MaybePromptFood
 
 ---------------------------------------------------------------------------
 -- Beallitasok: "Buffs" ful
@@ -646,6 +807,16 @@ local cbAlert = NS.OptCheck(L["Reminder popup out of combat"],
     function() return not QuestFocusDB.noBuffAlert end,
     function(v) QuestFocusDB.noBuffAlert = not v; wipe(dismissed); lastAlertKey = nil end, page)
 cbAlert:SetPoint("TOPLEFT", last, "BOTTOMLEFT", -2, -14)
+
+local pickBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+pickBtn:SetSize(170, 22)
+pickBtn:SetPoint("TOPLEFT", cbAlert, "BOTTOMLEFT", 2, -10)
+pickBtn:SetText(L["Choose XP food from bags"])
+pickBtn:SetScript("OnClick", ShowFoodPicker)
+
+NS.RefreshBuffOptions = function()
+    for _, s in ipairs(slotUI) do s.refresh() end
+end
 
 page:SetScript("OnShow", function()
     cbBar.refresh(); cbWarn.refresh(); cbAlert.refresh()

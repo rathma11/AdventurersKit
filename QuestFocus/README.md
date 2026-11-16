@@ -45,7 +45,7 @@ With no quest selected, the panel suggests what to do next:
 ### Buff reminders
 Watched buffs (warning + reminder popup). An optional row of buttons under the panel is **off by default**, because the buff frame already shows the timers; turn it on on the Buffs tab:
 - **Sleeping bag:** found in your bags by name. The buff is spell 429959 and needs **3 stacks**. The button shows the stacks (e.g. `54m 2/3`), and fewer than 3 counts as low, the same as an expiring buff.
-- **XP food:** drag the item in once on the Buffs tab.
+- **XP food:** if none is set, a picker opens about 12 s after login. It lists the food in your bags, with items whose description mentions XP or experience first (marked "XP"). Click one to set it. "Don't ask again" stops the picker. You can open it any time with **Choose XP food from bags** on the Buffs tab, or drag an item onto the slot.
 - **Weapon enchant:** sharpening stone, weightstone or oil, found by name. Clicking applies it to your main hand.
 
 Each button shows the time left on its buff. When the buff is missing, or about to run out, the button pulses red. "About to run out" is set per buff on the Buffs tab: by default 10 min for the sleeping bag, and 1 min for the XP food and the weapon enchant (so those only warn when missing or almost gone). You also get one warning on screen and in chat. The buff an item gives is learned the first time you use it from the button.
