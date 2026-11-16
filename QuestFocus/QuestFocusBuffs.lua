@@ -51,8 +51,11 @@ end
 
 local function ItemSpell(id)
     if not id then return end
-    local name, spellId = GetItemSpell(id)
-    return name, spellId
+    -- Ezen a kliensen a GetItemSpell hibat dobhat: vedetten hivjuk
+    local fn = (C_Item and C_Item.GetItemSpell) or GetItemSpell
+    if not fn then return end
+    local ok, name, spellId = pcall(fn, id)
+    if ok then return name, spellId end
 end
 
 local function HelpfulAuras()
@@ -172,10 +175,19 @@ for i, slot in ipairs(SLOTS) do
     buttons[i] = b
 end
 
+-- Secure gombot NEM horgonyzunk a panelhez (attol a panel is vedett lenne, es harcban
+-- a meretezese/mozgatasa blokkolva lenne): a panel kepernyo-pozicioja alapjan tesszuk le.
+local lastGeo
 local function Anchor()
+    if InCombatLockdown() then return end
+    local p = NS.panel
+    local r, b = p:GetRight(), p:GetBottom()
+    local geo = p:IsShown() and r and b and (math.floor(r) .. ":" .. math.floor(b)) or "none"
+    if geo == lastGeo and bar:GetNumPoints() > 0 then return end
+    lastGeo = geo
     bar:ClearAllPoints()
-    if NS.panel:IsShown() then
-        bar:SetPoint("TOPRIGHT", NS.panel, "BOTTOMRIGHT", -4, -2)
+    if geo ~= "none" then
+        bar:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", r - 4, b - 2)
     else
         bar:SetPoint("RIGHT", UIParent, "RIGHT", -264, -20)
     end
@@ -213,6 +225,7 @@ local function Rebuild()
     end
     if x == 0 then bar:Hide() return end
     bar:SetWidth(x)
+    lastGeo = nil
     Anchor()
     bar:Show()
 end
@@ -257,11 +270,8 @@ bar:SetScript("OnUpdate", function(_, dt)
     if elapsed < 0.25 then return end
     elapsed = 0
     Tick()
+    Anchor() -- a panel mozgott / atmeretezodott (csak harcon kivul tesz barmit)
 end)
-
--- A panel ki/be: ujrahorgonyzas (csak harcon kivul)
-NS.panel:HookScript("OnShow", function() if not InCombatLockdown() and bar:IsShown() then Anchor() end end)
-NS.panel:HookScript("OnHide", function() if not InCombatLockdown() and bar:IsShown() then Anchor() end end)
 
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
