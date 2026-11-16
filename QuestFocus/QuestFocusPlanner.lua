@@ -390,6 +390,39 @@ local function BuildRoute(pc, px, py)
     return route
 end
 
+-- A kijelolt mellett: a quest log tobbi questjenek hatralevo mob-objective-jei, amiknek
+-- van spawnja 'radius' yardon belul. Legkozelebbi elol, max 4.
+NS.NearbyQuestTargets = function(exclude, radius)
+    local pc, px, py = NS.PlayerWorldPos()
+    if not pc then return {} end
+    local out = {}
+    for i = 1, NS.NumLogEntries() do
+        local title, isHeader, qid, done = NS.GetLogEntry(i)
+        if not isHeader and qid and qid ~= exclude and not done then
+            local q = NS.GetQuestieQuest(qid)
+            if q then
+                for _, o in ipairs(NS.CollectTargets(q, false)) do
+                    if not o.completed and not o.turnIn then
+                        local npcs, names = {}, {}
+                        for _, s in ipairs(o.sources) do
+                            if s.isNpc and s.name then npcs[#npcs + 1] = s; names[#names + 1] = s.name end
+                        end
+                        if #npcs > 0 then
+                            local _, d = Nearest(npcs, pc, px, py)
+                            if d and d <= radius then
+                                out[#out + 1] = { qid = qid, title = title, desc = o.desc, names = names, dist = d, obj = o }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a.dist < b.dist end)
+    for i = #out, 5, -1 do out[i] = nil end
+    return out
+end
+
 local function IsDone(qid)
     if C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted and C_QuestLog.IsQuestFlaggedCompleted(qid) then return true end
     if IsQuestFlaggedCompleted and IsQuestFlaggedCompleted(qid) then return true end
@@ -648,8 +681,19 @@ local cbToast = NS.OptCheck(L["Progress popup"],
     function(v) QuestFocusDB.noToast = not v end, pagePanel)
 cbToast:SetPoint("TOPLEFT", cbSuggest, "BOTTOMLEFT", 0, -6)
 
+local cbNearby = NS.OptCheck(L["Also target mobs of other nearby quests"],
+    L["Mobs of other quests in your log that are within ~200 yards are added to the QFocus macro, "]
+    .. L["and listed on the panel under ALSO NEARBY (click one to focus that quest)."],
+    function() return not QuestFocusDB.noNearbyQuests end,
+    function(v)
+        QuestFocusDB.noNearbyQuests = not v
+        if not v then state.extra = nil end
+        NS.Panel_Update()
+    end, pagePanel)
+cbNearby:SetPoint("TOPLEFT", cbToast, "BOTTOMLEFT", 0, -6)
+
 local etaNote = pagePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-etaNote:SetPoint("TOPLEFT", cbToast, "BOTTOMLEFT", 2, -14)
+etaNote:SetPoint("TOPLEFT", cbNearby, "BOTTOMLEFT", 2, -14)
 etaNote:SetWidth(520)
 etaNote:SetJustifyH("LEFT")
 etaNote:SetText(L["Time left is learned from your own pace: how fast each objective counter grew, otherwise "]
@@ -665,4 +709,4 @@ resetPace:SetScript("OnClick", function()
     wipe(mobKills)
     NS.Print(L["Kill pace reset."])
 end)
-NS.opt:HookScript("OnShow", function() cbSuggest.refresh(); cbToast.refresh() end)
+NS.opt:HookScript("OnShow", function() cbSuggest.refresh(); cbToast.refresh(); cbNearby.refresh() end)

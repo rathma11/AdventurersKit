@@ -423,24 +423,32 @@ local function BuildMacroBody(objectives, onlyIndex)
     for _, t in ipairs(tail) do len = len + #t + 1 end
     local n = 0
     wipe(targetNames)
+    local function addName(name)
+        if not name or seen[name] then return end
+        seen[name] = true
+        targetNames[name] = true
+        n = n + 1
+        if not pick then -- nev szerint, ha nincs latszo quest mob nameplate (vagy harc)
+            local line = "/targetexact [noexists] " .. name
+            local cost = #line + 1 + #DEADCLR + 1
+            if len + cost <= MACRO_MAX then
+                lines[#lines + 1] = line
+                lines[#lines + 1] = DEADCLR
+                len = len + cost
+            end
+        end
+    end
     for i, obj in ipairs(objectives or {}) do
         if (onlyIndex == nil and not obj.completed) or onlyIndex == i then
             for _, src in ipairs(obj.sources) do
-                if src.isNpc and src.name and not seen[src.name] then
-                    seen[src.name] = true
-                    targetNames[src.name] = true
-                    n = n + 1
-                    if not pick then -- nev szerint, ha nincs latszo quest mob nameplate (vagy harc)
-                        local line = "/targetexact [noexists] " .. src.name
-                        local cost = #line + 1 + #DEADCLR + 1
-                        if len + cost <= MACRO_MAX then
-                            lines[#lines + 1] = line
-                            lines[#lines + 1] = DEADCLR
-                            len = len + cost
-                        end
-                    end
-                end
+                if src.isNpc then addName(src.name) end
             end
+        end
+    end
+    -- A kozelben levo tobbi quest mobjai is (ha nem egy konkret objective-re szukitettel)
+    if not turnIn and onlyIndex == nil then
+        for _, e in ipairs(state.extra or {}) do
+            for _, name in ipairs(e.names) do addName(name) end
         end
     end
     if n == 0 then
@@ -997,6 +1005,48 @@ panel:HookScript("OnUpdate", function(_, dt)
     if state.questId then UpdateStats() end
 end)
 
+local SelectQuestRef -- lent: SelectQuest
+
+-- "ALSO NEARBY": a kozelben levo tobbi quest mob-objective-jei (a macro ezeket is targeteli)
+panel.extraHeader = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+panel.extraHeader:SetTextColor(0.75, 0.65, 0.45)
+panel.extraHeader:SetText(L["ALSO NEARBY (in the macro too)"])
+panel.extraRows = {}
+local function GetExtraRow(i)
+    local r = panel.extraRows[i]
+    if r then return r end
+    r = CreateFrame("Button", nil, panel)
+    r:SetSize(PANEL_W - 24, 16)
+    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.text:SetAllPoints()
+    r.text:SetJustifyH("LEFT")
+    r.text:SetWordWrap(false)
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    r:SetScript("OnClick", function(self)
+        local e = self.extra
+        if e and SelectQuestRef then SelectQuestRef(e.qid, e.title, false, true) end
+    end)
+    r:SetScript("OnEnter", function(self)
+        local e = self.extra
+        if not e then return end
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText(e.title or "?", 1, 1, 1)
+        GameTooltip:AddLine(e.desc, 1, 0.82, 0, true)
+        GameTooltip:AddLine(table.concat(e.names, ", "), 0.9, 0.9, 0.9, true)
+        GameTooltip:AddLine((L["Nearest: %d yd"]):format(e.dist), 0.6, 0.8, 1)
+        local eta = NS.EtaLine and NS.EtaLine(e.obj)
+        if eta then GameTooltip:AddLine(eta, 0.8, 0.8, 0.8, true) end
+        GameTooltip:AddLine(L["The QFocus macro targets these mobs too."], 0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Click: focus this quest"], 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    panel.extraRows[i] = r
+    return r
+end
+
 local function Panel_Update()
     if QuestFocusDB.hidePanel then
         panel:Hide()
@@ -1005,6 +1055,8 @@ local function Panel_Update()
     if not state.questId then
         -- Nincs kijelolt quest: javaslatok (QuestFocusPlanner.lua)
         for i = 1, #panel.lines do panel.lines[i]:Hide() end
+        for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
+        panel.extraHeader:Hide()
         panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
         if NS.ShowSuggestions and NS.ShowSuggestions() then panel:Show() else panel:Hide() end
         return
@@ -1029,6 +1081,31 @@ local function Panel_Update()
         y = y - 17
     end
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
+    -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
+    local extras = (not state.isComplete and state.objIndex == nil) and state.extra or nil
+    local nExtra = 0
+    if extras and #extras > 0 then
+        y = y - 4
+        panel.extraHeader:ClearAllPoints()
+        panel.extraHeader:SetPoint("TOPLEFT", 14, y)
+        panel.extraHeader:Show()
+        y = y - 15
+        for i, e in ipairs(extras) do
+            local r = GetExtraRow(i)
+            r.extra = e
+            local eta = NS.EtaShort and NS.EtaShort(e.obj)
+            r.text:SetText(("|TInterface\\COMMON\\Indicator-Yellow:12:12|t |cffd8c8a0%s:|r %s%s"):format(
+                e.title or "?", e.desc or "?", eta and ("  |cff999999" .. eta .. "|r") or ""))
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+            r:Show()
+            y = y - 17
+            nExtra = i
+        end
+    else
+        panel.extraHeader:Hide()
+    end
+    for i = nExtra + 1, #panel.extraRows do panel.extraRows[i]:Hide() end
     if #objs == 0 then
         panel.footer:SetText(QuestieAvailable() and L["No objective data for this quest."] or L["Questie is not loaded."])
     else
@@ -1071,6 +1148,7 @@ local function SelectQuest(questId, title, isComplete, mark)
     end
     if mark then state.lastMarkQuest, state.lastMarkTime = questId, now end
     local changed = questId ~= state.questId
+    if changed then state.extra = nil end -- a ticker 3 mp-en belul ujraszamolja
     state.questId = questId
     state.title = title or state.title
     state.isComplete = isComplete and true or false
@@ -1080,8 +1158,34 @@ local function SelectQuest(questId, title, isComplete, mark)
     if mark then MarkObjective(state.objIndex) end
 end
 
+SelectQuestRef = SelectQuest
+
+-- Kozeli tobbi quest figyelese (3 mp-enkent, harcon kivul): a macro es a panel frissul
+local extraTicker = CreateFrame("Frame")
+local extraElapsed, lastExtraKey = 0, nil
+extraTicker:SetScript("OnUpdate", function(_, dt)
+    extraElapsed = extraElapsed + dt
+    if extraElapsed < 3 then return end
+    extraElapsed = 0
+    if not state.questId or InCombatLockdown() then return end
+    local list = {}
+    if not QuestFocusDB.noNearbyQuests and not state.isComplete and NS.NearbyQuestTargets then
+        local ok, r = pcall(NS.NearbyQuestTargets, state.questId, tonumber(QuestFocusDB.nearbyRadius) or 200)
+        if ok and r then list = r end
+    end
+    local key = tostring(state.questId) .. "|"
+    for _, e in ipairs(list) do key = key .. e.qid .. ":" .. tostring(e.desc) .. ";" end
+    state.extra = list
+    if key ~= lastExtraKey then
+        lastExtraKey = key
+        UpdateMacro()
+        Panel_Update()
+    end
+end)
+
 local function ClearQuest()
     state.questId, state.title, state.objectives, state.objIndex = nil, nil, nil, nil
+    state.extra = nil
     ClearWaypoint()
     QuestFocusDB.lastQuest = nil
     Panel_Update() -- kijeloles nelkul javaslatokat mutat
