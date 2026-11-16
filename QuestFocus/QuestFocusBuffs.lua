@@ -8,7 +8,8 @@ local L = NS.L
 local Print = NS.Print
 
 local SLOTS = {
-    { key = "rest",   label = L["Sleeping bag"], names = { L["Sleeping Bag"] } },
+    -- Cozy Sleeping Bag buff: spell 429959, 3 stack kell belole
+    { key = "rest",   label = L["Sleeping bag"], names = { L["Sleeping Bag"] }, spellId = 429959, stacks = 3 },
     { key = "food",   label = L["XP food"],      names = {} },
     { key = "weapon", label = L["Weapon enchant"],
       names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] } },
@@ -60,39 +61,52 @@ end
 
 -- Ezen a kliensen harcban az aurak "secret" ertekek: addon nem olvashatja (hibat dob).
 -- Ezert csak harcon kivul olvasunk, harcban a legutobbi eredmeny (abszolut lejarati idok) megy.
-local auraCache = {}
+local auraCache, auraById = {}, {}
 local function ReadAuras()
-    local out = {}
+    local out, byId = {}, {}
     for i = 1, 40 do
-        local ok, name, duration, expires, _
+        local ok, name, count, duration, expires, spellId, _
         if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
             local a
             ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
             if not ok then return nil end
             if not a then break end
-            ok = pcall(function() name, duration, expires = a.name, a.duration, a.expirationTime end)
+            ok = pcall(function()
+                name, count, duration, expires, spellId = a.name, a.applications, a.duration, a.expirationTime, a.spellId
+            end)
             if not ok then return nil end
         else
-            ok, name, _, _, _, duration, expires = pcall(UnitAura, "player", i, "HELPFUL")
+            ok, name, _, count, _, duration, expires, _, _, _, spellId = pcall(UnitAura, "player", i, "HELPFUL")
             if not ok then return nil end
             if not name then break end
         end
         if type(name) == "string" then
-            out[name] = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0 }
+            local a = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0, count = tonumber(count) or 0 }
+            out[name] = a
+            if tonumber(spellId) then byId[tonumber(spellId)] = a end
         end
     end
-    return out
+    return out, byId
 end
 
 local function HelpfulAuras()
     if InCombatLockdown() then return auraCache end
-    local ok, fresh = pcall(ReadAuras)
-    if ok and fresh then auraCache = fresh end
+    local ok, fresh, byId = pcall(ReadAuras)
+    if ok and fresh then auraCache, auraById = fresh, byId end
     return auraCache
 end
 
--- Hatralevo mp (nil = nincs buff, math.huge = nem jar le)
+-- Hatralevo mp (nil = nincs buff, math.huge = nem jar le), masodik ertek: stackek szama
 local function Remaining(slot, itemId, auras)
+    if slot.spellId then
+        local a = auraById[slot.spellId]
+        if a then
+            local stacks = math.max(a.count or 0, 1)
+            if a.expires == 0 then return math.huge, stacks end
+            return a.expires - GetTime(), stacks
+        end
+        return nil, 0
+    end
     if slot.key == "weapon" then
         local ok, has, ms = pcall(GetWeaponEnchantInfo)
         if ok and has then
@@ -143,6 +157,17 @@ bar:SetSize(3 * (BTN + 6), BTN + 14)
 bar:Hide()
 
 local buttons = {}
+
+-- Stack kovetelmeny (alvozsak: 3 stack kell)
+local function ShortStacks(slot, stacks)
+    return slot.stacks and (stacks or 0) < slot.stacks
+end
+local function StackText(slot, stacks)
+    if not slot.stacks then return "" end
+    local c = ShortStacks(slot, stacks) and "|cffff9933" or "|cff33ff99"
+    return (" %s%d/%d|r"):format(c, stacks or 0, slot.stacks)
+end
+
 local function FmtLeft(sec)
     if not sec then return "|cffff4444" .. L["none"] .. "|r" end
     if sec == math.huge then return "|cff33ff99on|r" end
@@ -182,8 +207,11 @@ for i, slot in ipairs(SLOTS) do
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
         if self.itemId then GameTooltip:SetItemByID(self.itemId) else GameTooltip:SetText(slot.label, 1, 1, 1) end
         GameTooltip:AddLine(" ")
-        local left = Remaining(slot, self.itemId, HelpfulAuras())
-        GameTooltip:AddLine(slot.label .. ": " .. FmtLeft(left), 1, 0.82, 0)
+        local left, stacks = Remaining(slot, self.itemId, HelpfulAuras())
+        GameTooltip:AddLine(slot.label .. ": " .. FmtLeft(left) .. StackText(slot, stacks), 1, 0.82, 0)
+        if slot.stacks then
+            GameTooltip:AddLine((L["Needs %d stacks of the buff (spell %d)."]):format(slot.stacks, slot.spellId), 0.7, 0.7, 0.7)
+        end
         GameTooltip:AddLine(slot.key == "weapon" and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
         GameTooltip:Show()
     end)
@@ -260,9 +288,9 @@ local function Tick()
     for _, b in ipairs(buttons) do
         if b:IsShown() then
             local slot = b.slot
-            local left = Remaining(slot, b.itemId, auras)
-            b.time:SetText(FmtLeft(left))
-            local low = (not left) or (left ~= math.huge and left < limit)
+            local left, stacks = Remaining(slot, b.itemId, auras)
+            b.time:SetText(FmtLeft(left) .. StackText(slot, stacks))
+            local low = (not left) or (left ~= math.huge and left < limit) or ShortStacks(slot, stacks)
             local canFix = b.itemId and GetItemCount(b.itemId) > 0
             b.warn:SetShown(low and canFix)
             b.warn:SetAlpha(pulse + 0.2)
@@ -387,11 +415,12 @@ local function UpdateAlert(auras)
     local need, key = {}, ""
     for _, slot in ipairs(SLOTS) do
         local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
-        local left = Remaining(slot, id, auras)
-        if left and (left == math.huge or left >= limit) then dismissed[slot.key] = nil end
+        local left, stacks = Remaining(slot, id, auras)
+        local short = ShortStacks(slot, stacks)
+        if left and (left == math.huge or left >= limit) and not short then dismissed[slot.key] = nil end
         if id and GetItemCount(id) > 0 and not dismissed[slot.key]
-            and (not left or (left ~= math.huge and left < limit)) then
-            need[#need + 1] = { slot = slot, id = id, left = left }
+            and (not left or (left ~= math.huge and left < limit) or short) then
+            need[#need + 1] = { slot = slot, id = id, left = left, stacks = stacks }
             key = key .. slot.key .. id .. ";"
         end
     end
@@ -425,7 +454,8 @@ local function UpdateAlert(auras)
     end
     for i, n in ipairs(need) do
         local name = GetItemInfo(n.id) or n.slot.label
-        local state = n.left and ((L["%s left"]):format(FmtLeft(n.left))) or ("|cffff4444" .. L["missing"] .. "|r")
+        local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left))) or ("|cffff4444" .. L["missing"] .. "|r"))
+            .. StackText(n.slot, n.stacks)
         alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
     end
 end

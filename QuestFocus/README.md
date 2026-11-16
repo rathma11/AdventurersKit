@@ -39,7 +39,7 @@ With no quest selected, the panel suggests what to do next:
 
 ### Buff reminders
 A small row of buttons under the panel:
-- **Sleeping bag:** found in your bags by name.
+- **Sleeping bag:** found in your bags by name. The buff is spell 429959 and needs **3 stacks**. The button shows the stacks (e.g. `54m 2/3`), and fewer than 3 counts as low, the same as an expiring buff.
 - **XP food:** drag the item in once on the Buffs tab.
 - **Weapon enchant:** sharpening stone, weightstone or oil, found by name. Clicking applies it to your main hand.
 
