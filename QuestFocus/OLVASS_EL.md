@@ -24,6 +24,7 @@ Kell hozzá: **Questie**. A TomTom nem kötelező: ha fent van, annak a nyilát 
 | `/qf options` | beállítások ablak (Options → AddOns → QuestFocus), van Debug füle is |
 | `/qf zone` | zóna fókusz ki/be: csak az aktuális zóna questjei maradnak a Questie trackerben |
 | `/qf minimap` | minimap gomb ki/be |
+| `/qf bags` | quest item lista a táska mellett ki/be |
 | `/qf debug` | diagnosztika a chatbe |
 | `/qf spell <név>` | tap spell a macroba (pl. `/qf spell Moonfire`); `/qf spell` = törlés, `/qf spell off` = kikapcsolás |
 | `/qf next` | következő objective (marker + macro); érdemes erre is egy macrót csinálni |
@@ -40,6 +41,14 @@ Kell hozzá: **Questie**. A TomTom nem kötelező: ha fent van, annak a nyilát 
 ## Minimap gomb és zóna fókusz
 - **Minimap gomb:** bal klikk megnyitja a beállításokat, jobb klikk a zóna fókuszt kapcsolja. Húzással áthelyezhető.
 - **Zóna fókusz:** csak az aktuális zóna questjei (és a kijelölt QFocus quest) maradnak a Questie trackerben, a többit kiveszi. Zónaváltáskor automatikusan követ. Kikapcsoláskor minden visszakerül úgy, ahogy volt. A zónát a quest log fejléce alapján dönti el. Összecsukott fejléc alatti questeket nem lát.
+
+## Quest item lista a táska mellett
+Ha nyitva a táska (Bagnon vagy a sima Blizzard táska), a bal oldalán megjelenik egy lista a quest itemekről:
+- **sárga:** melyik questhez kell, és hol tartasz (pl. 5/7), vagy „kész, leadni”;
+- **zöld:** questet indít (jobb klikk rá a táskában);
+- **szürke:** nincs hozzá aktív quest, valószínűleg eladható vagy eldobható.
+
+Egérrel fölé állva látod az item tooltipjét, klikkre a quest kijelölődik (marker + QFocus macro). Kikapcsolás: `/qf bags` vagy a beállításokban.
 
 ## Beállítások (opcionális)
 Esc → Options → AddOns → **QuestFocus**, vagy `/qf options`. Alapból minden új opció ki van kapcsolva.
