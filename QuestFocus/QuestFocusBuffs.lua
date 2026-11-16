@@ -447,6 +447,13 @@ local function UpdateAlert(auras)
     end
     -- Ugyanazon a helyen jelenik meg, mint a progress kisablak: ha az eppen kint van
     -- (pl. harc vegen), megvarjuk, amig eltunik, es utana jon a buff emlekezteto
+    -- Betolteskor a panel csak par mp mulva jon fel (Questie): addig varunk, hogy a
+    -- kisablak a panel folott jelenjen meg, ne magaban a kepernyo tetejen.
+    -- (Ha a panelt bezartad, nem varunk ra.)
+    if not alert:IsShown() and not NS.panel:IsShown() and not QuestFocusDB.hidePanel then
+        lastAlertKey = nil
+        return
+    end
     if not alert:IsShown() and NS.ToastFrame and NS.ToastFrame:IsShown() then
         lastAlertKey = nil
         return
