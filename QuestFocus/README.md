@@ -23,7 +23,7 @@ Requires **Questie**. TomTom is optional: if it is installed, its arrow is used.
 - If no quest mob nameplate is visible (too far away, nameplates off) or you are in combat, the macro targets by name. It skips corpses, but it can't detect tapped mobs this way; a red warning appears if the target is tapped.
 
 ### Other quests nearby
-While you focus a quest, the addon also looks at the other quests in your log. Unfinished mob objectives with a spawn within ~200 yards are added to the QFocus macro, so it targets those mobs too (e.g. tigers and panthers in the same spot). The panel lists them under **ALSO NEARBY** with progress and time left; click one to focus that quest. This is off at turn-in and when you narrowed the macro to one objective. Toggle it on the Panel tab.
+While you focus a quest, the addon also looks at the other quests in your log. Unfinished mob objectives with a spawn within ~200 yards are added to the QFocus macro, so it targets those mobs too (e.g. tigers and panthers in the same spot). The panel lists them under **ALSO NEARBY** with progress and time left; click one to focus that quest. This is off when you narrowed the macro to one objective. At turn-in, when the turn-in NPC is more than ~100 yards away, the macro targets these nearby quest mobs; closer than that, it targets the NPC again. Toggle it on the Panel tab.
 
 ### Panel
 - Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (average time per kill, searching included), plus a progress bar.

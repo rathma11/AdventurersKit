@@ -392,6 +392,15 @@ local function BuildMacroBody(objectives, onlyIndex)
     -- (vagy harc): /targetexact nev szerint, a hullat eldobjuk, a tapoltat itt nem tudjuk kiszurni.
     -- Leadasnal baratsagos NPC kell: ott mindig nev szerint
     local turnIn = objectives and objectives[1] and objectives[1].turnIn
+    -- Leadasnal: ha a leado NPC messze van (>100 yd), de a kozelben van mas quest mobja,
+    -- a macro azokat targeteli; az NPC kozeleben visszavalt az NPC-re
+    if turnIn and onlyIndex == nil and state.extra and #state.extra > 0 then
+        local _, d = FindNearest(objectives[1].sources)
+        if not d or d > 100 then
+            turnIn = false
+            objectives = {}
+        end
+    end
     local useNP = NameplatesUsable() and not turnIn and not InCombatLockdown()
     local CLEAR, DEADCLR = "/cleartarget", "/cleartarget [dead]"
     local pick = useNP and state.pick or nil
@@ -1082,7 +1091,7 @@ local function Panel_Update()
     end
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
     -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
-    local extras = (not state.isComplete and state.objIndex == nil) and state.extra or nil
+    local extras = (state.objIndex == nil) and state.extra or nil
     local nExtra = 0
     if extras and #extras > 0 then
         y = y - 4
@@ -1169,11 +1178,17 @@ extraTicker:SetScript("OnUpdate", function(_, dt)
     extraElapsed = 0
     if not state.questId or InCombatLockdown() then return end
     local list = {}
-    if not QuestFocusDB.noNearbyQuests and not state.isComplete and NS.NearbyQuestTargets then
+    if not QuestFocusDB.noNearbyQuests and NS.NearbyQuestTargets then
         local ok, r = pcall(NS.NearbyQuestTargets, state.questId, tonumber(QuestFocusDB.nearbyRadius) or 200)
         if ok and r then list = r end
     end
-    local key = tostring(state.questId) .. "|"
+    -- leadasnal a "messze van-e az NPC" is szamit (a macro ennek megfeleloen valt)
+    local far = ""
+    if state.isComplete and state.objectives and state.objectives[1] and state.objectives[1].turnIn then
+        local _, d = FindNearest(state.objectives[1].sources)
+        far = (not d or d > 100) and "far" or "near"
+    end
+    local key = tostring(state.questId) .. "|" .. far .. "|"
     for _, e in ipairs(list) do key = key .. e.qid .. ":" .. tostring(e.desc) .. ";" end
     state.extra = list
     if key ~= lastExtraKey then
