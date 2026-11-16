@@ -25,6 +25,7 @@ Requires **Questie**. TomTom is optional: if it is installed, its arrow is used.
 ### Panel
 - Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (average time per kill, searching included), plus a progress bar.
 - Each objective shows its own estimated time left. Hover it for the details.
+- **Resize:** drag the grip in the bottom right corner to make the whole panel bigger or smaller (60-160%). Right click the grip to reset. The size is saved.
 - **Progress popup:** for a few seconds after an objective counter goes up, a small popup above the panel shows the new count and the time left.
 
 ### Time left estimate

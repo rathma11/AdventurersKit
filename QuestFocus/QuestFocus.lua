@@ -763,10 +763,66 @@ panel.footDivider:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
 
 panel.footer = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 panel.footer:SetJustifyH("LEFT")
-panel.footer:SetWidth(PANEL_W - 26)
+panel.footer:SetWidth(PANEL_W - 44) -- a jobb also sarokban az atmeretezo fogantyu
 panel.footer:SetWordWrap(false) -- egy sor: a panel magassaga ne valtozzon harc kozben
 
 panel.lines = {}
+
+-- Atmeretezes: jobb also sarok fogantyu, a panel meretaranyat (scale) allitja, a bal felso
+-- sarok helyben marad. Jobb klikk: vissza 100%-ra. Mentve: QuestFocusDB.panelScale
+local function SetPanelScale(s)
+    s = math.max(0.6, math.min(1.6, s))
+    local old = panel:GetScale()
+    local l, t = panel:GetLeft(), panel:GetTop()
+    panel:SetScale(s)
+    if l and t then
+        panel:ClearAllPoints()
+        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l * old / s, t * old / s)
+    end
+    if QuestFocusDB then QuestFocusDB.panelScale = s end
+end
+NS.SetPanelScale = SetPanelScale
+
+-- A panel egy pontja UIParent koordinatakban (a panel scale-je miatt atszamolva) -
+-- a panelhez nem horgonyzott (secure) ablakok elhelyezesehez
+NS.PanelEdge = function(which)
+    local v = (which == "left" and panel:GetLeft()) or (which == "right" and panel:GetRight())
+        or (which == "top" and panel:GetTop()) or (which == "bottom" and panel:GetBottom())
+    if not v then return end
+    return v * panel:GetEffectiveScale() / UIParent:GetEffectiveScale()
+end
+
+local grip = CreateFrame("Button", nil, panel)
+grip:SetSize(16, 16)
+grip:SetPoint("BOTTOMRIGHT", -4, 4)
+grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+grip:RegisterForClicks("RightButtonUp")
+grip:SetScript("OnClick", function() SetPanelScale(1) end)
+grip:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" then return end
+    local x, y = GetCursorPosition()
+    self.drag = { x = x, y = y, scale = panel:GetScale() }
+    self:SetScript("OnUpdate", function()
+        local cx, cy = GetCursorPosition()
+        local ui = UIParent:GetEffectiveScale()
+        -- jobbra-lefele huzas nagyit, balra-felfele kicsinyit
+        local d = ((cx - self.drag.x) - (cy - self.drag.y)) / 2 / ui
+        SetPanelScale(self.drag.scale * (1 + d / (PANEL_W * self.drag.scale)))
+    end)
+end)
+grip:SetScript("OnMouseUp", function(self)
+    self:SetScript("OnUpdate", nil)
+    self.drag = nil
+end)
+grip:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(L["Drag to resize"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right click: reset size"], 0.7, 0.7, 0.7)
+    GameTooltip:Show()
+end)
+grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 -- Fejlec es lablec elhelyezese; mode = "quest" (statisztikaval) vagy "list" (javaslatok).
 -- Visszaadja, honnan kezdodhet a tartalom (y).
@@ -1217,6 +1273,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         QuestFocusDB = QuestFocusDB or {}
     elseif event == "PLAYER_LOGIN" then
+        if tonumber(QuestFocusDB.panelScale) then panel:SetScale(QuestFocusDB.panelScale) end
         InstallHooks()
         if not _G.QuestieLoader then
             Print(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])

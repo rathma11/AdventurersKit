@@ -559,7 +559,7 @@ local function UpdateUseButton()
     local key = GetBindingKey("CLICK QuestFocusUseItem:LeftButton")
     useBtn.key:SetText(key and GetBindingText and GetBindingText(key, true) or (key or ""))
     -- Nem a panelhez horgonyzunk (attol a panel vedett lenne): kepernyo-pozicio alapjan
-    local l, t = panel:GetLeft(), panel:GetTop()
+    local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
     if l and t then
         useBtn:ClearAllPoints()
         useBtn:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", l - 4, t)
@@ -581,7 +581,7 @@ ticker:SetScript("OnUpdate", function(_, dt)
         UpdateUseButton()
     elseif useBtn:IsShown() and not InCombatLockdown() then
         -- a panel elmozdult: a gomb koveti
-        local l, t = NS.panel:GetLeft(), NS.panel:GetTop()
+        local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
         if l and t and useBtn.geo ~= (math.floor(l) .. ":" .. math.floor(t)) then UpdateUseButton() end
     end
     if useBtn:IsShown() and useBtn.itemId then

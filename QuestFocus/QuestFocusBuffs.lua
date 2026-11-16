@@ -230,7 +230,7 @@ local lastGeo
 local function Anchor()
     if InCombatLockdown() then return end
     local p = NS.panel
-    local r, b = p:GetRight(), p:GetBottom()
+    local r, b = NS.PanelEdge("right"), NS.PanelEdge("bottom")
     local geo = p:IsShown() and r and b and (math.floor(r) .. ":" .. math.floor(b)) or "none"
     if geo == lastGeo and bar:GetNumPoints() > 0 then return end
     lastGeo = geo
@@ -410,7 +410,7 @@ end)
 local function PlaceAlert()
     alert:ClearAllPoints()
     local p = NS.panel
-    local r, t = p:GetRight(), p:GetTop()
+    local r, t = NS.PanelEdge("right"), NS.PanelEdge("top")
     if p:IsShown() and r and t then
         alert:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", r, t + 4)
     else
