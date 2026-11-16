@@ -10,6 +10,21 @@ local L = setmetatable({}, { __index = function(_, k) return k end })
 NS.L = L
 NS.locale = GetLocale and GetLocale() or "enUS"
 
+-- Tiltott / blokkolt muveletek (a "has been blocked from an action" ablak) naplozasa a Debug fulre,
+-- hogy lassuk, melyik fuggvenyrol van szo.
+local blockWatch = CreateFrame("Frame")
+blockWatch:RegisterEvent("ADDON_ACTION_BLOCKED")
+blockWatch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+blockWatch:SetScript("OnEvent", function(_, event, addon, func)
+    if addon ~= "QuestFocus" then return end
+    local msg = ("%s: %s"):format(event == "ADDON_ACTION_FORBIDDEN" and "FORBIDDEN" or "BLOCKED", tostring(func))
+    for _, x in ipairs(NS.errors) do
+        if x.msg == msg then x.count, x.time = x.count + 1, date("%H:%M:%S") return end
+    end
+    table.insert(NS.errors, 1, { msg = msg, count = 1, time = date("%H:%M:%S"),
+        stack = InCombatLockdown() and "(in combat)" or "(out of combat)" })
+end)
+
 -- Sajat Lua hibak gyujtese a Debug fulre. Alapbol nem dobunk fel hibaablakot a
 -- QuestFocus hibaira (QuestFocusDB.showErrors kapcsolja), mas addonoket nem erinti.
 NS.errors = {}

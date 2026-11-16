@@ -29,7 +29,7 @@ Requires **Questie**. TomTom is optional: if it is installed, its arrow is used.
 
 ### Time left estimate
 - The best source is your own pace on that objective, i.e. how fast its counter has been growing.
-- Without that, it uses your kill pace (time between your kills, breaks over 5 min ignored) times the kills still needed. For loot objectives this uses the Questie drop rate: 10 items at 5% is about 200 kills.
+- Without that, it uses your kill pace (time between your kills, taken from the "X dies, you gain N experience" messages; breaks over 5 min ignored) times the kills still needed. For loot objectives this uses the Questie drop rate: 10 items at 5% is about 200 kills.
 - A `?` means there is no kill data yet, so a default of 45 s per kill is used. Reset the pace on the Panel tab.
 
 ### What next? (no quest selected)
