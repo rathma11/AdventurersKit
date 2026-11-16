@@ -86,6 +86,7 @@ local function QuestNeeds()
                         objItems[o.Id] = true
                         add(o.Id, {
                             qid = qid, title = title, done = done or o.Completed,
+                            questDone = done and true or false, -- az egesz quest kesz (leadhato)
                             collected = tonumber(o.Collected), needed = tonumber(o.Needed),
                         })
                     end
@@ -94,7 +95,7 @@ local function QuestNeeds()
                 for _, id in pairs(q.requiredSourceItems or {}) do used[id] = true end
                 if tonumber(q.sourceItemId) and q.sourceItemId > 0 then used[q.sourceItemId] = true end
                 for id in pairs(used) do
-                    if not objItems[id] then add(id, { qid = qid, title = title, done = done, use = true }) end
+                    if not objItems[id] then add(id, { qid = qid, title = title, done = done, questDone = done, use = true }) end
                 end
             end
         end
@@ -342,8 +343,18 @@ local function RowText(e)
     end
     if e.needs then
         local n = e.needs[1]
-        local prog = n.use and L["use / carry"] or (n.done and L["complete, turn in"])
-            or (n.needed and ("%d/%d"):format(n.collected or 0, n.needed)) or L["needed"]
+        local count = n.needed and ("%d/%d"):format(math.min(n.collected or 0, n.needed), n.needed)
+        local prog
+        if n.use then
+            prog = L["use / carry"]
+        elseif n.questDone then
+            prog = "|cff33ff99" .. L["quest complete, turn in"] .. "|r"
+        elseif n.done then
+            -- csak ez az objective kesz, a quest tobbi resze meg hatravan
+            prog = "|cff33ff99" .. (count or "") .. " " .. L["done"] .. "|r |cffaaaaaa" .. L["(keep it, quest not finished)"] .. "|r"
+        else
+            prog = count or L["needed"]
+        end
         local extra = ""
         if e.surplus then extra = extra .. (L[" |cffaaaaaa+%d surplus|r"]):format(e.surplus) end
         if #e.needs > 1 then extra = extra .. (" |cffaaaaaa(+%d quest)|r"):format(#e.needs - 1) end
@@ -645,7 +656,7 @@ local cbBag = NS.OptCheck(L["Quest item list next to the bags"],
 cbBag:SetPoint("TOPLEFT", NS.optNote, "BOTTOMLEFT", -2, -12)
 
 local cbGlow = NS.OptCheck(L["Color quest items in Bagnon"],
-    L["Yellow: needed for an active quest. Green: done / needed for turn-in. Blue: starts a quest. Grey: no active quest."],
+    L["Yellow: needed for an active quest. Green: you have enough (objective done, keep it for the turn-in). Blue: starts a quest. Grey: no active quest."],
     function() return not QuestFocusDB.noBagGlow end,
     function(v)
         QuestFocusDB.noBagGlow = not v

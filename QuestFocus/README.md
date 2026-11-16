@@ -76,7 +76,7 @@ Each button shows the time left on its buff. When the buff is missing, or has le
 ## Quest items
 **List next to the bags.** While your bags are open (Bagnon or the default bags), a list of your quest items appears on their left. It is never taller than the bag window and scrolls if needed; the +/− button collapses it. Row colors:
 - **yellow:** needed for an active quest, with your progress (e.g. 5/7). If you carry more than needed it shows "+2 surplus";
-- **green:** you have it, the quest is complete, needed for turn-in;
+- **green:** you have enough. If the whole quest is complete, the row says "quest complete, turn in". If only this objective is done, it says "7/7 done (keep it, quest not finished)";
 - **blue:** starts a quest (right click it in the bag);
 - **grey:** no active quest needs it;
 - **IN BANK:** an active quest needs it and it is in your bank (based on Bagnon/BagBrother's last bank snapshot). If you also have some in your bags, the name shows "+N bank".
