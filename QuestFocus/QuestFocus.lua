@@ -899,7 +899,8 @@ grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 -- Fejlec es lablec elhelyezese; mode = "quest" (statisztikaval) vagy "list" (javaslatok).
 -- Visszaadja, honnan kezdodhet a tartalom (y).
 local function PanelChrome(mode, sectionText)
-    local quest = mode == "quest"
+    -- Varos modban (IsResting) nincs statisztika: ott nem harcolsz, kisebb a panel
+    local quest = mode == "quest" and not (NS.InCity and NS.InCity())
     panel.stats:SetShown(quest)
     panel.bar:SetShown(quest)
     local y = quest and -112 or -56
@@ -2080,6 +2081,8 @@ SlashCmdList.QUESTFOCUS = function(msg)
         ToggleZoneFocus()
     elseif msg == "bags" then
         if NS.ToggleBagList then NS.ToggleBagList() end
+    elseif msg == "city" then
+        if NS.ShowCityList then NS.ShowCityList() end
     elseif msg == "buffreset" then
         if NS.ResetBuffLearn then NS.ResetBuffLearn() end
     elseif msg == "junk" then

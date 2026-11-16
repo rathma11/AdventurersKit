@@ -50,6 +50,9 @@ When a quest you can pick up is within ~300 yards, a popup appears at the top ce
 
 Only quests between your level minus 2 and plus 10 are shown; this range also applies to the "Pick up nearby" list. Change the range or turn the popup off on the Panel tab. The length is a rough estimate, because Questie's data has no counts: about 8 kills per mob objective, 6 items per loot objective (with the drop rate), about 1 min for talk or delivery quests, all scaled by your kill pace.
 
+### City mode
+In a city or an inn (where you get rested XP), quests don't pop up one by one. When you arrive, a single list shows every quest you can pick up within ~600 yards, up to 12. Each row has the level, the name, the estimated length and the distance, and a click puts a TomTom marker on the quest giver. The list refreshes while you walk around, and quests you have picked up drop off it. It closes when you leave; X hides it until the next city. `/qf city` opens it anywhere. In city mode the panel also hides the Progress / Time left / Pace boxes. Toggle it on the Panel tab.
+
 ### Buff reminders
 Watched buffs (warning + reminder popup). An optional row of buttons under the panel is **off by default**, because the buff frame already shows the timers; turn it on on the Buffs tab:
 - **Sleeping bag:** found in your bags by name. The buff is spell 429959 and needs **3 stacks**. The button shows the stacks (e.g. `54m 2/3`), and fewer than 3 counts as low, the same as an expiring buff.
@@ -79,6 +82,7 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/qf zone` | toggle zone focus: only quests of the current zone stay in the Questie tracker |
 | `/qf minimap` | toggle the minimap button |
 | `/qf bags` | toggle the quest item list next to the bags |
+| `/qf city` | list of quests to pick up nearby (city mode list) |
 | `/qf junk` | destroy unsellable leftover quest items (asks for each one) |
 | `/qf debug` | diagnostics to chat |
 | `/qf spell <name>` | tag spell in the macro (e.g. `/qf spell Moonfire`); `/qf spell` = clear, `/qf spell off` = disable |
