@@ -182,7 +182,7 @@ local function ItemSourceLines(entry, limit)
     for _, s in ipairs(objs) do
         if n >= limit then break end
         n = n + 1
-        lines[#lines + 1] = { "Felvehető: " .. (s.name or "?") .. " (földön / tárgyban)", 0.6, 1, 0.6 }
+        lines[#lines + 1] = { "Felvehetö: " .. (s.name or "?") .. " (földön / tárgyban)", 0.6, 1, 0.6 }
     end
     for _, s in ipairs(mobs) do
         if n >= limit then break end
@@ -689,7 +689,7 @@ local function FooterText()
         return ("|cffffff00Leadás:|r %s%s"):format(name, distTxt and (" - " .. distTxt) or "")
     end
     if (state.macroCount or 0) == 0 then
-        return "Nincs targetelhető mob (item / object gyűjtés)" .. (distTxt and (" - " .. distTxt) or "")
+        return "Nincs targetelhetö mob (item / object gyüjtés)" .. (distTxt and (" - " .. distTxt) or "")
     end
     local u = state.pick
     if u == "busy" then
@@ -747,7 +747,7 @@ local function GetLine(i)
                 dist and (" (%d yd)"):format(dist) or ""), 0.6, 0.8, 1)
         end
         GameTooltip:AddLine("Bal klikk: marker + macro csak erre", 0.5, 0.5, 0.5)
-        GameTooltip:AddLine("Jobb klikk: macro az összes hátralévőre", 0.5, 0.5, 0.5)
+        GameTooltip:AddLine("Jobb klikk: macro az összes hátralévöre", 0.5, 0.5, 0.5)
         GameTooltip:Show()
     end)
     line:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -964,7 +964,7 @@ local function ScheduleRefresh()
             -- Leadva vagy abandon: marker es kijeloles torlese
             local old = state.title
             ClearQuest()
-            Print("|cffffff00%s|r eltűnt a logból, a markert töröltem.", old or "Quest")
+            Print("|cffffff00%s|r eltünt a logból, a markert töröltem.", old or "Quest")
             return
         end
         local becameComplete = done and not state.isComplete
@@ -987,7 +987,7 @@ local function ScheduleRefresh()
             UpdateMacro()
             Panel_Update()
             if state.waypoint or state.tomtomUid then
-                Print("Objective kész, a marker a következő célra került.")
+                Print("Objective kész, a marker a következö célra került.")
                 MarkObjective(nil)
             end
         end
@@ -1018,7 +1018,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         InstallHooks()
         if not _G.QuestieLoader then
-            Print("|cffff5555A Questie nem található.|r Telepítsd, enélkül nem működik.")
+            Print("|cffff5555A Questie nem található.|r Telepítsd, enélkül nem müködik.")
         end
         -- Utolso kijelolt quest visszaallitasa, ha a Questie mar betoltott
         C_Timer.After(8, function()
@@ -1430,7 +1430,7 @@ end
 zoneBtn:SetScript("OnClick", function() ToggleZoneFocus(); RefreshZoneBtn() end)
 
 local cbMinimap = OptCheck("Minimap gomb",
-    "Bal klikk: beállítások, jobb klikk: zóna fókusz. Húzással áthelyezhető.",
+    "Bal klikk: beállítások, jobb klikk: zóna fókusz. Húzással áthelyezhetö.",
     function() return not QuestFocusDB.hideMinimap end,
     function(v) QuestFocusDB.hideMinimap = not v; UpdateMinimapButton() end)
 cbMinimap:SetPoint("TOPLEFT", zoneHint, "BOTTOMLEFT", -6, -14)
@@ -1465,7 +1465,7 @@ dbgChat:SetSize(120, 22)
 dbgChat:SetPoint("LEFT", dbgRefresh, "RIGHT", 6, 0)
 dbgChat:SetText("Chatbe írás")
 dbgChat:SetScript("OnClick", function() for _, l in ipairs(DebugLines()) do Print(l) end end)
-local dbgLive = OptLabel(pageDebug, "Élő: 0,5 mp-enként frissül, amíg nyitva van.", "GameFontDisableSmall")
+local dbgLive = OptLabel(pageDebug, "Élö: 0,5 mp-enként frissül, amíg nyitva van.", "GameFontDisableSmall")
 dbgLive:SetPoint("LEFT", dbgChat, "RIGHT", 10, 0)
 local dbgElapsed = 0
 pageDebug:SetScript("OnShow", RefreshDebug)
@@ -1592,8 +1592,8 @@ SlashCmdList.QUESTFOCUS = function(msg)
         Print("  /qf junk - nem eladható, felesleges quest itemek eldobása (egyenként rákérdez)")
         Print("  /qf debug - diagnosztika a chatbe")
         Print("  /qf spell <név> - tap spell a macroba; /qf spell - törlés; /qf spell off - kikapcsolás")
-        Print("  /qf next - következő objective (marker + macro)")
-        Print("  /qf all - macro az összes hátralévő objective mobjára")
+        Print("  /qf next - következö objective (marker + macro)")
+        Print("  /qf all - macro az összes hátralévö objective mobjára")
         Print("  /qf mark - marker újra a legközelebbi helyre")
         Print("  /qf arrow - saját nyíl ki/be")
         Print("  /qf ping - ping a targetre a macroban ki/be")

@@ -245,6 +245,35 @@ list.title = list:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 list.title:SetPoint("TOPLEFT", 10, -8)
 list.rows = {}
 local anchorFrame
+local RefreshBagList -- lent
+
+-- Osszecsukas: csak a fejlec latszik
+local collapseBtn = CreateFrame("Button", nil, list)
+collapseBtn:SetSize(18, 18)
+collapseBtn:SetPoint("TOPRIGHT", -6, -5)
+local function UpdateCollapseIcon()
+    local c = QuestFocusDB and QuestFocusDB.bagListCollapsed
+    collapseBtn:SetNormalTexture(c and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
+    collapseBtn:SetPushedTexture(c and "Interface\\Buttons\\UI-PlusButton-Down" or "Interface\\Buttons\\UI-MinusButton-Down")
+end
+collapseBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
+collapseBtn:SetScript("OnClick", function()
+    QuestFocusDB.bagListCollapsed = not QuestFocusDB.bagListCollapsed
+    RefreshBagList()
+end)
+collapseBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(QuestFocusDB.bagListCollapsed and "Lista kinyitása" or "Lista összecsukása", 1, 1, 1)
+    GameTooltip:Show()
+end)
+collapseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+-- Gorgetheto tartalom
+local scroll = CreateFrame("ScrollFrame", "QuestFocusBagListScroll", list, "UIPanelScrollFrameTemplate")
+scroll:SetPoint("TOPLEFT", 6, -26)
+local content = CreateFrame("Frame", nil, scroll)
+content:SetSize(220, 10)
+scroll:SetScrollChild(content)
 
 local junkBtn = CreateFrame("Button", nil, list, "UIPanelButtonTemplate")
 junkBtn:SetSize(240, 20)
@@ -253,8 +282,8 @@ junkBtn:Hide()
 local function GetRow(i)
     local r = list.rows[i]
     if r then return r end
-    r = CreateFrame("Button", nil, list)
-    r:SetSize(244, 30)
+    r = CreateFrame("Button", nil, content)
+    r:SetSize(218, 30)
     r.icon = r:CreateTexture(nil, "ARTWORK")
     r.icon:SetSize(24, 24)
     r.icon:SetPoint("LEFT", 2, 0)
@@ -264,12 +293,12 @@ local function GetRow(i)
     r.border:SetColorTexture(1, 1, 1, 0)
     r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 6, 0)
-    r.name:SetWidth(210)
+    r.name:SetWidth(186)
     r.name:SetJustifyH("LEFT")
     r.name:SetWordWrap(false)
     r.sub = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
-    r.sub:SetWidth(210)
+    r.sub:SetWidth(186)
     r.sub:SetJustifyH("LEFT")
     r.sub:SetWordWrap(false)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
@@ -323,7 +352,7 @@ local function RowText(e)
     return e.noValue and "Nincs aktív quest, nem eladható (/qf junk)" or "Nincs aktív quest, eladható", c
 end
 
-local function RefreshBagList()
+RefreshBagList = function()
     Scan()
     MaybeRefreshBagnon()
     if not (anchorFrame and anchorFrame:IsShown()) or QuestFocusDB.noBagList then list:Hide() return end
@@ -331,10 +360,24 @@ local function RefreshBagList()
     local rows = {}
     for _, e in ipairs(scan.items) do rows[#rows + 1] = e end
     for _, e in ipairs(scan.bankOnly) do rows[#rows + 1] = e end
+    if #rows == 0 then list:Hide() return end
 
-    local y = -26
+    list.title:SetText(("Quest itemek (%d)"):format(#rows))
+    UpdateCollapseIcon()
+    list:ClearAllPoints()
+    list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
+    list:Show()
+
+    if QuestFocusDB.bagListCollapsed then
+        scroll:Hide()
+        junkBtn:Hide()
+        list:SetHeight(28)
+        return
+    end
+    scroll:Show()
+
+    local y = 0
     for i, e in ipairs(rows) do
-        if i > MAX_ROWS then break end
         local r = GetRow(i)
         r.entry = e
         r.icon:SetTexture(e.icon or 134400)
@@ -349,30 +392,37 @@ local function RefreshBagList()
         r.sub:SetText(text)
         r.sub:SetTextColor(col[1], col[2], col[3])
         r:ClearAllPoints()
-        r:SetPoint("TOPLEFT", list, "TOPLEFT", 8, y)
+        r:SetPoint("TOPLEFT", content, "TOPLEFT", 2, y)
         r:Show()
         y = y - 32
     end
-    local shown = math.min(#rows, MAX_ROWS)
-    for i = shown + 1, #list.rows do list.rows[i]:Hide() end
-    list.title:SetText(#rows > MAX_ROWS and ("Quest itemek (%d, első %d)"):format(#rows, MAX_ROWS)
-        or ("Quest itemek (%d)"):format(#rows))
+    for i = #rows + 1, #list.rows do list.rows[i]:Hide() end
+    local contentH = -y
+    content:SetHeight(math.max(contentH, 1))
 
+    local junkH = 0
     if #scan.leftovers > 0 then
         junkBtn:SetText(("Felesleges, nem eladható eldobása (%d)"):format(#scan.leftovers))
         junkBtn:ClearAllPoints()
-        junkBtn:SetPoint("TOPLEFT", list, "TOPLEFT", 10, y - 2)
+        junkBtn:SetPoint("BOTTOMLEFT", list, "BOTTOMLEFT", 10, 8)
         junkBtn:Show()
-        y = y - 26
+        junkH = 26
     else
         junkBtn:Hide()
     end
 
-    list:SetHeight(-y + 8)
-    if #rows == 0 then list:Hide() return end
-    list:ClearAllPoints()
-    list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
-    list:Show()
+    -- A lista nem lehet magasabb a taskanal; ha tobb a sor, gorgetheto
+    local maxH = math.max(120, anchorFrame:GetHeight() or 400)
+    local fullH = 26 + contentH + junkH + 8
+    local h = math.min(fullH, maxH)
+    list:SetHeight(h)
+    local needScroll = fullH > maxH
+    scroll:ClearAllPoints()
+    scroll:SetPoint("TOPLEFT", 6, -26)
+    scroll:SetPoint("BOTTOMRIGHT", needScroll and -28 or -6, 8 + junkH)
+    local bar = scroll.ScrollBar or _G["QuestFocusBagListScrollScrollBar"]
+    if bar then bar:SetShown(needScroll) end
+    if not needScroll then scroll:SetVerticalScroll(0) end
 end
 
 ---------------------------------------------------------------------------
@@ -450,7 +500,7 @@ useBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetItemByID(self.itemId)
     GameTooltip:AddLine("QuestFocus: a kijelölt quest itemje", 0.2, 1, 0.6)
     if not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
-        GameTooltip:AddLine("Billentyű: Options > Keybindings > AddOns > QuestFocus", 0.5, 0.5, 0.5)
+        GameTooltip:AddLine("Billentyü: Options > Keybindings > AddOns > QuestFocus", 0.5, 0.5, 0.5)
     end
     GameTooltip:Show()
 end)
@@ -597,7 +647,7 @@ cbGlow:SetPoint("TOPLEFT", cbBag, "BOTTOMLEFT", 0, -6)
 
 local cbUse = NS.OptCheck("Quest item gomb a panel mellett",
     "Ha a kijelölt questhez használható item kell (pl. mobra dobni), egy gomb jelenik meg a QuestFocus panel bal oldalán. "
-    .. "Billentyűt is köthetsz rá: Options > Keybindings > AddOns > QuestFocus.",
+    .. "Billentyüt is köthetsz rá: Options > Keybindings > AddOns > QuestFocus.",
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; UpdateUseButton() end)
 cbUse:SetPoint("TOPLEFT", cbGlow, "BOTTOMLEFT", 0, -6)
