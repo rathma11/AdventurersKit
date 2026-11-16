@@ -325,6 +325,54 @@ local function FindNearest(sources)
     return best, bestDist
 end
 
+-- Marker celpont: ha mar a spawn teruleten vagy (IN_AREA yardon belul van spawn), nem kuld
+-- sehova (inArea = true). Kulonben nem a puszta legkozelebbi pontot adja, hanem azt, ami
+-- kozel van ES korulotte sok spawn van (suru resz), igy nem egy magányos pontra visz.
+local IN_AREA, CLUSTER_R, CLUSTER_W = 150, 80, 40
+local function FindSpawnTarget(sources)
+    local pc, px, py = PlayerWorldPos()
+    if not pc then return FindNearest(sources) end
+    local pts = {}
+    for _, src in ipairs(sources) do
+        if type(src.spawns) == "table" then
+            for areaId, list in pairs(src.spawns) do
+                local uiMap = UiMapFromArea(areaId)
+                if uiMap and type(list) == "table" then
+                    for _, c in ipairs(list) do
+                        local x, y = c[1], c[2]
+                        if type(x) == "number" and type(y) == "number" and x >= 0 and y >= 0 then
+                            local wc, wx, wy = WorldPos(uiMap, x / 100, y / 100)
+                            if wc == pc and wx then
+                                pts[#pts + 1] = { map = uiMap, x = x, y = y, name = src.name, wc = wc, wx = wx, wy = wy,
+                                    d = math.sqrt((wx - px) ^ 2 + (wy - py) ^ 2) }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if #pts == 0 then return FindNearest(sources) end -- masik kontinens: a regi mod
+    local nearest
+    for _, p in ipairs(pts) do if not nearest or p.d < nearest.d then nearest = p end end
+    if nearest.d <= IN_AREA then return nearest, nearest.d, true end
+    -- csak a kozelebbi pontokat nezzuk (a legkozelebbi tavolsaganak 3x-osaig), sulyozva a surusseggel
+    local best, bestScore
+    local limit = nearest.d * 3 + 200
+    for _, p in ipairs(pts) do
+        if p.d <= limit then
+            local n = 0
+            for _, q in ipairs(pts) do
+                if q ~= p and math.abs(q.wx - p.wx) < CLUSTER_R and math.abs(q.wy - p.wy) < CLUSTER_R then n = n + 1 end
+            end
+            local score = p.d - CLUSTER_W * math.min(n, 8)
+            if not bestScore or score < bestScore then best, bestScore = p, score end
+        end
+    end
+    best = best or nearest
+    return best, best.d, false
+end
+
 ---------------------------------------------------------------------------
 -- Macro
 ---------------------------------------------------------------------------
@@ -645,9 +693,16 @@ local function MarkObjective(i)
         Print(L["No known location for: %s"], state.title or "?")
         return
     end
-    local p, dist = FindNearest(sources)
+    local p, dist, inArea = FindSpawnTarget(sources)
     if not p then
         Print(L["No coordinates found (it may be inside an instance)."])
+        return
+    end
+    -- Mob objective-nel, ha mar a teruleten vagy, nem kuldunk tovabb (leadasnal mindig jelolunk)
+    local isTurnIn = list[1] and list[1].turnIn
+    if inArea and not isTurnIn then
+        ClearWaypoint()
+        Print(L["You are in the spawn area of |cffffff00%s|r, no marker needed (nearest spawn %d yd)."], p.name or "?", dist or 0)
         return
     end
     SetWaypoint(p, p.name or state.title)

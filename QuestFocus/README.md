@@ -91,6 +91,8 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/qf unmark` | remove the marker (TomTom + map pin + arrow) |
 | `/qf clear` | clear the selection and the marker |
 
+**Where the marker goes:** if you are already in the spawn area (a spawn within ~150 yards), no marker is placed; the macro targets the visible mobs anyway. Otherwise it picks a spawn point that is close **and** has many other spawns around it, so it leads to the dense part, not to a lone spawn point. The spawn points come from the Questie database, not from live mobs.
+
 **Automatic marker cleanup:** when an objective is done, the marker jumps to the next remaining target. When the quest is complete, it moves to the turn-in NPC. When you turn it in (or abandon it), the marker is removed. Right clicking the built-in arrow also removes it.
 
 ## Minimap button and zone focus
