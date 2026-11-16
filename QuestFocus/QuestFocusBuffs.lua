@@ -62,6 +62,11 @@ local CLASS_BUFFS = {
     },
 }
 local _, PLAYER_CLASS = UnitClass("player")
+-- Minden class buff neve (barmelyik classe): ilyen nem lehet egy item "megtanult" buffja
+local CLASS_SPELL_SET = {}
+for _, list in pairs(CLASS_BUFFS) do
+    for _, s in ipairs(list) do for _, n in ipairs(s.spells) do CLASS_SPELL_SET[n] = true end end
+end
 for _, s in ipairs(CLASS_BUFFS[PLAYER_CLASS] or {}) do
     s.names = {}
     s.isClass = true
@@ -184,6 +189,11 @@ local function Remaining(slot, itemId, auras)
     end
     local names = {}
     local learned = itemId and DB().buffLearn[itemId]
+    if learned and CLASS_SPELL_SET[learned] then
+        -- rosszul tanult (pl. kozben kapott Blessing): eldobjuk
+        DB().buffLearn[itemId] = nil
+        learned = nil
+    end
     if learned then names[#names + 1] = learned end
     local spell = ItemSpell(itemId)
     if spell then names[#names + 1] = spell end
@@ -279,13 +289,47 @@ end
 local function CheckLearning()
     if not learning then return end
     if GetTime() > learning.untilT then learning = nil return end
+    -- Nem lehet a buff: class buffok (blessing, aura...), mas itemek mar megtanult buffjai,
+    -- vegtelen aurak. Igy egy kozben kapott Blessing nem "tanulodik meg" kajanak.
+    local skip = {}
+    for _, s in ipairs(SLOTS) do
+        for _, n in ipairs(s.spells or {}) do skip[n] = true end
+    end
+    for id, n in pairs(DB().buffLearn) do if id ~= learning.itemId then skip[n] = true end end
     for name, a in pairs(HelpfulAuras()) do
-        if not learning.before[name] and (a.duration == 0 or a.duration >= 300) then
+        if not learning.before[name] and not skip[name] and a.duration >= 300 then
             DB().buffLearn[learning.itemId] = name
             learning = nil
             return
         end
     end
+end
+
+-- Debug: mit lat a buff figyelo (Debug ful / /qf debug)
+NS.BuffDebugLines = function()
+    local out = { L["Buffs:"] }
+    local auras = HelpfulAuras()
+    for _, slot in ipairs(SLOTS) do
+        local a = Action(slot)
+        local id = a and a.id or FindItem(slot)
+        local left, stacks = Remaining(slot, id, auras)
+        local what = a and (a.kind == "spell" and a.name or (GetItemInfo(a.id) or ("item " .. a.id)))
+            or (id and ((GetItemInfo(id) or ("item " .. id)) .. " (0 in bags)")) or "-"
+        local learned = id and DB().buffLearn[id]
+        out[#out + 1] = ("  %s: %s | buff: %s | left: %s%s%s%s"):format(slot.label, what,
+            learned or (slot.isClass and "class" or "-"),
+            left and (left == math.huge and "on" or ("%ds"):format(left)) or "|cffff4444none|r",
+            slot.stacks and (" stacks " .. tostring(stacks or 0) .. "/" .. slot.stacks) or "",
+            DB()["noBuff_" .. slot.key] and " |cff808080(off)|r" or "",
+            NS.buffDismissed and NS.buffDismissed[slot.key] and " |cff808080(closed with X)|r" or "")
+    end
+    return out
+end
+
+-- Megtanult buff torlese (ha rosszat tanult): /qf buffreset
+NS.ResetBuffLearn = function()
+    wipe(DB().buffLearn)
+    NS.Print(L["Learned item buffs cleared; they are learned again on next use."])
 end
 
 ---------------------------------------------------------------------------
@@ -509,6 +553,7 @@ aClose:SetSize(20, 20)
 aClose:SetPoint("TOPRIGHT", -2, -2)
 
 local dismissed = {}   -- slot.key -> true: bezarta, amig a buff fel nem kerul ujra
+NS.buffDismissed = dismissed
 local alertRows = {}
 local ROW_H = 26
 for i, slot in ipairs(SLOTS) do

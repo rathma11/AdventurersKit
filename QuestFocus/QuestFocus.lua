@@ -1593,6 +1593,11 @@ local function DebugLines()
     if not any then out[#out + 1] = L["  (none)"] end
     out[#out + 1] = "Macro:"
     for line in (state.lastBody or "-"):gmatch("[^\n]+") do out[#out + 1] = "  " .. line end
+    if NS.BuffDebugLines then
+        out[#out + 1] = " "
+        local ok, lines = pcall(NS.BuffDebugLines)
+        if ok and lines then for _, l in ipairs(lines) do out[#out + 1] = l end end
+    end
     local errs = NS.errors or {}
     out[#out + 1] = " "
     out[#out + 1] = (L["|cffff5555Lua errors: %d|r"]):format(#errs)
@@ -1989,6 +1994,8 @@ SlashCmdList.QUESTFOCUS = function(msg)
         ToggleZoneFocus()
     elseif msg == "bags" then
         if NS.ToggleBagList then NS.ToggleBagList() end
+    elseif msg == "buffreset" then
+        if NS.ResetBuffLearn then NS.ResetBuffLearn() end
     elseif msg == "junk" then
         if NS.DiscardLeftovers then NS.DiscardLeftovers() end
     elseif msg == "minimap" then
