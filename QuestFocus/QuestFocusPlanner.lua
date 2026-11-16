@@ -294,12 +294,11 @@ ShowToast = function(qid, title, o)
     local tex = o.Type == "item" and o.Id and GetItemIcon and GetItemIcon(o.Id)
     toast.icon:SetTexture(tex or "Interface\\Icons\\Ability_Hunter_SniperShot")
     toast:ClearAllPoints()
-    if NS.BuffAlertFrame and NS.BuffAlertFrame:IsShown() then
-        toast:SetPoint("BOTTOMRIGHT", NS.BuffAlertFrame, "TOPRIGHT", 0, 4)
-    elseif NS.panel:IsShown() then
-        toast:SetPoint("BOTTOMRIGHT", NS.panel, "TOPRIGHT", 0, 4)
+    -- Kepernyo kozepen felul, a jatek sajat "X slain 7/10" kiirasa alatt
+    if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
+        toast:SetPoint("TOP", UIErrorsFrame, "BOTTOM", 0, -6)
     else
-        toast:SetPoint("TOP", UIParent, "TOP", 0, -160)
+        toast:SetPoint("TOP", UIParent, "TOP", 0, -190)
     end
     toast.t = 0
     toast:SetAlpha(1)

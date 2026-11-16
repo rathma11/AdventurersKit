@@ -29,7 +29,7 @@ While you focus a quest, the addon also looks at the other quests in your log. U
 - Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (average time per kill, searching included), plus a progress bar.
 - Each objective shows its own estimated time left. Hover it for the details.
 - **Resize:** drag the grip in the bottom right corner to make the whole panel bigger or smaller (60-160%). Right click the grip to reset. The size is saved.
-- **Progress popup:** for a few seconds after an objective counter goes up, a small popup above the panel shows the new count and the time left.
+- **Progress popup:** for a few seconds after an objective counter goes up, a small popup at the top center of the screen (under the game's own "X slain 7/10" text) shows the new count and the time left.
 
 ### Time left estimate
 Every source measures the **time between** two events, so the searching is counted too, not just the fight. A gap of 15 minutes or more counts as a break and is left out.
