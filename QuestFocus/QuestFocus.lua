@@ -134,6 +134,8 @@ local function CollectTargets(quest, isComplete)
             end
             local entry = { desc = desc, completed = o.Completed and true or false, sources = {} }
             if o.Type == "item" and o.Id then entry.itemId = o.Id end
+            entry.qid = quest.Id
+            entry.qo = o -- Questie objective (Collected/Needed) az ETA szamitashoz
             local seen = {}
 
             for id, s in pairs(o.spawnList or {}) do
@@ -632,7 +634,9 @@ end
 -- Panel
 ---------------------------------------------------------------------------
 local panel = CreateFrame("Frame", "QuestFocusPanel", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-panel:SetSize(280, 60)
+local PANEL_W = 300
+local GOLD = { 0.95, 0.78, 0.40 }
+panel:SetSize(PANEL_W, 60)
 panel:SetPoint("RIGHT", UIParent, "RIGHT", -260, 80)
 panel:SetMovable(true)
 panel:SetClampedToScreen(true)
@@ -643,34 +647,147 @@ panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
 if panel.SetBackdrop then
     panel:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 14,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 16, edgeSize = 20,
+        insets = { left = 5, right = 5, top = 5, bottom = 5 },
     })
-    panel:SetBackdropColor(0, 0, 0, 0.75)
+    panel:SetBackdropColor(0.04, 0.04, 0.06, 0.93)
+    panel:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3], 1)
 end
 panel:Hide()
 
+-- Fejlec: ikon + cim + alcim
+local iconFrame = CreateFrame("Frame", nil, panel, BackdropTemplateMixin and "BackdropTemplate" or nil)
+iconFrame:SetSize(30, 30)
+iconFrame:SetPoint("TOPLEFT", 11, -11)
+if iconFrame.SetBackdrop then
+    iconFrame:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10 })
+    iconFrame:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3], 0.9)
+end
+panel.icon = iconFrame:CreateTexture(nil, "ARTWORK")
+panel.icon:SetPoint("TOPLEFT", 3, -3)
+panel.icon:SetPoint("BOTTOMRIGHT", -3, 3)
+panel.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
+
 panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-panel.title:SetPoint("TOPLEFT", 10, -9)
-panel.title:SetWidth(236)
+panel.title:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 8, -1)
+panel.title:SetWidth(PANEL_W - 80)
 panel.title:SetJustifyH("LEFT")
 panel.title:SetWordWrap(false)
+panel.title:SetTextColor(1, 0.86, 0.5)
+
+panel.sub = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+panel.sub:SetPoint("TOPLEFT", panel.title, "BOTTOMLEFT", 0, -3)
+panel.sub:SetWidth(PANEL_W - 80)
+panel.sub:SetJustifyH("LEFT")
+panel.sub:SetWordWrap(false)
 
 local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
-close:SetSize(24, 24)
-close:SetPoint("TOPRIGHT", 0, 0)
+close:SetSize(26, 26)
+close:SetPoint("TOPRIGHT", -3, -3)
 close:SetScript("OnClick", function()
     QuestFocusDB.hidePanel = true
     panel:Hide()
     Print(L["Panel hidden. It comes back when you click a quest, or: /qf"])
 end)
 
-panel.footer = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+local function Divider(y)
+    local t = panel:CreateTexture(nil, "ARTWORK")
+    t:SetHeight(1)
+    t:SetPoint("TOPLEFT", 12, y)
+    t:SetPoint("TOPRIGHT", -12, y)
+    t:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.35)
+    return t
+end
+panel.headDivider = Divider(-48)
+
+-- Statisztika dobozok: haladas / hatralevo ido / tempo
+panel.stats = CreateFrame("Frame", nil, panel)
+panel.stats:SetPoint("TOPLEFT", 12, -55)
+panel.stats:SetPoint("TOPRIGHT", -12, -55)
+panel.stats:SetHeight(38)
+panel.statBoxes = {}
+local boxW = (PANEL_W - 24 - 8) / 3
+for i, label in ipairs({ L["PROGRESS"], L["TIME LEFT"], L["PACE"] }) do
+    local b = CreateFrame("Frame", nil, panel.stats, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    b:SetSize(boxW, 38)
+    b:SetPoint("TOPLEFT", (i - 1) * (boxW + 4), 0)
+    if b.SetBackdrop then
+        b:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 10,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        b:SetBackdropColor(0, 0, 0, 0.55)
+        b:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+    end
+    b.label = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    b.label:SetPoint("TOP", 0, -5)
+    b.label:SetText(label)
+    b.label:SetTextColor(0.75, 0.65, 0.45)
+    b.value = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    b.value:SetPoint("BOTTOM", 0, 5)
+    b.value:SetText("-")
+    panel.statBoxes[i] = b
+end
+
+-- Osszesitett haladas csik
+panel.bar = CreateFrame("StatusBar", nil, panel)
+panel.bar:SetPoint("TOPLEFT", 13, -99)
+panel.bar:SetPoint("TOPRIGHT", -13, -99)
+panel.bar:SetHeight(6)
+panel.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+panel.bar:SetStatusBarColor(0.95, 0.75, 0.2)
+panel.bar:SetMinMaxValues(0, 1)
+local barBg = panel.bar:CreateTexture(nil, "BACKGROUND")
+barBg:SetAllPoints()
+barBg:SetColorTexture(0.15, 0.15, 0.15, 0.9)
+
+panel.section = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+panel.section:SetTextColor(0.75, 0.65, 0.45)
+panel.section:SetJustifyH("LEFT")
+
+panel.footDivider = panel:CreateTexture(nil, "ARTWORK")
+panel.footDivider:SetHeight(1)
+panel.footDivider:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
+
+panel.footer = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 panel.footer:SetJustifyH("LEFT")
-panel.footer:SetWidth(260)
+panel.footer:SetWidth(PANEL_W - 26)
 
 panel.lines = {}
+
+-- Fejlec es lablec elhelyezese; mode = "quest" (statisztikaval) vagy "list" (javaslatok).
+-- Visszaadja, honnan kezdodhet a tartalom (y).
+local function PanelChrome(mode, sectionText)
+    local quest = mode == "quest"
+    panel.stats:SetShown(quest)
+    panel.bar:SetShown(quest)
+    local y = quest and -112 or -56
+    if sectionText then
+        panel.section:ClearAllPoints()
+        panel.section:SetPoint("TOPLEFT", 14, y)
+        panel.section:SetText(sectionText)
+        panel.section:Show()
+        y = y - 15
+    else
+        panel.section:Hide()
+    end
+    return y
+end
+
+-- Tartalom utan: elvalaszto + lablec, panel magassag
+local function PanelFinish(y)
+    panel.footDivider:ClearAllPoints()
+    panel.footDivider:SetPoint("TOPLEFT", 12, y - 5)
+    panel.footDivider:SetPoint("TOPRIGHT", -12, y - 5)
+    panel.footer:ClearAllPoints()
+    panel.footer:SetPoint("TOPLEFT", panel, "TOPLEFT", 13, y - 11)
+    panel:SetHeight(-y + 11 + math.max(14, panel.footer:GetStringHeight()) + 12)
+end
+NS.PanelChrome, NS.PanelFinish = PanelChrome, PanelFinish
 
 -- A panel alja: elo allapot (kit targetel a macro, mennyire van messze a marker)
 local function MarkerDistance()
@@ -717,7 +834,7 @@ local function GetLine(i)
     local line = panel.lines[i]
     if line then return line end
     line = CreateFrame("Button", nil, panel)
-    line:SetSize(262, 16)
+    line:SetSize(PANEL_W - 24, 16)
     line:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     line.text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     line.text:SetAllPoints()
@@ -747,6 +864,8 @@ local function GetLine(i)
             GameTooltip:AddLine((L["Nearest: %s %.1f, %.1f%s"]):format(ZoneName(p.map), p.x, p.y,
                 dist and (" (%d yd)"):format(dist) or ""), 0.6, 0.8, 1)
         end
+        local etaLine = not o.completed and NS.EtaLine and NS.EtaLine(o)
+        if etaLine then GameTooltip:AddLine(etaLine, 0.8, 0.8, 0.8, true) end
         GameTooltip:AddLine(L["Left click: marker + macro for this only"], 0.5, 0.5, 0.5)
         GameTooltip:AddLine(L["Right click: macro for all remaining"], 0.5, 0.5, 0.5)
         GameTooltip:Show()
@@ -756,24 +875,85 @@ local function GetLine(i)
     return line
 end
 
+local ICON_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t "
+local ICON_TODO = "|TInterface\\COMMON\\Indicator-Gray:12:12|t "
+local ICON_SEL = "|TInterface\\COMMON\\Indicator-Green:12:12|t "
+local ICON_TI = "|TInterface\\GossipFrame\\ActiveQuestIcon:12:12|t "
+
+-- Statisztika dobozok + haladas csik
+local function UpdateStats()
+    local objs = state.objectives or {}
+    local have, need, doneObj, nObj = 0, 0, 0, 0
+    for _, o in ipairs(objs) do
+        if not o.turnIn then
+            nObj = nObj + 1
+            if o.completed then doneObj = doneObj + 1 end
+            local c, n = o.qo and tonumber(o.qo.Collected), o.qo and tonumber(o.qo.Needed)
+            if c and n and n > 0 then
+                have, need = have + math.min(c, n), need + n
+            else
+                have, need = have + (o.completed and 1 or 0), need + 1
+            end
+        end
+    end
+    local b = panel.statBoxes
+    if state.isComplete then
+        b[1].value:SetText("|cff33ff99" .. L["Done"] .. "|r")
+        panel.bar:SetValue(1)
+        panel.bar:SetStatusBarColor(0.3, 0.85, 0.3)
+    else
+        b[1].value:SetText(need > 0 and ("%d / %d"):format(have, need) or "-")
+        panel.bar:SetValue(need > 0 and have / need or 0)
+        panel.bar:SetStatusBarColor(0.95, 0.75, 0.2)
+    end
+    local total = not state.isComplete and NS.QuestEta and NS.QuestEta(objs)
+    b[2].value:SetText(total or "-")
+    b[3].value:SetText(NS.PaceText and NS.PaceText() or "-")
+    if state.isComplete then
+        panel.sub:SetText(L["Ready to turn in"])
+    else
+        panel.sub:SetText((L["%d / %d objectives"]):format(doneObj, nObj))
+    end
+end
+
+local statsElapsed = 0
+panel:HookScript("OnUpdate", function(_, dt)
+    statsElapsed = statsElapsed + dt
+    if statsElapsed < 2 then return end
+    statsElapsed = 0
+    if state.questId then UpdateStats() end
+end)
+
 local function Panel_Update()
-    if not state.questId or QuestFocusDB.hidePanel then
+    if QuestFocusDB.hidePanel then
         panel:Hide()
         return
     end
+    if not state.questId then
+        -- Nincs kijelolt quest: javaslatok (QuestFocusPlanner.lua)
+        for i = 1, #panel.lines do panel.lines[i]:Hide() end
+        panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
+        if NS.ShowSuggestions and NS.ShowSuggestions() then panel:Show() else panel:Hide() end
+        return
+    end
+    if NS.HideSuggestions then NS.HideSuggestions() end
     panel.title:SetText(state.title or ("Quest " .. state.questId))
+    panel.icon:SetTexture("Interface\\Icons\\" .. (state.isComplete and ICON_TURNIN or ICON_HUNT))
     local objs = state.objectives or {}
-    local y = -28
+    local y = PanelChrome("quest", L["OBJECTIVES"])
     for i, o in ipairs(objs) do
         local line = GetLine(i)
         line.index = i
-        local prefix = (state.objIndex == i) and "|cff33ff99> |r" or "   "
-        local color = o.completed and "|cff808080" or (o.turnIn and "|cffffff00" or "|cffffffff")
-        line.text:SetText(prefix .. color .. o.desc .. "|r")
+        local icon = o.completed and ICON_DONE or (o.turnIn and ICON_TI)
+            or (state.objIndex == i and ICON_SEL) or ICON_TODO
+        local color = o.completed and "|cff808080" or (o.turnIn and "|cffffff00")
+            or (state.objIndex == i and "|cff33ff99") or "|cffffffff"
+        local eta = not o.completed and NS.EtaShort and NS.EtaShort(o)
+        line.text:SetText(icon .. color .. o.desc .. "|r" .. (eta and ("  |cff999999" .. eta .. "|r") or ""))
         line:ClearAllPoints()
-        line:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, y)
+        line:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
         line:Show()
-        y = y - 16
+        y = y - 17
     end
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
     if #objs == 0 then
@@ -781,9 +961,8 @@ local function Panel_Update()
     else
         panel.footer:SetText(FooterText())
     end
-    panel.footer:ClearAllPoints()
-    panel.footer:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y - 4)
-    panel:SetHeight(-y + 24)
+    UpdateStats()
+    PanelFinish(y)
     panel:Show()
 end
 
@@ -831,8 +1010,8 @@ end
 local function ClearQuest()
     state.questId, state.title, state.objectives, state.objIndex = nil, nil, nil, nil
     ClearWaypoint()
-    panel:Hide()
     QuestFocusDB.lastQuest = nil
+    Panel_Update() -- kijeloles nelkul javaslatokat mutat
     state.macroCount = 0
     wipe(targetNames)
     local body = '/run print("QuestFocus: no quest selected")'
@@ -877,6 +1056,8 @@ local function AddQuestTooltip(tooltip, questId, isComplete)
             else
                 tooltip:AddDoubleLine("  " .. table.concat(names, ", "), where, 1, 1, 1, 0.6, 0.8, 1)
             end
+            local etaLine = NS.EtaLine and NS.EtaLine(o)
+            if etaLine then tooltip:AddLine("  " .. etaLine, 0.8, 0.8, 0.8, true) end
         end
     end
     tooltip:AddLine(L["Click: marker + QFocus macro"], 0.5, 0.5, 0.5)
@@ -1028,6 +1209,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
                 local title, done = FindQuestInLog(id)
                 if title then SelectQuest(id, title, done, false) end
             end
+            if not state.questId then Panel_Update() end
         end)
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- Harcban a gombot nem lehet atallitani, a regi nameplate token pedig mar mas mobra
@@ -1211,8 +1393,8 @@ local function OptLabel(parent, text, template)
     return fs
 end
 
-local function OptCheck(label, tip, get, set)
-    local cb = CreateFrame("CheckButton", nil, opt.pageMain, "UICheckButtonTemplate")
+local function OptCheck(label, tip, get, set, parent)
+    local cb = CreateFrame("CheckButton", nil, parent or opt.pageMain, "UICheckButtonTemplate")
     cb:SetSize(26, 26)
     cb.label = OptLabel(cb, label)
     cb.label:SetPoint("LEFT", cb, "RIGHT", 4, 1)
@@ -1258,6 +1440,22 @@ for i, def in ipairs({ { L["Settings"], pageMain }, { "Debug", pageDebug } }) do
     tabs[i] = t
 end
 opt.pageMain = pageMain
+
+-- Uj ful a tobbi fajlnak (QuestFocusPlanner.lua, QuestFocusBuffs.lua)
+NS.AddOptionsTab = function(label)
+    local page = CreateFrame("Frame", nil, opt)
+    page:SetAllPoints(pageMain)
+    page:Hide()
+    local i = #tabs + 1
+    local t = CreateFrame("Button", nil, opt, "UIPanelButtonTemplate")
+    t:SetSize(110, 22)
+    t:SetText(label)
+    t.page = page
+    t:SetPoint("TOPLEFT", optSub, "BOTTOMLEFT", (i - 1) * 114, -10)
+    t:SetScript("OnClick", function() SelectTab(i) end)
+    tabs[i] = t
+    return page
+end
 
 -- Spell a tapeleshez
 local cbSpell = OptCheck(L["Spell in the macro (tagging)"],
@@ -1505,6 +1703,9 @@ end
 NS.Print, NS.state, NS.GetQuestieQuest = Print, state, GetQuestieQuest
 NS.NumLogEntries, NS.GetLogEntry, NS.FindQuestInLog = NumLogEntries, GetLogEntry, FindQuestInLog
 NS.SelectQuest, NS.OptCheck, NS.opt, NS.optNote, NS.panel = SelectQuest, OptCheck, opt, optNote, panel
+NS.CollectTargets, NS.WorldPos, NS.UiMapFromArea, NS.PlayerWorldPos = CollectTargets, WorldPos, UiMapFromArea, PlayerWorldPos
+NS.ZoneName, NS.SetWaypoint, NS.Panel_Update, NS.GetNPC, NS.GetObject, NS.Module = ZoneName, SetWaypoint, Panel_Update, GetNPC, GetObject, Module
+NS.ClearWaypoint, NS.AddQuestTooltip, NS.QuestieAvailable = ClearWaypoint, AddQuestTooltip, QuestieAvailable
 
 SLASH_QUESTFOCUS1 = "/qf"
 SLASH_QUESTFOCUS2 = "/questfocus"
@@ -1536,7 +1737,7 @@ SlashCmdList.QUESTFOCUS = function(msg)
         end
     elseif msg == "" then
         QuestFocusDB.hidePanel = panel:IsShown()
-        if not state.questId then Print(L["Select a quest in the quest log (L)."]) end
+        if not state.questId and QuestFocusDB.noSuggest then Print(L["Select a quest in the quest log (L)."]) end
         Panel_Update()
     elseif msg == "next" then
         local objs = state.objectives or {}

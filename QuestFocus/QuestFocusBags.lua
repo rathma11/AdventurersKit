@@ -652,6 +652,7 @@ local cbUse = NS.OptCheck(L["Quest item button next to the panel"],
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; UpdateUseButton() end)
 cbUse:SetPoint("TOPLEFT", cbGlow, "BOTTOMLEFT", 0, -6)
+NS.optLast = cbUse -- a kovetkezo fajl kapcsoloi ez ala kerulnek
 
 NS.opt:HookScript("OnShow", function()
     cbBag.refresh(); cbGlow.refresh(); cbUse.refresh()

@@ -22,6 +22,29 @@ Requires **Questie**. TomTom is optional: if it is installed, its arrow is used.
 - If the only quest mobs nearby are tapped or dead, the macro targets nothing and shows "nearby quest mobs are taken".
 - If no quest mob nameplate is visible (too far away, nameplates off) or you are in combat, the macro targets by name. It skips corpses, but it can't detect tapped mobs this way; a red warning appears if the target is tapped.
 
+### Panel
+- Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (your average time per kill), plus a progress bar.
+- Each objective shows its own estimated time left. Hover it for the details.
+- **Progress popup:** for a few seconds after an objective counter goes up, a small popup above the panel shows the new count and the time left.
+
+### Time left estimate
+- The best source is your own pace on that objective, i.e. how fast its counter has been growing.
+- Without that, it uses your kill pace (time between your kills, breaks over 5 min ignored) times the kills still needed. For loot objectives this uses the Questie drop rate: 10 items at 5% is about 200 kills.
+- A `?` means there is no kill data yet, so a default of 45 s per kill is used. Reset the pace on the Panel tab.
+
+### What next? (no quest selected)
+With no quest selected, the panel suggests what to do next:
+- **Route:** quests from your log ordered as a route. It always goes to the nearest next stop, which is the remaining objectives or the turn-in NPC. Each row shows the extra distance and the time left. Click a row to select that quest.
+- **Pick up nearby:** the 3 nearest quests you can pick up, from Questie's available quests, with completed quests filtered out. They are colored by difficulty. Click one to put a marker on the quest giver.
+
+### Buff reminders
+A small row of buttons under the panel:
+- **Sleeping bag:** found in your bags by name.
+- **XP food:** drag the item in once on the Buffs tab.
+- **Weapon enchant:** sharpening stone, weightstone or oil, found by name. Clicking applies it to your main hand.
+
+Each button shows the time left on its buff. When the buff is missing, or has less than 10 minutes left (you can change this), the button pulses red. You also get one warning on screen and in chat. The buff an item gives is learned the first time you use it from the button.
+
 ## Commands
 | Command | What it does |
 |---|---|
@@ -71,6 +94,8 @@ Esc → Options → AddOns → **QuestFocus**, or `/qf options`. New options are
 - **Ping the target** and **own arrow** on/off (same as `/qf ping` and `/qf arrow`).
 - **Zone focus** button and **minimap button** on/off.
 - **Quest item list**, **Bagnon coloring** and **quest item button** on/off.
+- **Panel tab:** quest suggestions, progress popup, reset kill pace.
+- **Buffs tab:** buff buttons, warning and how many minutes before, item slots. Drag an item from your bags onto a slot. Right click cycles through set, automatic and off.
 - **Debug tab:** live view of the selected quest, the wanted mobs, the picked nameplate, combat state, the visible quest mob nameplates and the current macro text.
 
 The macro icon changes automatically: **crosshair** while you need to kill mobs or collect items, **letter** when the quest is complete and must be turned in, **map** when no quest is selected.

@@ -8,3 +8,5 @@
 Locales.lua
 QuestFocus.lua
 QuestFocusBags.lua
+QuestFocusPlanner.lua
+QuestFocusBuffs.lua
