@@ -336,8 +336,9 @@ if alert.SetBackdrop then
         tile = true, tileSize = 16, edgeSize = 12,
         insets = { left = 3, right = 3, top = 3, bottom = 3 },
     })
-    alert:SetBackdropColor(0.06, 0.03, 0.03, 0.93)
-    alert:SetBackdropBorderColor(1, 0.55, 0.25, 0.95)
+    -- ugyanaz a kinezet, mint a progress kisablake
+    alert:SetBackdropColor(0.04, 0.04, 0.06, 0.92)
+    alert:SetBackdropBorderColor(0.95, 0.78, 0.40, 0.9)
 end
 local aAccent = alert:CreateTexture(nil, "ARTWORK")
 aAccent:SetPoint("TOPLEFT", 4, -4)
@@ -428,6 +429,12 @@ local function UpdateAlert(auras)
     end
     if #need == 0 then
         if alert:IsShown() then alert:Hide() end
+        lastAlertKey = nil
+        return
+    end
+    -- Ugyanazon a helyen jelenik meg, mint a progress kisablak: ha az eppen kint van
+    -- (pl. harc vegen), megvarjuk, amig eltunik, es utana jon a buff emlekezteto
+    if not alert:IsShown() and NS.ToastFrame and NS.ToastFrame:IsShown() then
         lastAlertKey = nil
         return
     end

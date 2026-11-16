@@ -212,6 +212,7 @@ toast.text:SetJustifyH("LEFT")
 toast.text:SetWordWrap(false)
 
 local TOAST_HOLD, TOAST_FADE = 3.5, 0.6
+NS.ToastFrame = toast -- a buff emlekezteto megvarja, amig ez eltunik
 toast:SetScript("OnUpdate", function(self, dt)
     self.t = (self.t or 0) + dt
     if self.t > TOAST_HOLD + TOAST_FADE then
