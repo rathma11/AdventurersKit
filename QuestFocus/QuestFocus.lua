@@ -899,7 +899,8 @@ grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 -- Fejlec es lablec elhelyezese; mode = "quest" (statisztikaval) vagy "list" (javaslatok).
 -- Visszaadja, honnan kezdodhet a tartalom (y).
 local function PanelChrome(mode, sectionText)
-    local quest = mode == "quest"
+    -- Varosban nincs statisztika (ott nem harcolsz), kiveve leadas modban (utazas dobozok)
+    local quest = mode == "quest" and (state.isComplete or not (NS.InCity and NS.InCity()))
     panel.stats:SetShown(quest)
     panel.bar:SetShown(quest)
     local y = quest and -112 or -56
@@ -1058,10 +1059,12 @@ local function UpdateStats()
         end
     end
     local b = panel.statBoxes
-    -- Varos modban (IsResting) nem harcolsz: tavolsag / utazasi ido / legjobb mod (gyalog, HS, repules)
-    if NS.InCity and NS.InCity() then
+    -- Leadas modban: tavolsag / utazasi ido / legjobb mod (gyalog, HS, repules) a leado NPC-ig
+    if state.isComplete then
         b[1].label:SetText(L["DISTANCE"]); b[2].label:SetText(L["TRAVEL"]); b[3].label:SetText(L["BEST WAY"])
-        local r = state.waypoint and NS.TravelAdvice and NS.TravelAdvice(state.waypoint)
+        local dest = state.waypoint
+        if not dest and objs[1] and objs[1].turnIn then dest = FindNearest(objs[1].sources) end
+        local r = dest and NS.TravelAdvice and NS.TravelAdvice(dest)
         b[1].value:SetText(r and r.dist and ("%d yd"):format(r.dist) or "-")
         local t = r and (r.bestTime or r.walk)
         if t then
@@ -1155,6 +1158,7 @@ local function Panel_Update()
         for i = 1, #panel.lines do panel.lines[i]:Hide() end
         for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
         panel.extraHeader:Hide()
+        if panel.hsRow then panel.hsRow:Hide() end
         panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
         if NS.ShowSuggestions and NS.ShowSuggestions() then panel:Show() else panel:Hide() end
         return
@@ -1204,6 +1208,44 @@ local function Panel_Update()
         panel.extraHeader:Hide()
     end
     for i = nExtra + 1, #panel.extraRows do panel.extraRows[i]:Hide() end
+    -- Hearthstone tipp: hany kesz quest adhato le ott, ahova a HS visz
+    -- (leadas modban mar 1-tol, kulonben 2-tol mutatjuk)
+    local hsList, hsName, hsCd
+    if NS.HearthTurnIns then
+        local ok, a, b, c = pcall(NS.HearthTurnIns)
+        if ok then hsList, hsName, hsCd = a, b, c end
+    end
+    if hsList and (#hsList >= 2 or state.isComplete) then
+        local r = panel.hsRow
+        if not r then
+            r = CreateFrame("Button", nil, panel)
+            r:SetSize(PANEL_W - 24, 16)
+            r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            r.text:SetAllPoints()
+            r.text:SetJustifyH("LEFT")
+            r.text:SetWordWrap(false)
+            r:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:SetText((L["Hearthstone: %s"]):format(self.hsName or "?"), 1, 1, 1)
+                GameTooltip:AddLine(L["Quests you could turn in there:"], 1, 0.82, 0)
+                for _, t in ipairs(self.hsList or {}) do GameTooltip:AddLine("  " .. t, 1, 1, 1) end
+                GameTooltip:Show()
+            end)
+            r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            panel.hsRow = r
+        end
+        r.hsList, r.hsName = hsList, hsName
+        local cdTxt = (hsCd and hsCd > 0) and ("  |cff999999" .. L["HS cooldown"] .. " " .. math.ceil(hsCd / 60) .. "m|r") or ""
+        r.text:SetText(("|TInterface\\Icons\\INV_Misc_Rune_01:12:12|t |cff33ff99" .. L["Hearth home: %d quests to turn in at %s"] .. "|r%s")
+            :format(#hsList, hsName or "?", cdTxt))
+        y = y - 4
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        r:Show()
+        y = y - 17
+    elseif panel.hsRow then
+        panel.hsRow:Hide()
+    end
     if #objs == 0 then
         panel.footer:SetText(QuestieAvailable() and L["No objective data for this quest."] or L["Questie is not loaded."])
     else

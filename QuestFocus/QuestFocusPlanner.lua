@@ -729,6 +729,29 @@ local function TravelAdvice(dest)
 end
 NS.TravelAdvice = TravelAdvice
 
+-- Hany kesz quest adhato le a HS helyen (a leado NPC ~400 yardon belul van a HS-tol)?
+-- Csak ha messze vagy a HS-tol (>500 yd). Visszaad: lista (quest nevek), HS neve, cooldown
+NS.HearthTurnIns = function()
+    local h, cd, have = HearthInfo()
+    if not (h and have) then return end
+    local pc, px, py = NS.PlayerWorldPos()
+    if pc and pc == h.wc and Dist(px, py, h.wx, h.wy) <= 500 then return end
+    local list = {}
+    for i = 1, NS.NumLogEntries() do
+        local title, isHeader, qid, done = NS.GetLogEntry(i)
+        if not isHeader and qid and done then
+            local q = NS.GetQuestieQuest(qid)
+            local objs = q and NS.CollectTargets(q, true)
+            if objs and objs[1] and objs[1].turnIn then
+                local _, d = Nearest(objs[1].sources, h.wc, h.wx, h.wy)
+                if d and d <= 400 then list[#list + 1] = title or ("Quest " .. qid) end
+            end
+        end
+    end
+    if #list == 0 then return end
+    return list, h.name, cd
+end
+
 local function BestWayText(r)
     if not r then return "-" end
     if r.best == "hs" then return "|cff33ff99" .. L["Hearth"] .. "|r" end
