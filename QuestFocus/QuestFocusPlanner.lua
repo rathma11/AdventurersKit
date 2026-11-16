@@ -309,9 +309,11 @@ ShowToast = function(qid, title, o, fromQueue)
     local tex = o.Type == "item" and o.Id and GetItemIcon and GetItemIcon(o.Id)
     toast.icon:SetTexture(tex or "Interface\\Icons\\Ability_Hunter_SniperShot")
     toast:ClearAllPoints()
-    -- Kepernyo kozepen felul, a jatek sajat "X slain 7/10" kiirasa alatt
-    if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
-        toast:SetPoint("TOP", UIErrorsFrame, "BOTTOM", 0, -6)
+    -- A panel folott (ha a buff emlekezteto kint van, afolott)
+    if NS.BuffAlertFrame and NS.BuffAlertFrame:IsShown() then
+        toast:SetPoint("BOTTOMRIGHT", NS.BuffAlertFrame, "TOPRIGHT", 0, 4)
+    elseif NS.panel:IsShown() then
+        toast:SetPoint("BOTTOMRIGHT", NS.panel, "TOPRIGHT", 0, 4)
     else
         toast:SetPoint("TOP", UIParent, "TOP", 0, -190)
     end
@@ -614,11 +616,11 @@ local function ShowQuestPopup(d)
     qpop.text:SetText(("%s[%s] %s|r  |cff999999%s %s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
         FormatTime(est), L["est."]))
     qpop:ClearAllPoints()
-    -- a progress kisablak helye alatt
+    -- kozepen felul, a jatek sajat kiirasai alatt
     if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
-        qpop:SetPoint("TOP", UIErrorsFrame, "BOTTOM", 0, -60)
+        qpop:SetPoint("TOP", UIErrorsFrame, "BOTTOM", 0, -6)
     else
-        qpop:SetPoint("TOP", UIParent, "TOP", 0, -244)
+        qpop:SetPoint("TOP", UIParent, "TOP", 0, -190)
     end
     qpop.t = 0
     qpop:SetAlpha(1)
