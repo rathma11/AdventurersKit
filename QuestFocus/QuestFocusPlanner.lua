@@ -431,21 +431,24 @@ end
 
 local starterCache = {} -- qid -> quest giver forrasok
 
-local function BuildPickups(pc, px, py)
+local function BuildPickups(pc, px, py, maxN)
     local AQ = NS.Module("AvailableQuests")
     local avail = AQ and AQ.__availableQuests
     if type(avail) ~= "table" then return {} end
     local QP = NS.Module("QuestiePlayer")
     local inLog = QP and QP.currentQuestlog or {}
     local level = UnitLevel("player") or 1
-    local green = GetQuestGreenRange and GetQuestGreenRange() or 8
+    -- Szintsav: a quest szintje a sajatodnal max 2-vel kisebb, max 10-zel nagyobb (allithato)
+    local below = tonumber(QuestFocusDB.pickupBelow) or 2
+    local above = tonumber(QuestFocusDB.pickupAbove) or 10
     local list = {}
     for qid in pairs(avail) do
         if not inLog[qid] and not IsDone(qid) then
             local q = NS.GetQuestieQuest(qid)
+            local ql = q and tonumber(q.level) or 0
             if q and type(q.Starts) == "table" and not q.isHidden
                 and (q.requiredLevel or 0) <= level
-                and not (q.level and q.level > 0 and level - q.level > green) then
+                and (ql <= 0 or (ql >= level - below and ql <= level + above)) then
                 local sources = starterCache[qid]
                 if not sources then
                 sources = {}
@@ -460,14 +463,174 @@ local function BuildPickups(pc, px, py)
                 end
                 end
                 local p, d = Nearest(sources, pc, px, py)
-                if p then list[#list + 1] = { qid = qid, name = q.name, level = q.level, point = p, dist = d } end
+                if p then list[#list + 1] = { qid = qid, name = q.name, level = q.level, point = p, dist = d, quest = q } end
             end
         end
     end
     table.sort(list, function(a, b) return a.dist < b.dist end)
-    for i = #list, PICKUP_LEN + 1, -1 do list[i] = nil end
+    for i = #list, (maxN or PICKUP_LEN) + 1, -1 do list[i] = nil end
     return list
 end
+
+-- Felveheto quest becsult hossza (a DB-ben nincs darabszam, ezert durva becsles):
+-- mob objective ~8 kill, item ~6 db (drop rate-tel), object ~30 mp, egyeb/beszelgetes ~1 perc.
+local function EstimateQuestTime(q)
+    local pace = KillPace()
+    local DB = NS.Module("QuestieDB")
+    local total, any = 0, false
+    for _, o in ipairs(type(q.ObjectiveData) == "table" and q.ObjectiveData or {}) do
+        any = true
+        if o.Type == "monster" or o.Type == "killcredit" then
+            total = total + 8 * pace
+        elseif o.Type == "item" then
+            local best
+            if DB and type(DB.GetItem) == "function" then
+                local ok, item = pcall(DB.GetItem, DB, o.Id)
+                if ok and type(item) == "table" and type(item.Sources) == "table" then
+                    for _, src in ipairs(item.Sources) do
+                        if src.Type == "monster" and not src.Vendor and type(DB.GetItemDroprate) == "function" then
+                            local ok2, rate = pcall(DB.GetItemDroprate, o.Id, src.Id)
+                            if ok2 and type(rate) == "table" then rate = rate[1] end
+                            rate = tonumber(rate)
+                            if rate and rate > 0 and (not best or rate > best) then best = rate end
+                        end
+                    end
+                end
+            end
+            total = total + (best and (6 * 100 / math.min(best, 100)) * pace or 6 * 30)
+        elseif o.Type == "object" then
+            total = total + 30
+        else
+            total = total + 60
+        end
+    end
+    if not any then total = 60 end -- beszelgetos / kezbesito quest
+    return total
+end
+NS.EstimateQuestTime = EstimateQuestTime
+
+---------------------------------------------------------------------------
+-- Kozeli felveheto quest kisablak: kozepen felul, a progress alatt. Kattintasra
+-- marker (TomTom nyil) a quest adora. Questenkent egyszer szol egy jatekmenetben.
+---------------------------------------------------------------------------
+local NEARBY_RADIUS = 300
+local qpop = CreateFrame("Button", "QuestFocusQuestPopup", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+qpop:SetSize(270, 50)
+qpop:SetFrameStrata("MEDIUM")
+qpop:RegisterForClicks("LeftButtonUp")
+qpop:Hide()
+if qpop.SetBackdrop then
+    qpop:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    qpop:SetBackdropColor(0.04, 0.04, 0.06, 0.92)
+    qpop:SetBackdropBorderColor(0.95, 0.78, 0.40, 0.9)
+end
+local qAccent = qpop:CreateTexture(nil, "ARTWORK")
+qAccent:SetPoint("TOPLEFT", 4, -4)
+qAccent:SetPoint("BOTTOMLEFT", 4, 4)
+qAccent:SetWidth(2)
+qAccent:SetColorTexture(1, 0.82, 0, 1)
+qpop.label = qpop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+qpop.label:SetPoint("TOPLEFT", 12, -7)
+qpop.label:SetTextColor(1, 0.82, 0)
+qpop.label:SetText(L["QUEST NEARBY"])
+qpop.right = qpop:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+qpop.right:SetPoint("TOPRIGHT", -24, -7)
+qpop.icon = qpop:CreateTexture(nil, "ARTWORK")
+qpop.icon:SetSize(18, 18)
+qpop.icon:SetPoint("BOTTOMLEFT", 12, 8)
+qpop.icon:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
+qpop.text = qpop:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+qpop.text:SetPoint("LEFT", qpop.icon, "RIGHT", 6, 0)
+qpop.text:SetPoint("RIGHT", -9, 0)
+qpop.text:SetJustifyH("LEFT")
+qpop.text:SetWordWrap(false)
+local qClose = CreateFrame("Button", nil, qpop, "UIPanelCloseButton")
+qClose:SetSize(20, 20)
+qClose:SetPoint("TOPRIGHT", -2, -2)
+qClose:SetScript("OnClick", function() qpop:Hide() end)
+local qhl = qpop:CreateTexture(nil, "HIGHLIGHT")
+qhl:SetAllPoints()
+qhl:SetColorTexture(1, 1, 1, 0.06)
+
+local QPOP_HOLD, QPOP_FADE = 10, 1
+qpop:SetScript("OnUpdate", function(self, dt)
+    if self:IsMouseOver() then self.t = 0; self:SetAlpha(1) return end -- egerrel folotte nem tunik el
+    self.t = (self.t or 0) + dt
+    if self.t > QPOP_HOLD + QPOP_FADE then
+        self:Hide()
+    elseif self.t > QPOP_HOLD then
+        self:SetAlpha(1 - (self.t - QPOP_HOLD) / QPOP_FADE)
+    end
+end)
+qpop:SetScript("OnClick", function(self)
+    local d = self.data
+    if not d then return end
+    NS.SetWaypoint(d.point, d.point.name or d.name)
+    if state.waypoint then state.waypoint.giver = d.qid end
+    NS.Print(L["Marker: quest giver |cffffff00%s|r for %s"], d.point.name or "?", d.name or "?")
+    self:Hide()
+end)
+qpop:SetScript("OnEnter", function(self)
+    local d = self.data
+    if not d then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetText(("[%s] %s"):format(tostring(d.level or "?"), d.name or "?"), 1, 1, 1)
+    GameTooltip:AddLine((L["Quest giver: %s"]):format(d.point.name or "?"), 1, 0.82, 0)
+    GameTooltip:AddLine(("%s %.1f, %.1f"):format(NS.ZoneName(d.point.map), d.point.x, d.point.y), 0.6, 0.8, 1)
+    GameTooltip:AddLine(L["Length is a rough estimate (objective types, drop rate, your kill pace)."], 0.6, 0.6, 0.6, true)
+    GameTooltip:AddLine(L["Click: marker (TomTom arrow) on the quest giver"], 0.5, 0.5, 0.5)
+    GameTooltip:Show()
+end)
+qpop:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+local announced = {} -- qid -> true: errol mar szoltunk ebben a jatekmenetben
+
+local function ShowQuestPopup(d)
+    local col = GetQuestDifficultyColor and d.level and GetQuestDifficultyColor(d.level)
+    local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
+    local est = EstimateQuestTime(d.quest)
+    qpop.data = d
+    qpop.right:SetText(("|cff99ccff%d yd|r"):format(d.dist + 0.5))
+    qpop.text:SetText(("%s[%s] %s|r  |cff999999%s %s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
+        FormatTime(est), L["est."]))
+    qpop:ClearAllPoints()
+    -- a progress kisablak helye alatt
+    if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
+        qpop:SetPoint("TOP", UIErrorsFrame, "BOTTOM", 0, -60)
+    else
+        qpop:SetPoint("TOP", UIParent, "TOP", 0, -244)
+    end
+    qpop.t = 0
+    qpop:SetAlpha(1)
+    qpop:Show()
+    if PlaySound and SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_OPEN then PlaySound(SOUNDKIT.IG_QUEST_LIST_OPEN) end
+end
+
+local qpopTicker = CreateFrame("Frame")
+local qpopElapsed = 0
+qpopTicker:SetScript("OnUpdate", function(_, dt)
+    qpopElapsed = qpopElapsed + dt
+    if qpopElapsed < 5 then return end
+    qpopElapsed = 0
+    if QuestFocusDB.noQuestPopup or InCombatLockdown() or qpop:IsShown() or not NS.QuestieAvailable() then return end
+    local pc, px, py = NS.PlayerWorldPos()
+    if not pc then return end
+    local ok, list = pcall(BuildPickups, pc, px, py, 10)
+    if not ok or not list then return end
+    for _, d in ipairs(list) do
+        if d.dist > NEARBY_RADIUS then break end
+        if not announced[d.qid] then
+            announced[d.qid] = true
+            ShowQuestPopup(d)
+            return
+        end
+    end
+end)
 
 ---------------------------------------------------------------------------
 -- Panel sorok
@@ -691,8 +854,41 @@ local cbNearby = NS.OptCheck(L["Also target mobs of other nearby quests"],
     end, pagePanel)
 cbNearby:SetPoint("TOPLEFT", cbToast, "BOTTOMLEFT", 0, -6)
 
+local cbQPop = NS.OptCheck(L["Popup for quests you can pick up nearby"],
+    L["When a quest you can pick up is within ~300 yards, a popup shows its level, an estimated length and the distance. "]
+    .. L["Click it for a marker (TomTom arrow) on the quest giver. Each quest only once per session."],
+    function() return not QuestFocusDB.noQuestPopup end,
+    function(v) QuestFocusDB.noQuestPopup = not v end, pagePanel)
+cbQPop:SetPoint("TOPLEFT", cbNearby, "BOTTOMLEFT", 0, -6)
+
+-- Szintsav a felveheto questekhez (javaslatok + kisablak)
+local lvlLabel = pagePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+lvlLabel:SetPoint("TOPLEFT", cbQPop, "BOTTOMLEFT", 32, -8)
+lvlLabel:SetText(L["Quest level: your level minus"])
+local function LvlBox(key, default, anchor)
+    local b = CreateFrame("EditBox", nil, pagePanel, "InputBoxTemplate")
+    b:SetSize(28, 18)
+    b:SetAutoFocus(false)
+    b:SetNumeric(true)
+    b:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
+    b:SetScript("OnEnterPressed", function(self)
+        local v = tonumber(self:GetText())
+        if v then QuestFocusDB[key] = v end
+        self:SetText(tonumber(QuestFocusDB[key]) or default)
+        self:ClearFocus()
+    end)
+    b:SetScript("OnEscapePressed", function(self) self:SetText(tonumber(QuestFocusDB[key]) or default); self:ClearFocus() end)
+    b.refresh = function() b:SetText(tonumber(QuestFocusDB[key]) or default) end
+    return b
+end
+local belowBox = LvlBox("pickupBelow", 2, lvlLabel)
+local lvlMid = pagePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+lvlMid:SetPoint("LEFT", belowBox, "RIGHT", 6, 0)
+lvlMid:SetText(L["... plus"])
+local aboveBox = LvlBox("pickupAbove", 10, lvlMid)
+
 local etaNote = pagePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-etaNote:SetPoint("TOPLEFT", cbNearby, "BOTTOMLEFT", 2, -14)
+etaNote:SetPoint("TOPLEFT", lvlLabel, "BOTTOMLEFT", -30, -16)
 etaNote:SetWidth(520)
 etaNote:SetJustifyH("LEFT")
 etaNote:SetText(L["Time left is learned from your own pace: how fast each objective counter grew, otherwise "]
@@ -708,4 +904,7 @@ resetPace:SetScript("OnClick", function()
     wipe(mobKills)
     NS.Print(L["Kill pace reset."])
 end)
-NS.opt:HookScript("OnShow", function() cbSuggest.refresh(); cbToast.refresh(); cbNearby.refresh() end)
+NS.opt:HookScript("OnShow", function()
+    cbSuggest.refresh(); cbToast.refresh(); cbNearby.refresh(); cbQPop.refresh()
+    belowBox.refresh(); aboveBox.refresh()
+end)

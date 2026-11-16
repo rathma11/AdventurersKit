@@ -45,6 +45,11 @@ With no quest selected, the panel suggests what to do next:
 - **Route:** quests from your log ordered as a route. It always goes to the nearest next stop, which is the remaining objectives or the turn-in NPC. Each row shows the extra distance and the time left. Click a row to select that quest.
 - **Pick up nearby:** the 3 nearest quests you can pick up, from Questie's available quests, with completed quests filtered out. They are colored by difficulty. Click one to put a marker on the quest giver.
 
+### Quests to pick up nearby
+When a quest you can pick up is within ~300 yards, a popup appears at the top center (under the progress popup). It shows the quest level, colored by difficulty, an estimated length and the distance, e.g. `[32] Some Quest ~5m est. 250 yd`. Click it to get a marker (TomTom arrow) on the quest giver. Each quest pops up only once per session, and hovering keeps it open.
+
+Only quests between your level minus 2 and plus 10 are shown; this range also applies to the "Pick up nearby" list. Change the range or turn the popup off on the Panel tab. The length is a rough estimate, because Questie's data has no counts: about 8 kills per mob objective, 6 items per loot objective (with the drop rate), about 1 min for talk or delivery quests, all scaled by your kill pace.
+
 ### Buff reminders
 Watched buffs (warning + reminder popup). An optional row of buttons under the panel is **off by default**, because the buff frame already shows the timers; turn it on on the Buffs tab:
 - **Sleeping bag:** found in your bags by name. The buff is spell 429959 and needs **3 stacks**. The button shows the stacks (e.g. `54m 2/3`), and fewer than 3 counts as low, the same as an expiring buff.
