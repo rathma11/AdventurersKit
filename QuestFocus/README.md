@@ -96,6 +96,7 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 ## Minimap button and zone focus
 - **Minimap button:** left click opens the settings, right click toggles zone focus. Drag it to move it around the minimap.
 - **Zone focus:** only quests of the current zone (plus the selected QFocus quest) stay in the Questie tracker; the rest are untracked. It follows you when you change zones. Turning it off restores everything as it was. The zone is taken from the quest log headers, so quests under a collapsed header are not seen.
+- **Zone question:** while zone focus is off, entering a zone where you have quests (and other quests elsewhere) opens a popup asking whether to focus on it. The choices are **Focus**, **Not now** and **Don't ask again**. It asks once per zone per session, and waits until combat ends. Toggle it with **Ask when entering a new zone** in the settings. Next to the zone focus button, the settings show whether zone focus is on and for which zone.
 
 ## Quest items
 **List next to the bags.** While your bags are open (Bagnon or the default bags), a list of your quest items appears on their left. It is never taller than the bag window and scrolls if needed; the +/− button collapses it. Row colors:

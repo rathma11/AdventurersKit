@@ -1507,14 +1507,60 @@ local function ToggleZoneFocus()
     if QuestFocusDB.zoneFocus then ZoneFocusOff() else ZoneFocusOn() end
 end
 
--- Zonavaltaskor a fokusz koveti a jatekost
+-- Zonavaltaskor: ha be van kapcsolva, a fokusz koveti a jatekost; ha nincs, megkerdezzuk
+-- (zonankent egyszer egy jatekmenetben, csak ha van questunk abban a zonaban)
+local askedZone = {}
+StaticPopupDialogs["QUESTFOCUS_ZONEFOCUS"] = {
+    text = L["QuestFocus: you have %d quest(s) in |cffffff00%s|r.\nFocus on this zone? The other quests leave the Questie tracker (they come back when you turn it off)."],
+    button1 = L["Focus"],
+    button2 = L["Not now"],
+    button3 = L["Don't ask again"],
+    OnAccept = function() ZoneFocusOn() end,
+    OnAlt = function()
+        QuestFocusDB.noZonePrompt = true
+        Print(L["Zone question turned off. Turn it back on: Options > QuestFocus > Ask when entering a new zone."])
+    end,
+    timeout = 30,
+    whileDead = false,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+local function MaybeAskZone()
+    if QuestFocusDB.noZonePrompt or QuestFocusDB.zoneFocus then return end
+    local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
+    if not zone or zone == "" or askedZone[zone] then return end
+    local here, other = 0, 0
+    for _, e in pairs(LogQuests()) do
+        if e.header == zone then here = here + 1 else other = other + 1 end
+    end
+    -- csak ha van itt quest, es van mas is, amit el lehetne rejteni
+    if here == 0 or other == 0 then return end
+    if InCombatLockdown() then
+        state.askZoneAfterCombat = true
+        return
+    end
+    askedZone[zone] = true
+    StaticPopup_Show("QUESTFOCUS_ZONEFOCUS", here, zone)
+end
+NS.MaybeAskZone = MaybeAskZone
+
 local zoneWatcher = CreateFrame("Frame")
 zoneWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-zoneWatcher:SetScript("OnEvent", function()
+zoneWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+zoneWatcher:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        if state.askZoneAfterCombat then state.askZoneAfterCombat = nil; MaybeAskZone() end
+        return
+    end
     C_Timer.After(1, function()
         local zf = QuestFocusDB and QuestFocusDB.zoneFocus
         local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
-        if zf and zone and zone ~= "" and zf.zone ~= zone then ZoneFocusOn() end
+        if zf and zone and zone ~= "" and zf.zone ~= zone then
+            ZoneFocusOn()
+        elseif not zf then
+            MaybeAskZone()
+        end
     end)
 end)
 
@@ -1817,17 +1863,33 @@ local zoneHint = OptLabel(pageMain, L["Only quests of the current zone stay in t
     .. L["Follows you when you change zones; turning it off restores everything. Minimap: right click."], "GameFontDisableSmall")
 zoneHint:SetPoint("TOPLEFT", zoneBtn, "BOTTOMLEFT", 0, -4)
 zoneHint:SetWidth(420)
+-- Allapot a gomb mellett, hogy egyertelmu legyen: be van-e kapcsolva, es melyik zonara
+local zoneState = OptLabel(pageMain, "", "GameFontHighlightSmall")
+zoneState:SetPoint("LEFT", zoneBtn, "RIGHT", 10, 0)
 local function RefreshZoneBtn()
     local zf = QuestFocusDB.zoneFocus
-    zoneBtn:SetText(zf and (L["Zone focus OFF ("] .. (zf.zone or "?") .. ")") or L["Focus on this zone"])
+    local here = GetRealZoneText and GetRealZoneText() or GetZoneText() or "?"
+    if zf then
+        zoneBtn:SetText(L["Turn off zone focus"])
+        zoneState:SetText((L["Zone focus is |cff33ff99ON|r: %s"]):format(zf.zone or "?"))
+    else
+        zoneBtn:SetText((L["Focus on %s"]):format(here))
+        zoneState:SetText(L["Zone focus is |cff808080off|r (all quests in the tracker)"])
+    end
 end
 zoneBtn:SetScript("OnClick", function() ToggleZoneFocus(); RefreshZoneBtn() end)
+
+local cbZoneAsk = OptCheck(L["Ask when entering a new zone"],
+    L["When you enter a zone where you have quests, a popup asks whether to focus on that zone."],
+    function() return not QuestFocusDB.noZonePrompt end,
+    function(v) QuestFocusDB.noZonePrompt = not v end)
+cbZoneAsk:SetPoint("TOPLEFT", zoneHint, "BOTTOMLEFT", -6, -8)
 
 local cbMinimap = OptCheck(L["Minimap button"],
     L["Left click: settings, right click: zone focus. Drag to move."],
     function() return not QuestFocusDB.hideMinimap end,
     function(v) QuestFocusDB.hideMinimap = not v; UpdateMinimapButton() end)
-cbMinimap:SetPoint("TOPLEFT", zoneHint, "BOTTOMLEFT", -6, -14)
+cbMinimap:SetPoint("TOPLEFT", cbZoneAsk, "BOTTOMLEFT", 0, -6)
 
 local optNote = OptLabel(pageMain, L["The macro can't be changed in combat; changes apply after combat."],
     "GameFontDisableSmall")
@@ -1881,7 +1943,7 @@ pageDebug:SetScript("OnUpdate", function(_, dt)
 end)
 
 opt:SetScript("OnShow", function()
-    for _, cb in ipairs({ cbSpell, cbAttack, cbPing, cbArrow, cbMinimap }) do cb.refresh() end
+    for _, cb in ipairs({ cbSpell, cbAttack, cbPing, cbArrow, cbMinimap, cbZoneAsk }) do cb.refresh() end
     RefreshSpellUI()
     RefreshZoneBtn()
     SelectTab(1)
