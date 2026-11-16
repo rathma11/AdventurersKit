@@ -756,6 +756,7 @@ panel.footDivider:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
 panel.footer = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 panel.footer:SetJustifyH("LEFT")
 panel.footer:SetWidth(PANEL_W - 26)
+panel.footer:SetWordWrap(false) -- egy sor: a panel magassaga ne valtozzon harc kozben
 
 panel.lines = {}
 
@@ -780,12 +781,20 @@ end
 
 -- Tartalom utan: elvalaszto + lablec, panel magassag
 local function PanelFinish(y)
+    -- A panel teteje maradjon a helyen (ne a kozepe korul nojon/zsugorodjon), hogy az alatta
+    -- levo buff gombok ne csusszanak ra
+    local p1 = panel:GetPoint(1)
+    local l, t = panel:GetLeft(), panel:GetTop()
+    if p1 ~= "TOPLEFT" and l and t then
+        panel:ClearAllPoints()
+        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+    end
     panel.footDivider:ClearAllPoints()
     panel.footDivider:SetPoint("TOPLEFT", 12, y - 5)
     panel.footDivider:SetPoint("TOPRIGHT", -12, y - 5)
     panel.footer:ClearAllPoints()
     panel.footer:SetPoint("TOPLEFT", panel, "TOPLEFT", 13, y - 11)
-    panel:SetHeight(-y + 11 + math.max(14, panel.footer:GetStringHeight()) + 12)
+    panel:SetHeight(-y + 11 + 14 + 12)
 end
 NS.PanelChrome, NS.PanelFinish = PanelChrome, PanelFinish
 

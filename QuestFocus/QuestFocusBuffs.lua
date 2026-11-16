@@ -9,10 +9,10 @@ local Print = NS.Print
 
 local SLOTS = {
     -- Cozy Sleeping Bag buff: spell 429959, 3 stack kell belole
-    { key = "rest",   label = L["Sleeping bag"], names = { L["Sleeping Bag"] }, spellId = 429959, stacks = 3 },
-    { key = "food",   label = L["XP food"],      names = {} },
+    { key = "rest",   label = L["Sleeping bag"], names = { L["Sleeping Bag"] }, spellId = 429959, stacks = 3, warn = 10 },
+    { key = "food",   label = L["XP food"],      names = {}, warn = 1 },
     { key = "weapon", label = L["Weapon enchant"],
-      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] } },
+      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 10 },
 }
 local BTN = 30
 
@@ -22,8 +22,10 @@ local function DB()
     return QuestFocusDB
 end
 
-local function Minutes()
-    return tonumber(QuestFocusDB.buffWarnMin) or 10
+-- Figyelmeztetesi kuszob percben, buffonkent (alap: slot.warn)
+local function Minutes(slot)
+    local t = QuestFocusDB.buffWarn
+    return (t and tonumber(t[slot.key])) or slot.warn or 10
 end
 
 ---------------------------------------------------------------------------
@@ -168,12 +170,12 @@ local function StackText(slot, stacks)
     return (" %s%d/%d|r"):format(c, stacks or 0, slot.stacks)
 end
 
-local function FmtLeft(sec)
+local function FmtLeft(sec, slot)
     if not sec then return "|cffff4444" .. L["none"] .. "|r" end
     if sec == math.huge then return "|cff33ff99on|r" end
     local m = math.floor(sec / 60)
     local txt = m >= 60 and ("%dh"):format(math.floor(m / 60)) or (m >= 1 and ("%dm"):format(m) or ("%ds"):format(math.floor(sec)))
-    if sec < Minutes() * 60 then return "|cffff9933" .. txt .. "|r" end
+    if slot and sec < Minutes(slot) * 60 then return "|cffff9933" .. txt .. "|r" end
     return "|cffd0d0d0" .. txt .. "|r"
 end
 
@@ -208,7 +210,7 @@ for i, slot in ipairs(SLOTS) do
         if self.itemId then GameTooltip:SetItemByID(self.itemId) else GameTooltip:SetText(slot.label, 1, 1, 1) end
         GameTooltip:AddLine(" ")
         local left, stacks = Remaining(slot, self.itemId, HelpfulAuras())
-        GameTooltip:AddLine(slot.label .. ": " .. FmtLeft(left) .. StackText(slot, stacks), 1, 0.82, 0)
+        GameTooltip:AddLine(slot.label .. ": " .. FmtLeft(left, slot) .. StackText(slot, stacks), 1, 0.82, 0)
         if slot.stacks then
             GameTooltip:AddLine((L["Needs %d stacks of the buff (spell %d)."]):format(slot.stacks, slot.spellId), 0.7, 0.7, 0.7)
         end
@@ -283,13 +285,13 @@ local warned = {}
 local function Tick()
     if not bar:IsShown() then return end
     local auras = HelpfulAuras()
-    local limit = Minutes() * 60
     local pulse = 0.25 + 0.25 * math.sin(GetTime() * 5)
     for _, b in ipairs(buttons) do
         if b:IsShown() then
             local slot = b.slot
+            local limit = Minutes(slot) * 60
             local left, stacks = Remaining(slot, b.itemId, auras)
-            b.time:SetText(FmtLeft(left) .. StackText(slot, stacks))
+            b.time:SetText(FmtLeft(left, slot) .. StackText(slot, stacks))
             local low = (not left) or (left ~= math.huge and left < limit) or ShortStacks(slot, stacks)
             local canFix = b.itemId and GetItemCount(b.itemId) > 0
             b.warn:SetShown(low and canFix)
@@ -411,9 +413,9 @@ local function UpdateAlert(auras)
         lastAlertKey = nil
         return
     end
-    local limit = Minutes() * 60
     local need, key = {}, ""
     for _, slot in ipairs(SLOTS) do
+        local limit = Minutes(slot) * 60
         local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
         local left, stacks = Remaining(slot, id, auras)
         local short = ShortStacks(slot, stacks)
@@ -454,7 +456,7 @@ local function UpdateAlert(auras)
     end
     for i, n in ipairs(need) do
         local name = GetItemInfo(n.id) or n.slot.label
-        local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left))) or ("|cffff4444" .. L["missing"] .. "|r"))
+        local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
             .. StackText(n.slot, n.stacks)
         alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
     end
@@ -522,29 +524,14 @@ local cbWarn = NS.OptCheck(L["Warn before a buff expires"],
     function(v) QuestFocusDB.noBuffWarn = not v end, page)
 cbWarn:SetPoint("TOPLEFT", cbBar, "BOTTOMLEFT", 0, -6)
 
-local minBox = CreateFrame("EditBox", nil, page, "InputBoxTemplate")
-minBox:SetSize(40, 20)
-minBox:SetAutoFocus(false)
-minBox:SetNumeric(true)
-minBox:SetPoint("TOPLEFT", cbWarn, "BOTTOMLEFT", 32, -6)
-local minLabel = page:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-minLabel:SetPoint("LEFT", minBox, "RIGHT", 8, 0)
-minLabel:SetText(L["minutes before it runs out"])
-minBox:SetScript("OnEnterPressed", function(self)
-    local v = tonumber(self:GetText())
-    if v and v > 0 then QuestFocusDB.buffWarnMin = v end
-    wipe(warned)
-    self:ClearFocus()
-end)
-minBox:SetScript("OnEscapePressed", function(self) self:SetText(Minutes()); self:ClearFocus() end)
-
 local hint = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-hint:SetPoint("TOPLEFT", minBox, "BOTTOMLEFT", -32, -16)
+hint:SetPoint("TOPLEFT", cbWarn, "BOTTOMLEFT", 2, -12)
 hint:SetWidth(520)
 hint:SetJustifyH("LEFT")
 hint:SetText(L["Items: drag one from your bags onto a slot. Right click: automatic / none. "]
     .. L["Sleeping bag and weapon enchant are found by name if no item is set; XP food must be dragged in once. "]
-    .. L["The buff an item gives is learned the first time you use it from the button."])
+    .. L["The buff an item gives is learned the first time you use it from the button. "]
+    .. L["The number box: warn this many minutes before the buff runs out (Enter to save)."])
 
 local slotUI = {}
 local last = hint
@@ -559,9 +546,32 @@ for i, slot in ipairs(SLOTS) do
     s.icon = s:CreateTexture(nil, "ARTWORK")
     s.icon:SetPoint("TOPLEFT", 2, -2)
     s.icon:SetPoint("BOTTOMRIGHT", -2, 2)
+    -- Figyelmeztetes kuszob ehhez a buffhoz (perc)
+    s.min = CreateFrame("EditBox", nil, page, "InputBoxTemplate")
+    s.min:SetSize(34, 20)
+    s.min:SetAutoFocus(false)
+    s.min:SetNumeric(true)
+    s.min:SetPoint("LEFT", s, "RIGHT", 14, 0)
+    s.minLabel = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    s.minLabel:SetPoint("LEFT", s.min, "RIGHT", 4, 0)
+    s.minLabel:SetText(L["min"])
+    s.min:SetScript("OnEnterPressed", function(self)
+        local v = tonumber(self:GetText())
+        if v and v >= 0 then
+            QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
+            QuestFocusDB.buffWarn[slot.key] = v
+        end
+        wipe(warned)
+        wipe(dismissed)
+        lastAlertKey = nil
+        self:SetText(Minutes(slot))
+        self:ClearFocus()
+    end)
+    s.min:SetScript("OnEscapePressed", function(self) self:SetText(Minutes(slot)); self:ClearFocus() end)
     s.text = page:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    s.text:SetPoint("LEFT", s, "RIGHT", 10, 0)
+    s.text:SetPoint("LEFT", s.minLabel, "RIGHT", 12, 0)
     s.refresh = function()
+        s.min:SetText(Minutes(slot))
         local db = DB()
         local off = db["noBuff_" .. slot.key]
         local set = db.buffItems[slot.key]
@@ -609,6 +619,5 @@ cbAlert:SetPoint("TOPLEFT", last, "BOTTOMLEFT", -2, -14)
 
 page:SetScript("OnShow", function()
     cbBar.refresh(); cbWarn.refresh(); cbAlert.refresh()
-    minBox:SetText(Minutes())
     for _, s in ipairs(slotUI) do s.refresh() end
 end)
