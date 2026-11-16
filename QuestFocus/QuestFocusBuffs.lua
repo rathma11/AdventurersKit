@@ -140,7 +140,8 @@ local function ReadAuras()
             if not name then break end
         end
         if type(name) == "string" then
-            local a = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0, count = tonumber(count) or 0 }
+            local a = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0, count = tonumber(count) or 0,
+                        index = i, spellId = tonumber(spellId), name = name }
             out[name] = a
             if tonumber(spellId) then byId[tonumber(spellId)] = a end
         end
@@ -153,6 +154,34 @@ local function HelpfulAuras()
     local ok, fresh, byId = pcall(ReadAuras)
     if ok and fresh then auraCache, auraById = fresh, byId end
     return auraCache
+end
+
+-- XP buff felismerese: a buff leirasaban "experience" szerepel (spellId-nkent egyszer nezzuk,
+-- csak harcon kivul). Az alvozsak rested buffja (429959) nem szamit.
+local auraTip = CreateFrame("GameTooltip", "QuestFocusAuraTip", nil, "GameTooltipTemplate")
+local xpAuraCache = {}
+local function IsXPAura(a)
+    if not a or not a.spellId or a.spellId == 429959 then return false end
+    local cached = xpAuraCache[a.spellId]
+    if cached ~= nil then return cached end
+    if InCombatLockdown() or not a.index then return false end
+    local text = ""
+    local ok = pcall(function()
+        auraTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+        auraTip:ClearLines()
+        auraTip:SetUnitBuff("player", a.index)
+        for i = 1, auraTip:NumLines() do
+            local fs = _G["QuestFocusAuraTipTextLeft" .. i]
+            local t = fs and fs:GetText()
+            if t then text = text .. "\n" .. t end
+        end
+        auraTip:Hide()
+    end)
+    if not ok then return false end
+    local lower = text:lower()
+    local isXP = lower:find("experience", 1, true) ~= nil or lower:find("%f[%w]xp%f[%W]") ~= nil
+    xpAuraCache[a.spellId] = isXP
+    return isXP
 end
 
 -- Hatralevo mp (nil = nincs buff, math.huge = nem jar le), masodik ertek: stackek szama
@@ -189,7 +218,7 @@ local function Remaining(slot, itemId, auras)
     end
     local names = {}
     local learned = itemId and DB().buffLearn[itemId]
-    if learned and CLASS_SPELL_SET[learned] then
+    if learned and (CLASS_SPELL_SET[learned] or (slot.key == "food" and learned == L["Well Fed"])) then
         -- rosszul tanult (pl. kozben kapott Blessing): eldobjuk
         DB().buffLearn[itemId] = nil
         learned = nil
@@ -197,8 +226,19 @@ local function Remaining(slot, itemId, auras)
     if learned then names[#names + 1] = learned end
     local spell = ItemSpell(itemId)
     if spell then names[#names + 1] = spell end
-    if slot.key == "food" then names[#names + 1] = L["Well Fed"] end
+    -- XP kaja: a sima "Well Fed" NEM szamit (az nem az XP buff); helyette barmelyik buff,
+    -- aminek a leirasaban experience/XP van
+    if slot.key == "food" then
+        for _, a in pairs(auras) do
+            if a.duration > 60 and IsXPAura(a) then
+                if not learned and itemId then DB().buffLearn[itemId] = a.name end
+                if a.expires == 0 then return math.huge end
+                return a.expires - GetTime()
+            end
+        end
+    end
     for _, n in ipairs(names) do
+        if slot.key == "food" and n == L["Well Fed"] then n = nil end
         local a = auras[n]
         -- a 30 mp-es "Food" evo aura nem az igazi buff
         if a and not (slot.key == "food" and a.duration > 0 and a.duration <= 60) then
