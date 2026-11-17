@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.14", date = "2026-11-17", items = {
+        "City list is resizable: drag the bottom right corner (width, and how many quests show without scrolling); "
+            .. "saved, right-click the corner for the default size.",
+        "City list: removed the estimated quest length (~3m) from the rows.",
+    } },
     { version = "0.6.13", date = "2026-11-17", items = {
         "City list: Bank and AH buttons use the game's own banker / auctioneer tracking icons.",
     } },

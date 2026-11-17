@@ -5,7 +5,16 @@ local P = NS.P
 local announced, BuildPickups, EstimateQuestTime, FormatTime, NEARBY_RADIUS, qpop, ShowQuestPopup, state = P.announced, P.BuildPickups, P.EstimateQuestTime, P.FormatTime, P.NEARBY_RADIUS, P.qpop, P.ShowQuestPopup, P.state
 
 local CITY_RADIUS, CITY_MAX, CITY_VISIBLE, CITY_ROW_H = 600, 40, 12, 19
-local CITY_W = 500
+local CITY_W = 500 -- alap; a felhasznalo atmeretezheti (QuestFocusDB.citySize = { w, rows })
+local CITY_MIN_W, CITY_MAX_W, CITY_MIN_ROWS, CITY_MAX_ROWS = 430, 900, 3, 30
+local function CityW()
+    local s = QuestFocusDB and QuestFocusDB.citySize
+    return math.max(CITY_MIN_W, math.min(CITY_MAX_W, tonumber(s and s.w) or CITY_W))
+end
+local function CityRows()
+    local s = QuestFocusDB and QuestFocusDB.citySize
+    return math.max(CITY_MIN_ROWS, math.min(CITY_MAX_ROWS, tonumber(s and s.rows) or CITY_VISIBLE))
+end
 
 ---------------------------------------------------------------------------
 -- Quest extra info: XP jutalom (Questie QuestXP), lanc pozicio (preQuestSingle /
@@ -212,7 +221,7 @@ city.disableBtn:SetScript("OnEnter", function(self)
 end)
 city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 city.dungeonBtn = FlatBtn(L["Start dungeon"], NS.DUNGEON_ICON)
-city.dungeonBtn:SetPoint("BOTTOMRIGHT", city, "BOTTOMRIGHT", -12, 12)
+city.dungeonBtn:SetPoint("BOTTOMRIGHT", city, "BOTTOMRIGHT", -22, 12)
 city.dungeonBtn:SetScript("OnClick", function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
 city.dungeonBtn:SetScript("OnEnter", function(self)
     local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Start dungeon"])
@@ -449,6 +458,71 @@ do -- trainer: a sajat class ikonja (ha a koordinatak elerhetok), kulonben konyv
         L["Class trainer"], L["Click: marker on the nearest trainer of your class."], city.ahBtn)
 end
 
+---------------------------------------------------------------------------
+-- Atmeretezes: jobb also sarok fogantyu. Szelesseg szabadon (CITY_MIN_W..CITY_MAX_W),
+-- magassag sorokra kerekitve (ennyi quest sor latszik gorgetes nelkul). Mentve: citySize.
+---------------------------------------------------------------------------
+city:SetResizable(true)
+if city.SetResizeBounds then
+    city:SetResizeBounds(CITY_MIN_W, 120, CITY_MAX_W, 900)
+elseif city.SetMinResize then
+    city:SetMinResize(CITY_MIN_W, 120)
+    city:SetMaxResize(CITY_MAX_W, 900)
+end
+-- szelesseg fuggo elemek (sorok, gorgeto) - atmeretezes kozben elo frissites
+function city.ApplyWidth(w)
+    w = w or CityW()
+    if not city.sizing then city:SetWidth(w) end
+    cContent:SetWidth(w - 48)
+    for _, r in ipairs(cityRows) do r:SetWidth(w - 48) end
+    for _, r in ipairs(needRows) do r:SetWidth(w - 28) end
+    if city.lastTop then
+        cScroll:ClearAllPoints()
+        cScroll:SetPoint("TOPLEFT", city, "TOPLEFT", 12, city.lastTop)
+        cScroll:SetPoint("BOTTOMRIGHT", city, "TOPLEFT", w - (city.lastBar and 34 or 12),
+            city.lastTop - math.max(city.lastVisH or 0, 1))
+    end
+end
+local grip = CreateFrame("Button", nil, city)
+grip:SetSize(16, 16)
+grip:SetPoint("BOTTOMRIGHT", -5, 5)
+grip:SetNormalTexture("Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up")
+grip:SetHighlightTexture("Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight")
+grip:SetPushedTexture("Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down")
+grip:SetScript("OnMouseDown", function(_, btn)
+    if btn ~= "LeftButton" then return end
+    city.sizing = true
+    city:StartSizing("BOTTOMRIGHT")
+end)
+grip:SetScript("OnMouseUp", function()
+    if not city.sizing then return end
+    city:StopMovingOrSizing()
+    city.sizing = nil
+    local fixed = -(city.lastTop or -38) + 52
+    local rows = math.floor((city:GetHeight() - fixed) / CITY_ROW_H + 0.5)
+    QuestFocusDB.citySize = {
+        w = math.floor(math.max(CITY_MIN_W, math.min(CITY_MAX_W, city:GetWidth())) + 0.5),
+        rows = math.max(CITY_MIN_ROWS, math.min(CITY_MAX_ROWS, rows)),
+    }
+    NS.RefreshCityList()
+end)
+grip:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(L["Drag to resize"], 1, 1, 1)
+    GameTooltip:AddLine(L["Width, and how many quests are shown without scrolling. Right-click: default size."], 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+grip:RegisterForClicks("RightButtonUp")
+grip:SetScript("OnClick", function(_, btn)
+    if btn ~= "RightButton" then return end
+    QuestFocusDB.citySize = nil
+    NS.RefreshCityList()
+end)
+city:HookScript("OnSizeChanged", function(self, w)
+    if self.sizing then self.ApplyWidth(w) end
+end)
+
 local function InCity() return IsResting and IsResting() end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
 
@@ -490,8 +564,8 @@ local function RefreshCityList()
         end
         if info.chainPos then tags = tags .. ("   %s|cffb48cff%d/%d|r"):format(NS.ChainMarkup(), info.chainPos, info.chainLen) end
         if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
-        r.text:SetText(("%s[%s]|r %s%s%s|r%s  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
-            NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", tags, FormatTime(EstimateQuestTime(d.quest))))
+        r.text:SetText(("%s[%s]|r %s%s%s|r%s"):format(hex, tostring(d.level or "?"),
+            NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", tags))
         r.right:SetText(("|cffd8c070%s|r  |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", cContent, "TOPLEFT", 0, y)
@@ -516,12 +590,15 @@ local function RefreshCityList()
     local top = -38 - (#needs > 0 and (#needs * NEED_ROW_H + 6) or 0)
     city.title:SetText(n > 0 and (L["Quests to pick up here (%d)"]):format(n) or L["In town"])
     cContent:SetHeight(math.max(-y, 1))
-    local visH = math.min(n, CITY_VISIBLE) * CITY_ROW_H
+    local rowsMax = CityRows()
+    local visH = math.min(n, rowsMax) * CITY_ROW_H
     -- csuszka csak ha tobb sor van, mint ami kifer
-    local needBar = n > CITY_VISIBLE
+    local needBar = n > rowsMax
+    city.lastTop, city.lastN, city.lastVisH, city.lastBar = top, n, visH, needBar
+    city.ApplyWidth()
     cScroll:ClearAllPoints()
     cScroll:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top)
-    cScroll:SetPoint("BOTTOMRIGHT", city, "TOPLEFT", CITY_W - (needBar and 34 or 12), top - math.max(visH, 1))
+    cScroll:SetPoint("BOTTOMRIGHT", city, "TOPLEFT", CityW() - (needBar and 34 or 12), top - math.max(visH, 1))
     cScroll:SetShown(n > 0)
     if cScroll.ScrollBar then cScroll.ScrollBar:SetShown(needBar) end
     if not needBar then cScroll:SetVerticalScroll(0) end
@@ -536,6 +613,8 @@ local function RefreshCityList()
     city:SetHeight(-top + visH + 52)
     if not city:IsShown() and not city.closedHere then city:Show() end
 end
+
+NS.RefreshCityList = RefreshCityList
 
 local cityEv = CreateFrame("Frame")
 cityEv:RegisterEvent("PLAYER_UPDATE_RESTING")
