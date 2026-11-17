@@ -135,9 +135,18 @@ end
 
 -- Hasznalhato (Use:) item egy meg nem leadhato aktiv queshez: ezek a panel melletti
 -- gombokra kerulnek, nem a taska melletti listaba
+-- Csak az, amit HASZNALNI kell a queshez: a quest altal adott / megkovetelt item (n.use:
+-- sourceItemId, requiredSourceItems), vagy egy meg nem kesz objective quest-tipusu itemje.
+-- Gyujtendo fogyaszthato (pl. ital, kaja) NEM kerul ide, akkor sem, ha van Use: hatasa.
 local function IsPanelUseItem(e)
     if not On() or QuestFocusDB.noUseButton or not e.needs or not ItemHasUse(e.id) then return false end
-    for _, n in ipairs(e.needs) do if not n.questDone then return true end end
+    local classID = select(6, GetItemInfoInstant(e.id))
+    for _, n in ipairs(e.needs) do
+        if not n.questDone then
+            if n.use then return true end
+            if not n.done and classID == QUEST_CLASS then return true end
+        end
+    end
     return false
 end
 

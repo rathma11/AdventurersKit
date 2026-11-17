@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.2", date = "2026-11-17", items = {
+        "Usable quest item buttons: only items the quest gives you to use (or quest-type objective items), not collected consumables like drinks or food.",
+    } },
     { version = "0.4.1", date = "2026-11-17", items = {
         "Bag highlight fixed: clicking an item in the quest item list highlights it in the open bag (Bagnon or Blizzard bags) and dims the rest; click again to clear.",
     } },
