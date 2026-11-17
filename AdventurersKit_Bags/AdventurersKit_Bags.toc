@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Adventurer's Kit - Bags
 ## Notes: Adventurer's Kit module: quest item list, Bagnon highlight, use-item button and keybind
-## Version: 0.6.62
+## Version: 0.6.63
 ## Dependencies: AdventurersKit
 ## OptionalDeps: Bagnon
 

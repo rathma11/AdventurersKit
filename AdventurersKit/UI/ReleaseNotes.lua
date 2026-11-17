@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.63", date = "2026-11-17", items = {
+        "Lying in a sleeping bag out in the world no longer counts as being in town: the city list doesn't open, and "
+            .. "the outside warnings (bags filling up, repair, vendor nearby) still show. Near an innkeeper it's town as before.",
+    } },
     { version = "0.6.62", date = "2026-11-17", items = {
         "Quests you skip with the next arrow stay skipped after a reload or relog (saved per character). A loading "
             .. "screen no longer brings them back.",

@@ -791,9 +791,39 @@ local function NearInn()
     nearInn = (ok and p and d and d <= INN_R) and true or false
     return nearInn
 end
+-- Alvozsak (Cozy Sleeping Bag, buff 429959): kint a vilagban is "resting"-et ad, az nem varos.
+-- Harcban az aurak secret ertekek: ott a legutobbi (harcon kivuli) eredmeny marad.
+local SLEEP_BAG_ID = 429959
+local bagRest, bagRestAt = false, -10
+local function SleepingBagRest()
+    if InCombatLockdown() or GetTime() - bagRestAt < 2 then return bagRest end
+    bagRestAt = GetTime()
+    local found = false
+    pcall(function()
+        for i = 1, 40 do
+            local name, spellId
+            if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+                local a = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+                if not a then break end
+                name, spellId = a.name, a.spellId
+            else
+                local _
+                name, _, _, _, _, _, _, _, _, spellId = UnitAura("player", i, "HELPFUL")
+                if not name then break end
+            end
+            if spellId == SLEEP_BAG_ID or (type(name) == "string" and name:find("Sleeping Bag", 1, true)) then
+                found = true
+                break
+            end
+        end
+    end)
+    bagRest = found
+    return bagRest
+end
 local function InCity()
     if UnitOnTaxi and UnitOnTaxi("player") then return false end
-    return (IsResting and IsResting()) or NearInn()
+    if NearInn() then return true end
+    return (IsResting and IsResting() and not SleepingBagRest()) and true or false
 end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
 NS.InTown = InCity -- telepulesen vagy-e (a city list kapcsolotol fuggetlenul)

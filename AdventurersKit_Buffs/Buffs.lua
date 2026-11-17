@@ -1148,7 +1148,7 @@ end
 
 local function OutsideWarnings()
     local out = {}
-    if QuestFocusDB.noOutWarn or not NS.CityLimit or (NS.InTown and NS.InTown()) or (IsResting and IsResting()) then
+    if QuestFocusDB.noOutWarn or not NS.CityLimit or (NS.InTown and NS.InTown()) or (not NS.InTown and IsResting and IsResting()) then
         dismissed.w_bags, dismissed.w_repair, dismissed.w_vendor = nil, nil, nil -- varosban: kint legkozelebb ujra szolhat
         return out
     end
