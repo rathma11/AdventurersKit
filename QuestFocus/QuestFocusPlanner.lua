@@ -635,9 +635,19 @@ end
 ---------------------------------------------------------------------------
 local HS_ITEM, HS_CAST, FLY_SPEED = 6948, 10, 25 -- repules: legvonalban ~25 yd/mp (kerulokkel)
 
+-- Futasi sebesseg. Combatban a GetUnitSpeed "secret" erteket ad (nem szabad szamolni vele),
+-- ezert csak combaton kivul olvassuk, kozben az utolso jo ertek marad.
+local lastSpeed = 7
 local function Speed()
-    local _, run = GetUnitSpeed("player")
-    return math.max(tonumber(run) or 7, 7)
+    if InCombatLockdown() then return lastSpeed end
+    local ok, v = pcall(function()
+        local _, run = GetUnitSpeed("player")
+        if issecretvalue and issecretvalue(run) then return nil end
+        run = tonumber(run)
+        return run and math.max(run, 7) or nil
+    end)
+    if ok and v then lastSpeed = v end
+    return lastSpeed
 end
 
 local function SaveHearth()
