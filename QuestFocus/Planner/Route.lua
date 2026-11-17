@@ -173,7 +173,15 @@ end
 
 -- Felveheto quest becsult hossza (a DB-ben nincs darabszam, ezert durva becsles):
 -- mob objective ~8 kill, item ~6 db (drop rate-tel), object ~30 mp, egyeb/beszelgetes ~1 perc.
+-- Ha nem lehet ertelmesen becsulni (battleground, honor mark, olyan item, aminek nem
+-- ismerjuk a forrasat), nil-t ad: inkabb "?" latszik, mint egy felrevezeto 3 perc.
+local BG_ZONES = { [2597] = true, [3277] = true, [3358] = true } -- Alterac Valley, Warsong Gulch, Arathi Basin
+local BG_SORTS = { [-25] = true }                                -- QuestSort: Battlegrounds
+local BG_ITEMS = { [20558] = true, [20559] = true, [20560] = true } -- WSG / AB / AV Mark of Honor
 local function EstimateQuestTime(q)
+    if type(q) ~= "table" then return nil, "?" end
+    local zs = tonumber(q.zoneOrSort)
+    if zs and (BG_ZONES[zs] or BG_SORTS[zs]) then return nil, "battleground" end
     local pace = KillPace()
     local DB = NS.Module("QuestieDB")
     local total, any = 0, false
@@ -182,7 +190,8 @@ local function EstimateQuestTime(q)
         if o.Type == "monster" or o.Type == "killcredit" then
             total = total + 8 * pace
         elseif o.Type == "item" then
-            local best
+            if BG_ITEMS[o.Id] then return nil, "battleground" end
+            local best, fromObject
             if DB and type(DB.GetItem) == "function" then
                 local ok, item = pcall(DB.GetItem, DB, o.Id)
                 if ok and type(item) == "table" and type(item.Sources) == "table" then
@@ -192,11 +201,20 @@ local function EstimateQuestTime(q)
                             if ok2 and type(rate) == "table" then rate = rate[1] end
                             rate = tonumber(rate)
                             if rate and rate > 0 and (not best or rate > best) then best = rate end
+                        elseif src.Type == "object" then
+                            fromObject = true
                         end
                     end
                 end
             end
-            total = total + (best and (6 * 100 / math.min(best, 100)) * pace or 6 * 30)
+            if best then
+                total = total + (6 * 100 / math.min(best, 100)) * pace
+            elseif fromObject then
+                total = total + 6 * 30
+            else
+                -- nem tudjuk, honnan jon (vendor, crafting, BG, mas quest jutalma...)
+                return nil, "unknown source"
+            end
         elseif o.Type == "object" then
             total = total + 30
         else

@@ -190,6 +190,7 @@ NS.PaceText = function(objectives)
 end
 
 local function FormatTime(sec)
+    if not sec then return "?" end -- nem becsulheto (pl. battleground)
     if sec < 60 then return L["<1m"] end
     local m = math.floor(sec / 60 + 0.5)
     if m < 60 then return ("~%dm"):format(m) end

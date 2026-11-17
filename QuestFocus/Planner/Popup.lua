@@ -74,7 +74,8 @@ qpop:SetScript("OnEnter", function(self)
     local d = self.data
     if not d then return end
     NS.TT.Pickup(self, "ANCHOR_BOTTOM", d,
-        L["Length is a rough estimate (objective types, drop rate, your kill pace)."])
+        L["Length is a rough estimate (objective types, drop rate, your kill pace). "]
+        .. L["'?' / unknown: can't be estimated (battleground, item from an unknown source)."])
 end)
 qpop:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
@@ -86,8 +87,8 @@ local function ShowQuestPopup(d)
     local est = EstimateQuestTime(d.quest)
     qpop.data = d
     qpop.right:SetText(("|cff99ccff%d yd|r"):format(d.dist + 0.5))
-    qpop.text:SetText(("%s[%s] %s|r  |cff999999%s %s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
-        FormatTime(est), L["est."]))
+    qpop.text:SetText(("%s[%s] %s|r  |cff999999%s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
+        est and (FormatTime(est) .. " " .. L["est."]) or L["length unknown"]))
     qpop:ClearAllPoints()
     -- kozepen felul, a jatek sajat kiirasai alatt
     if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
