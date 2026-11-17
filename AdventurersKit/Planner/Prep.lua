@@ -70,7 +70,7 @@ local function Build()
     local e = NS.CollectDungeon and NS.CollectDungeon(name)
     prep.info = e
     local pc, px, py = NS.PlayerWorldPos()
-    local pickups, have = {}, {}
+    local pickups, have, insideList = {}, {}, {}
     for _, d in ipairs(e and e.quests or {}) do
         local q = NS.GetQuestieQuest(d.qid)
         if d.inLog then
@@ -94,7 +94,23 @@ local function Build()
                 r.point, r.dist = p, dist
             end
             r.giver = r.giver or d.note
-            pickups[#pickups + 1] = r
+            -- bent indulo quest (a quest ado csak az instance-ban van, vagy a Journal szerint
+            -- "inside"): nem kulon sor, hanem egy "+N bent indul" megjegyzes
+            local inside = false
+            if not r.point then
+                if r.sources and #r.sources > 0 and NS.PrepSpawnsInside then
+                    inside = true
+                    for _, s in ipairs(r.sources) do
+                        if not NS.PrepSpawnsInside(s.spawns) then inside = false break end
+                    end
+                end
+                if not inside and type(d.note) == "string" and d.note:lower():find("inside", 1, true) then inside = true end
+            end
+            if inside then insideList[#insideList + 1] = r else pickups[#pickups + 1] = r end
+        elseif d.qid and not NS.QuestIsDone(d.qid) and q and type(q.Starts) == "table" and type(q.Starts.Item) == "table"
+            and type(d.note) == "string" and d.note:lower():find("inside", 1, true) then
+            -- itemrol indul a dungeonban (nem "felveheto" a Questie szerint)
+            insideList[#insideList + 1] = { kind = "pickup", qid = d.qid, name = d.name or q.name, level = d.level, giver = d.note }
         end
     end
     -- legkozelebbi elol; hely nelkuliek (pl. a dungeonban indulo quest) a vegen
@@ -107,6 +123,7 @@ local function Build()
     table.sort(have, function(a, b) return (a.level or 0) < (b.level or 0) end)
     for _, r in ipairs(pickups) do rows[#rows + 1] = r end
     for _, r in ipairs(have) do rows[#rows + 1] = r end
+    if #insideList > 0 then rows[#rows + 1] = { kind = "note", list = insideList } end
     local ep, ed, detail = EntrancePoint(name)
     rows[#rows + 1] = { kind = "entrance", name = name, point = ep, dist = ed, detail = detail }
     prep.rows = rows
@@ -160,7 +177,7 @@ end
 
 local lastBody
 local function PrepMacro()
-    if not prep.dungeon then return end
+    if not prep.dungeon or (NS.PrepIsInside and NS.PrepIsInside()) then return end
     local body = '/run UIErrorsFrame:AddMessage("QFocus: dungeon prep - no quest giver nearby",1,.8,.2)'
     local giver
     local t = Target()
@@ -239,7 +256,7 @@ local function Line(i)
             -- vissza az automatikus celra (legkozelebbi quest ado, aztan a bejarat)
             prep.sel, prep.markedKey = nil, nil
             MarkRow(AutoTarget())
-        elseif d.kind == "have" then
+        elseif d.kind == "have" or d.kind == "note" then
             -- (a quest logban kijelolni nem lehet: az fokuszt valtana es kilepne a prep modbol)
             return
         else
@@ -253,7 +270,16 @@ local function Line(i)
         local d = self.data
         if not d then return end
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        if d.kind == "entrance" then
+        if d.kind == "note" then
+            GameTooltip:SetText(L["Quests that start inside the dungeon"], 1, 0.82, 0)
+            for _, x in ipairs(d.list) do
+                GameTooltip:AddLine(("[%s] %s"):format(tostring(x.level or "?"), x.name or "?"), 1, 1, 1)
+                if x.giver then GameTooltip:AddLine("    " .. x.giver, 0.7, 0.7, 0.7, true) end
+            end
+            GameTooltip:AddLine(L["Inside, the panel lists them where they come in the run."], 0.5, 0.5, 0.5, true)
+            GameTooltip:Show()
+            return
+        elseif d.kind == "entrance" then
             GameTooltip:SetText((L["%s entrance"]):format(d.name or "?"), 1, 0.6, 0.45)
             if d.point then
                 GameTooltip:AddLine(("%s %.1f, %.1f"):format(NS.ZoneName(d.point.map), d.point.x, d.point.y), 1, 1, 1)
@@ -290,10 +316,15 @@ local function Line(i)
     return r
 end
 
-NS.HidePrep = function()
+local function HideOutside()
     scroll:Hide()
     for _, r in ipairs(lines) do r:Hide() end
 end
+NS.HidePrep = function()
+    HideOutside()
+    if NS.HidePrepInside then NS.HidePrepInside() end
+end
+local function Inside() return NS.PrepIsInside and NS.PrepIsInside() end
 
 local function YdText(d) return d and ("|cff99ccff%d yd|r"):format(d) or nil end
 
@@ -311,6 +342,12 @@ end
 
 -- Panel_Update hivja (UI\Panel.lua), ha a prep mod aktiv
 NS.ShowPrep = function()
+    -- a dungeonon belul: a beluli fazis listaja (Planner\PrepInside.lua)
+    if Inside() and NS.ShowPrepInside then
+        HideOutside()
+        return NS.ShowPrepInside()
+    end
+    if NS.HidePrepInside then NS.HidePrepInside() end
     if prep.dirty then Build() end
     local name = prep.dungeon or "?"
     panel.title:SetText((L["Prep: %s"]):format(name))
@@ -320,7 +357,8 @@ NS.ShowPrep = function()
     local nPick, nHave = 0, 0
     local entrance
     for _, r in ipairs(prep.rows) do
-        if r.kind == "pickup" then nPick = nPick + 1 elseif r.kind == "have" then nHave = nHave + 1 else entrance = r end
+        if r.kind == "pickup" then nPick = nPick + 1 elseif r.kind == "have" then nHave = nHave + 1
+        elseif r.kind == "entrance" then entrance = r end
     end
     local ez = entrance and entrance.point and NS.ZoneName(entrance.point.map)
     panel.sub:SetText((L["%d to pick up, %d in log"]):format(nPick, nHave) .. (ez and ("  |cffff9070" .. ez .. "|r") or ""))
@@ -344,6 +382,9 @@ NS.ShowPrep = function()
                 .. (d.dist and ("  " .. YdText(math.floor(d.dist + 0.5))) or "")
         elseif d.kind == "have" then
             txt = ICON_DONE .. ("|cff808080[%s] %s|r  |cff60a060(%s)|r"):format(tostring(d.level or "?"), d.name or "?", L["in log"])
+        elseif d.kind == "note" then
+            txt = "|TInterface\\GossipFrame\\AvailableQuestIcon:12:12|t |cffffff00"
+                .. (L["+%d quests start inside the dungeon"]):format(#d.list) .. "|r"
         else
             local where = d.point and NS.ZoneName(d.point.map)
             local dist = d.dist and YdText(math.floor(d.dist + 0.5))
@@ -415,6 +456,12 @@ local function Refresh()
     PrepMacro()
     if NS.Panel_Update then NS.Panel_Update() end
 end
+-- (Planner\PrepInside.lua: az instance-bol kilepve vissza a prep listahoz, ujra markerrel)
+NS.PrepRefresh = function(force)
+    if force then prep.markedKey, prep.sel = nil, nil end
+    lastBody = nil
+    Refresh()
+end
 
 NS.StartPrep = function(name, restoring)
     if not name then return end
@@ -444,6 +491,8 @@ NS.StartPrep = function(name, restoring)
         NS.Loud(NS.Print, L["Dungeon prep: |cffffff00%s|r - %d quests to pick up, then the entrance. Leave: the X next to the title, or /qf dungeon off."],
             name, n)
     end
+    -- mar a dungeonban vagy: rogton a beluli fazis
+    if NS.PrepCheckInside then NS.PrepCheckInside() end
 end
 
 NS.StopPrep = function(quiet, restore)
@@ -453,6 +502,7 @@ NS.StopPrep = function(quiet, restore)
     local prev = c1 and rawget(c1, "prepPrev")
     if c1 and QuestFocusDB then c1.prepPrev = nil end
     prep.dungeon, prep.rows, prep.sel, prep.markedKey, prep.info = nil, {}, nil, nil, nil
+    if NS.PrepInsideReset then NS.PrepInsideReset() end
     local c = CharDB()
     if c and QuestFocusDB then c.prepDungeon = nil end
     NS.HidePrep()
@@ -507,8 +557,8 @@ end
 if NS.OnQuestChange then
     NS.OnQuestChange(function(event)
         if event == "QUEST_ACCEPTED" then acceptedAt = GetTime() end
-        if not prep.dungeon then return end
-        C_Timer.After(1.5, function() Refresh() end) -- (a Questie quest log listaja kesve frissul)
+        if not prep.dungeon or Inside() then return end
+        C_Timer.After(1.5, function() if not Inside() then Refresh() end end) -- (a Questie quest log listaja kesve frissul)
     end)
 end
 
@@ -519,7 +569,7 @@ ticker:SetScript("OnUpdate", function(_, dt)
     if el < 1 then return end
     sinceBuild = sinceBuild + el
     el = 0
-    if not prep.dungeon or InCombatLockdown() then return end
+    if not prep.dungeon or InCombatLockdown() or Inside() then return end
     if (NS.Moved and NS.Moved("prep", 20)) or sinceBuild >= 15 then
         sinceBuild = 0
         Build()

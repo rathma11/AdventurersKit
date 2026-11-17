@@ -816,6 +816,7 @@ local function UseRows()
     end
     add(panel.lines)
     add(panel.extraRows)
+    add(panel.prepLines) -- dungeon prep, a dungeonon beluli lista (AdventurersKit: Planner/PrepInside.lua)
     return out
 end
 
@@ -835,7 +836,7 @@ local function UpdateUseButton()
     local key, shown = {}, {}
     -- sorszoveg: ahol gomb van, ott a szoveg ne fusson ala
     local panel = NS.panel
-    for _, list in ipairs({ panel and panel.lines or {}, panel and panel.extraRows or {} }) do
+    for _, list in ipairs({ panel and panel.lines or {}, panel and panel.extraRows or {}, panel and panel.prepLines or {} }) do
         for _, r in ipairs(list) do
             if r.text and r.qfUseInset then
                 r.text:ClearAllPoints()

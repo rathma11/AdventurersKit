@@ -5,6 +5,21 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.67", date = "2026-11-17", items = {
+        "Dungeon prep continues inside the dungeon: when you zone into the prepped dungeon, the panel lists all its "
+            .. "quests in your log in boss order (built-in boss order for the classic and Forever dungeons; otherwise "
+            .. "quest log order), each with every objective under it: kills, loot, objects to click, turn-ins inside. "
+            .. "Quests from your log whose open objectives point into this instance are listed too, so nothing is missed.",
+        "Quests you can pick up inside (an NPC in the dungeon, or an item that drops there) show as \"!\" rows at "
+            .. "their place in the run. Before you go in, the prep list shows them as \"+N quests start inside\".",
+        "The next thing to do is highlighted, with a hint (which boss, which object), and the QFocus macro targets "
+            .. "its mobs (or the NPC to talk to). Quest items you have to use get the Bags module's use button on the "
+            .. "row.",
+        "No arrow inside: Questie has no coordinates for mobs in instances and the game gives no map position "
+            .. "there, so the panel shows the Next hint instead (if both ever exist, the marker / arrow works).",
+        "When all of the dungeon's quests are done (and nothing is left to pick up), the mode ends and you are back "
+            .. "on the quest you had before. Leaving the dungeon with quests still open goes back to the prep list.",
+    } },
     { version = "0.6.66", date = "2026-11-17", items = {
         "Dungeon list: a plain click on a dungeon or one of its quests now starts dungeon prep for that dungeon (the "
             .. "panel shows its quests to pick up, then the entrance). Shift+click does what a click did before (Dungeon "
