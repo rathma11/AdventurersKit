@@ -842,9 +842,16 @@ for i = 1, #SLOTS + MAX_CUSTOM + 3 do -- +3: kinti figyelmeztetesek (taska, javi
     b.click:SetPoint("LEFT", b.arrow, "RIGHT", 4, 0)
     b.click:SetPoint("RIGHT", alert, "RIGHT", -28, 0)
     b.click:SetHeight(20)
-    if b.click.SetClipsChildren then b.click:SetClipsChildren(true) end
-    b.click.text = b.click:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.click.text:SetPoint("LEFT", b.click, "LEFT", 0, 0)
+    -- elol a fix felirat (pl. "Vendor nearby"), utana a futo resz (sajat, levagott keretben)
+    b.click.label = b.click:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.click.label:SetPoint("LEFT", b.click, "LEFT", 0, 0)
+    b.click.label:SetWordWrap(false)
+    b.click.box = CreateFrame("Frame", nil, b.click)
+    b.click.box:SetPoint("TOPLEFT", b.click.label, "TOPRIGHT", 6, 4)
+    b.click.box:SetPoint("BOTTOMRIGHT", b.click, "BOTTOMRIGHT", 0, 0)
+    if b.click.box.SetClipsChildren then b.click.box:SetClipsChildren(true) end
+    b.click.text = b.click.box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.click.text:SetPoint("LEFT", b.click.box, "LEFT", 0, 0)
     b.click.text:SetJustifyH("LEFT")
     b.click.text:SetWordWrap(false)
     local chl = b.click:CreateTexture(nil, "HIGHLIGHT")
@@ -854,9 +861,9 @@ for i = 1, #SLOTS + MAX_CUSTOM + 3 do -- +3: kinti figyelmeztetesek (taska, javi
     -- futo szoveg: ha hosszabb, mint a hely, lassan balra csuszik, a vegen megall, majd elolrol
     b.click.off, b.click.wait = 0, 1.5
     b.click:SetScript("OnUpdate", function(self, dt)
-        local over = (self.text:GetStringWidth() or 0) - (self:GetWidth() or 0)
+        local over = (self.text:GetStringWidth() or 0) - (self.box:GetWidth() or 0)
         if over <= 2 then
-            if self.off ~= 0 then self.off = 0; self.text:SetPoint("LEFT", self, "LEFT", 0, 0) end
+            if self.off ~= 0 then self.off = 0; self.text:SetPoint("LEFT", self.box, "LEFT", 0, 0) end
             return
         end
         if self.wait > 0 then self.wait = self.wait - dt return end
@@ -867,7 +874,7 @@ for i = 1, #SLOTS + MAX_CUSTOM + 3 do -- +3: kinti figyelmeztetesek (taska, javi
             self.off = self.off + dt * 25
             if self.off >= over then self.off, self.atEnd, self.wait = over, true, 1.5 end
         end
-        self.text:SetPoint("LEFT", self, "LEFT", -self.off, 0)
+        self.text:SetPoint("LEFT", self.box, "LEFT", -self.off, 0)
     end)
     b.click:SetScript("OnClick", function()
         local h = b:GetScript("PostClick")
@@ -1044,16 +1051,30 @@ local WARN_VENDOR = { key = "w_vendor", label = L["Vendor nearby"], names = {}, 
     icon = "Interface\\Icons\\INV_Misc_Coin_01" }
 local VENDOR_R, VENDOR_BAG_PCT, VENDOR_REPAIR = 150, 50, 0.9
 local vendCache = { at = -10 }
+-- A legkozelebbi arus / javito keresese 5 mp-enkent (draga), a tavolsag viszont minden
+-- frissiteskor elo: ha elsetaltal (VENDOR_R folott), a sor azonnal eltunik.
 local function NearVendors()
-    if GetTime() - vendCache.at < 5 then return vendCache end
-    vendCache = { at = GetTime() }
-    if NS.NearestTownsfolk then
-        local ok, p, d = pcall(NS.NearestTownsfolk, "Sell")
-        if ok and p and d and d <= VENDOR_R then vendCache.sell, vendCache.sellD = p, d end
-        ok, p, d = pcall(NS.NearestTownsfolk, "Repair")
-        if ok and p and d and d <= VENDOR_R then vendCache.rep, vendCache.repD = p, d end
+    if GetTime() - vendCache.at >= 5 then
+        vendCache = { at = GetTime() }
+        if NS.NearestTownsfolk then
+            local ok, p, d = pcall(NS.NearestTownsfolk, "Sell")
+            if ok and p and d and d <= VENDOR_R * 2 then vendCache.sellP = p end
+            ok, p, d = pcall(NS.NearestTownsfolk, "Repair")
+            if ok and p and d and d <= VENDOR_R * 2 then vendCache.repP = p end
+        end
     end
-    return vendCache
+    local out = {}
+    local pc, px, py = NS.PlayerWorldPos and NS.PlayerWorldPos()
+    local function live(p)
+        if not (p and pc and p.wc == pc and p.wx) then return end
+        local d = math.sqrt((p.wx - px) ^ 2 + (p.wy - py) ^ 2)
+        if d <= VENDOR_R then return d end
+    end
+    local d = live(vendCache.sellP)
+    if d then out.sell, out.sellD = vendCache.sellP, d end
+    d = live(vendCache.repP)
+    if d then out.rep, out.repD = vendCache.repP, d end
+    return out
 end
 
 local function OutsideWarnings()
@@ -1257,8 +1278,15 @@ local function UpdateAlert(auras)
         local cnt = n.action and n.action.kind == "item" and GetItemCount(n.action.id) or nil
         alertRows[i].count:SetText(cnt and cnt > 0 and cnt or "")
         if n.info then
-            local t = ("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(n.slot.label, n.status or L["missing"], n.info)
-            if n.slot.warnRow then alertRows[i].click.text:SetText(t) else alertRows[i].text:SetText(t) end
+            if n.slot.warnRow then
+                -- fix felirat elol, csak a mogotte levo resz fut
+                local c = alertRows[i].click
+                c.label:SetText("|cffffd100" .. n.slot.label .. "|r")
+                c.text:SetText(("|cffff4444%s|r  |cff999999%s|r"):format(n.status or L["missing"], n.info))
+            else
+                alertRows[i].text:SetText(("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(
+                    n.slot.label, n.status or L["missing"], n.info))
+            end
         else
             local name = ActionName(n.action, n.slot)
             local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))

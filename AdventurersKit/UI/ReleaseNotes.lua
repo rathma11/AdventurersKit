@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.29", date = "2026-11-17", items = {
+        "Vendor nearby: disappears as soon as you are more than 150 yd from the vendor (live distance); the row's title stays "
+            .. "put and only the part after it scrolls.",
+    } },
     { version = "0.6.28", date = "2026-11-17", items = {
         "Buff reminder warning rows (vendor nearby, bags, repair): the whole row is clickable (marker), and the text "
             .. "scrolls when it doesn't fit. 'Vendor nearby' shows a vendor icon, or the repair icon for a repairer, "
