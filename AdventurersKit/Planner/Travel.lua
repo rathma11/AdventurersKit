@@ -1,5 +1,6 @@
 local ADDON_NAME, NS = ...
 local L = NS.L
+local GetItemCount, GetItemInfoInstant, GetItemInfo, GetItemIcon, GetItemSpell = NS.SafeItem.GetItemCount, NS.SafeItem.GetItemInfoInstant, NS.SafeItem.GetItemInfo, NS.SafeItem.GetItemIcon, NS.SafeItem.GetItemSpell -- biztonsagos item API (CoreInit.lua)
 NS.P = NS.P or {}
 local P = NS.P
 local FormatTime, Nearest, state = P.FormatTime, P.Nearest, P.state

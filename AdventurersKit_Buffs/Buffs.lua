@@ -6,6 +6,7 @@
 local NS = _G.QuestFocusNS -- a QuestFocus (alap) addon kozos nevtere
 if not NS then return end
 local L = NS.L
+local GetItemCount, GetItemInfoInstant, GetItemInfo, GetItemIcon, GetItemSpell = NS.SafeItem.GetItemCount, NS.SafeItem.GetItemInfoInstant, NS.SafeItem.GetItemInfo, NS.SafeItem.GetItemIcon, NS.SafeItem.GetItemSpell -- biztonsagos item API (CoreInit.lua)
 local Print = NS.Print
 
 local SLOTS = {

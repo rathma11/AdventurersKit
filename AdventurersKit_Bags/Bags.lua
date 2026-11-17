@@ -7,6 +7,7 @@
 local NS = _G.QuestFocusNS -- a QuestFocus (alap) addon kozos nevtere
 if not NS then return end
 local L = NS.L
+local GetItemCount, GetItemInfoInstant, GetItemInfo, GetItemIcon, GetItemSpell = NS.SafeItem.GetItemCount, NS.SafeItem.GetItemInfoInstant, NS.SafeItem.GetItemInfo, NS.SafeItem.GetItemIcon, NS.SafeItem.GetItemSpell -- biztonsagos item API (CoreInit.lua)
 local Print, state = NS.Print, NS.state
 
 local QUEST_CLASS = (Enum and Enum.ItemClass and Enum.ItemClass.Questitem) or 12
@@ -129,8 +130,7 @@ end
 local function On() return not NS.ModuleOn or NS.ModuleOn("QuestFocus_Bags") end
 
 local function ItemHasUse(id)
-    if C_Item and C_Item.GetItemSpell then return C_Item.GetItemSpell(id) ~= nil end
-    return GetItemSpell and GetItemSpell(id) ~= nil
+    return GetItemSpell(id) ~= nil -- biztonsagos valtozat (NS.SafeItem)
 end
 
 -- Hasznalhato (Use:) item egy meg nem leadhato aktiv queshez: ezek a panel melletti

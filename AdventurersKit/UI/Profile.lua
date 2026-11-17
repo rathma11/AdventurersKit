@@ -6,6 +6,7 @@
 -- class beallitasok csak azonos classnal.
 local ADDON_NAME, NS = ...
 local L = NS.L
+local GetItemCount, GetItemInfoInstant, GetItemInfo, GetItemIcon, GetItemSpell = NS.SafeItem.GetItemCount, NS.SafeItem.GetItemInfoInstant, NS.SafeItem.GetItemInfo, NS.SafeItem.GetItemIcon, NS.SafeItem.GetItemSpell -- biztonsagos item API (CoreInit.lua)
 
 local PREFIX = "AK1:"
 

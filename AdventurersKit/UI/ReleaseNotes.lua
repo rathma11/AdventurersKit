@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.6", date = "2026-11-17", items = {
+        "Fix: 'attempt to call a nil value' in GetItemCount / GetItemInfoInstant (Bags, Buffs). Item lookups now use the "
+            .. "C_Item API first and the old one as a fallback, both protected, so a broken item function can't stop the modules.",
+    } },
     { version = "0.6.5", date = "2026-11-17", items = {
         "City to-do: bags full warning (default 70% used, or fewer than 10 free slots) with the nearest vendor to sell to; "
             .. "the quest list stays below it.",

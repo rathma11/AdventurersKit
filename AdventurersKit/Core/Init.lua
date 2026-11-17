@@ -4,6 +4,41 @@
 
 local ADDON_NAME, NS = ...
 local L = NS.L
+
+-- Biztonsagos item API: a globalis GetItemCount / GetItemInfo... ezen a kliensen elavult
+-- atiranyitas lehet (vagy mas addon horgolja), ami "attempt to call a nil value"-t dob.
+-- Elobb a C_Item valtozat, aztan a regi globalis, mindketto pcall-lal; hiba eseten alapertek.
+-- A fajlok tetejen: local GetItemCount = NS.SafeItem.GetItemCount (stb.)
+local function Pack(...) return { n = select("#", ...), ... } end
+local function Try(names, ...)
+    for _, f in ipairs(names) do
+        local fn = f()
+        if fn then
+            local r = Pack(pcall(fn, ...))
+            if r[1] then return unpack(r, 2, r.n) end
+        end
+    end
+end
+local CI = function(k) return function() return C_Item and C_Item[k] end end
+local G = function(k) return function() return _G[k] end end
+NS.SafeItem = {
+    GetItemCount = function(id, ...)
+        if not id then return 0 end
+        for _, f in ipairs({ CI("GetItemCount"), G("GetItemCount") }) do
+            local fn = f()
+            if fn then
+                local ok, n = pcall(fn, id, ...)
+                if ok then return tonumber(n) or 0 end
+            end
+        end
+        return 0
+    end,
+    GetItemInfoInstant = function(id) if id then return Try({ CI("GetItemInfoInstant"), G("GetItemInfoInstant") }, id) end end,
+    GetItemInfo = function(id) if id then return Try({ CI("GetItemInfo"), G("GetItemInfo") }, id) end end,
+    GetItemIcon = function(id) if id then return Try({ CI("GetItemIconByID"), G("GetItemIcon") }, id) end end,
+    GetItemSpell = function(id) if id then return Try({ CI("GetItemSpell"), G("GetItemSpell") }, id) end end,
+}
+
 local MACRO_NAME = "QFocus"
 local ICON_FALLBACK = 134400 -- INV_Misc_QuestionMark
 local ICON_HUNT = "Ability_Hunter_SniperShot"   -- celkereszt: mobok
