@@ -436,9 +436,10 @@ local function HeadBtn(text, icon, coords, kind, tipTitle, tipText, anchor)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return b
 end
-city.bankBtn = HeadBtn(L["Bank"], "Interface\\Icons\\INV_Misc_Bag_10_Blue", nil, "Banker", L["Banker"],
+-- a minimap kovetes (tracking) sajat kis ikonjai: ugyanaz, amit a jatek a bankar / aukcios folott mutat
+city.bankBtn = HeadBtn(L["Bank"], "Interface\\Minimap\\Tracking\\Banker", { 0, 1, 0, 1 }, "Banker", L["Banker"],
     L["Click: marker on the nearest banker."], cClose)
-city.ahBtn = HeadBtn(L["AH"], "Interface\\Icons\\INV_Misc_Coin_01", nil, "Auctioneer", L["Auction House"],
+city.ahBtn = HeadBtn(L["AH"], "Interface\\Minimap\\Tracking\\Auctioneer", { 0, 1, 0, 1 }, "Auctioneer", L["Auction House"],
     L["Click: marker on the nearest auctioneer."], city.bankBtn)
 do -- trainer: a sajat class ikonja (ha a koordinatak elerhetok), kulonben konyv
     local cls = select(2, UnitClass("player"))

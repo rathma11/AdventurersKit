@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.13", date = "2026-11-17", items = {
+        "City list: Bank and AH buttons use the game's own banker / auctioneer tracking icons.",
+    } },
     { version = "0.6.12", date = "2026-11-17", items = {
         "City list: flat buttons in the list's own style instead of the red ones; Bank / AH / Trainer have small icons "
             .. "(Trainer shows your class icon).",
