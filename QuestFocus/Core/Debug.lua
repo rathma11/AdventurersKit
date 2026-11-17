@@ -38,6 +38,9 @@ local function DebugLines()
         GetBindLocation and GetBindLocation() or "?",
         (h and GetBindLocation and h.name == GetBindLocation()) and L["yes"]
             or L["no (bind at an innkeeper or use your Hearthstone once)"])
+    if NS.bagFocusDebug then
+        out[#out + 1] = "Bag highlight: " .. NS.bagFocusDebug
+    end
     if NS.BuffDebugLines then
         out[#out + 1] = " "
         local ok, lines = pcall(NS.BuffDebugLines)

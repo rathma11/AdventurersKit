@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.1", date = "2026-11-17", items = {
+        "Bag highlight fixed: clicking an item in the quest item list highlights it in the open bag (Bagnon or Blizzard bags) and dims the rest; click again to clear.",
+    } },
     { version = "0.4.0", date = "2026-11-17", items = {
         "New name: Adventurer's Kit (formerly QuestFocus). Folders, /qf, the QFocus macro and your settings stay the same.",
         "Panel: a small button next to the close button clears the focus (the quest stays in your log), same as /qf clear.",

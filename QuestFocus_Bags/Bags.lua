@@ -233,8 +233,10 @@ end
 -- Kiemelt item (a listaban rakattintottal): erosen pulzalo arany keret, a tobbi elhalvanyul
 local bagFocus -- itemID vagy nil
 
-local function ApplyFocus(self, B)
-    local id = self.info and self.info.itemID
+local anchorFrame -- a nyitott taska ablak (lent allitjuk: Attach)
+
+local function ApplyFocus(self, B, idOverride)
+    local id = idOverride or (self.info and (self.info.itemID or self.info.id))
     if bagFocus then
         if id == bagFocus then
             if not self.qfFocus then
@@ -312,11 +314,112 @@ local function UpdateAllBagFrames()
     end
 end
 
+---------------------------------------------------------------------------
+-- Kiemeles kozvetlenul: a nyitott taska ablak(ok) item gombjait magunk keressuk meg
+-- (Bagnon / BagBrother / Blizzard), es amig a kiemeles aktiv, felfrissitjuk (a Bagnon
+-- ujrarajzolaskor visszaallitja az atlatszosagot). Nem fugg a Bagnon belso metodusaitol.
+---------------------------------------------------------------------------
+local touched = setmetatable({}, { __mode = "k" }) -- gombok, amikhez hozzanyultunk
+local GetBagItemID = C_Container and C_Container.GetContainerItemID or GetContainerItemID
+
+local function IsItemButton(b)
+    if b.IsObjectType and b:IsObjectType("ItemButton") then return true end
+    return b.IconBorder ~= nil or (b.GetName and b:GetName() and b:GetName():find("Item%d+$") ~= nil)
+end
+
+local function ButtonItemID(b)
+    local info = b.info
+    if type(info) == "table" and (info.itemID or info.id) then return info.itemID or info.id end
+    local slot = b.GetID and b:GetID()
+    if not slot or slot <= 0 then return end
+    local okB, bag = pcall(function() return (b.GetBag and b:GetBag()) or b.bag end)
+    if not okB then bag = nil end
+    if not bag then
+        local p = b:GetParent()
+        bag = p and p.GetID and p:GetID()
+    end
+    if type(bag) ~= "number" then return end
+    local ok, id = pcall(GetBagItemID, bag, slot)
+    return ok and id or nil
+end
+
+local function CollectItemButtons(frame, out, depth)
+    if not frame or depth > 7 then return end
+    for _, c in ipairs({ frame:GetChildren() }) do
+        if c:IsShown() then
+            if c:IsObjectType("Button") and IsItemButton(c) then
+                out[#out + 1] = c
+            else
+                CollectItemButtons(c, out, depth + 1)
+            end
+        end
+    end
+end
+
+local function BagRoots()
+    local roots = {}
+    if anchorFrame and anchorFrame:IsShown() then roots[#roots + 1] = anchorFrame end
+    for _, name in ipairs({ "ContainerFrameCombinedBags" }) do
+        local f = _G[name]
+        if f and f:IsShown() and f ~= anchorFrame then roots[#roots + 1] = f end
+    end
+    for i = 1, 13 do
+        local f = _G["ContainerFrame" .. i]
+        if f and f:IsShown() and f ~= anchorFrame then roots[#roots + 1] = f end
+    end
+    return roots
+end
+
+local function ApplyFocusAll()
+    local found = 0
+    for _, root in ipairs(BagRoots()) do
+        local btns = {}
+        CollectItemButtons(root, btns, 0)
+        for _, b in ipairs(btns) do
+            local id = ButtonItemID(b)
+            ApplyFocus(b, nil, id or -1) -- -1: ures slot (elhalvanyul)
+            touched[b] = true
+            if id == bagFocus then found = found + 1 end
+        end
+    end
+    return found
+end
+
+-- ha a kiemelest kikapcsoljuk, minden erintett gombot visszaallitunk (zart taskaban is)
+local function ClearFocusAll()
+    for b in pairs(touched) do
+        if b.qfDimmed then
+            b.qfDimmed = nil
+            if b.qfFocus then b.qfFocus:Hide(); b.qfFocusAnim:Stop() end
+            b:SetAlpha(1)
+        end
+    end
+end
+
+local focusTicker = CreateFrame("Frame")
+focusTicker:Hide()
+local focusElapsed = 0
+focusTicker:SetScript("OnUpdate", function(self, dt)
+    focusElapsed = focusElapsed + dt
+    if focusElapsed < 0.3 then return end
+    focusElapsed = 0
+    if not bagFocus then self:Hide() return end
+    ApplyFocusAll()
+end)
+
 -- Kattintas a listaban: ki/be kapcsolja az item kiemeleset a taskaban
 NS.BagFocus = function(itemId)
     if not itemId and not bagFocus then return false end
     HookBagnonItems()
     if itemId then bagFocus = (bagFocus ~= itemId) and itemId or nil else bagFocus = nil end
+    if bagFocus then
+        local found = ApplyFocusAll()
+        focusTicker:Show()
+        NS.bagFocusDebug = ("item %d, %d button(s) found"):format(bagFocus, found)
+    else
+        ClearFocusAll()
+        focusTicker:Hide()
+    end
     UpdateAllBagFrames()
     return bagFocus ~= nil
 end
@@ -348,7 +451,6 @@ list.title:SetPoint("TOPLEFT", 10, -8)
 list.rows = {}
 -- taska bezarasakor a kiemeles is megszunik
 list:HookScript("OnHide", function() if NS.BagFocus then NS.BagFocus(nil) end end)
-local anchorFrame
 local RefreshBagList -- lent
 
 -- Osszecsukas: csak a fejlec latszik
