@@ -163,13 +163,30 @@ local function IconId(name)
     return iconCache[name]
 end
 
-local function CurrentIcon()
-    if QuestFocusDB and QuestFocusDB.icon then return IconId(QuestFocusDB.icon) end
-    if not state.questId then return IconId(ICON_IDLE) end
-    local objs = state.objectives or {}
-    if objs[1] and objs[1].turnIn then return IconId(ICON_TURNIN) end
-    return IconId(ICON_HUNT)
+-- Makro (es panel) ikon allapotonkent: idle = nincs kijelolt quest, hunt = mobok / gyujtes,
+-- turnin = leadas. QuestFocusDB.macroIcons[kind] = ikon nev (Interface\Icons\...), nil = alap.
+local ICON_DEFAULTS = { idle = ICON_IDLE, hunt = ICON_HUNT, turnin = ICON_TURNIN }
+local function MacroIconName(kind)
+    local db = QuestFocusDB
+    if not db then return ICON_DEFAULTS[kind] end
+    -- regi /qf icon beallitas (egy ikon mindenre) -> mindharom allapotra
+    if db.icon then
+        db.macroIcons = { idle = db.icon, hunt = db.icon, turnin = db.icon }
+        db.icon = nil
+    end
+    local t = db.macroIcons
+    return (t and t[kind]) or ICON_DEFAULTS[kind]
 end
+local function CurrentIconKind()
+    if not state.questId then return "idle" end
+    local objs = state.objectives or {}
+    if objs[1] and objs[1].turnIn then return "turnin" end
+    return "hunt"
+end
+local function CurrentIcon()
+    return IconId(MacroIconName(CurrentIconKind()))
+end
+NS.MacroIconName, NS.MacroIconDefaults, NS.CurrentIconKind = MacroIconName, ICON_DEFAULTS, CurrentIconKind
 
 local function ApplyMacro(body)
     if InCombatLockdown() then

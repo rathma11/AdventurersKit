@@ -511,13 +511,13 @@ local function Panel_Update()
         for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
         panel.extraHeader:Hide()
         if panel.hsRow then panel.hsRow:Hide() end
-        panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
+        panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName("idle"))
         if NS.ShowSuggestions and NS.ShowSuggestions() then panel:Show() else panel:Hide() end
         return
     end
     if NS.HideSuggestions then NS.HideSuggestions() end
     panel.title:SetText(state.title or ("Quest " .. state.questId))
-    panel.icon:SetTexture("Interface\\Icons\\" .. (state.isComplete and ICON_TURNIN or ICON_HUNT))
+    panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName(state.isComplete and "turnin" or "hunt"))
     local objs = state.objectives or {}
     local y = PanelChrome("quest", L["OBJECTIVES"])
     for i, o in ipairs(objs) do

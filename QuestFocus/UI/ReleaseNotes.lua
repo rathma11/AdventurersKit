@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.3.2", date = "2026-11-17", items = {
+        "Macro icons per state (hunting, turn-in, no quest): Macro & marker tab, click an icon to pick from a list opening to the side; the panel icon follows. /qf icon <name> sets all three.",
+    } },
     { version = "0.3.1", date = "2026-11-17", items = {
         "Zone focus: entering another zone with quests asks Switch / Keep / Turn off focus (or switch without asking: Zone focus tab).",
         "Minimap tooltip shows the new zone focus state right after a right click.",

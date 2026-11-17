@@ -88,20 +88,19 @@ local function SlashHandler(msg)
         if state.questId then UpdateMacro() Panel_Update() end
     elseif msg == "icon" or msg:match("^icon%s") then
         local name = msg:match("^icon%s+(%S+)")
+        -- egy ikon mindharom allapotra; allapotonkent: Options > Macro & marker > Macro icons
         if name then
             local id = IconId(name)
             if id == ICON_FALLBACK then
                 Print(L["Icon not found: %s (e.g. ability_hunter_snipershot)"], name)
                 return
             end
-            QuestFocusDB.icon = name
-            Print(L["QFocus icon: |T%d:16|t %s"], id, name)
+            for kind in pairs(NS.MacroIconDefaults) do NS.SetMacroIcon(kind, name, true) end
+            Print(L["QFocus icon (all states): |T%d:16|t %s"], id, name)
         else
-            QuestFocusDB.icon = nil
-            Print(L["QFocus icon: automatic (crosshair / letter at turn-in)"])
+            for kind in pairs(NS.MacroIconDefaults) do NS.SetMacroIcon(kind, nil, true) end
+            Print(L["QFocus icons: defaults (map / crosshair / letter at turn-in)"])
         end
-        state.lastIcon = nil
-        if not InCombatLockdown() then ApplyMacro(state.lastBody or BuildMacroBody(state.objectives, state.objIndex)) end
     elseif msg == "unmark" then
         ClearWaypoint()
         Print(L["Marker removed."])

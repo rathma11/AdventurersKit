@@ -4,6 +4,7 @@ NS.C = NS.C or {}
 local C = NS.C
 local arrow, DebugLines, ICON_HUNT, Panel_Update, Print, state, ToggleZoneFocus, UpdateMacro = C.arrow, C.DebugLines, C.ICON_HUNT, C.Panel_Update, C.Print, C.state, C.ToggleZoneFocus, C.UpdateMacro
 local UseOwnArrow = C.UseOwnArrow
+local ApplyMacro, BuildMacroBody, IconId = C.ApplyMacro, C.BuildMacroBody, C.IconId
 
 ---------------------------------------------------------------------------
 -- Beallitasok (Options > AddOns > QuestFocus)
@@ -463,23 +464,204 @@ mac:Check(L["Also target mobs of other nearby quests"],
         Panel_Update()
     end)
 
--- Makro ikon (ugyanaz, mint /qf icon)
-local iconLabel = OptLabel(pageMac, L["Macro icon"], "GameFontHighlightSmall")
-local iconBox = CreateFrame("EditBox", nil, pageMac, "InputBoxTemplate")
-iconBox:SetSize(200, 18)
-iconBox:SetAutoFocus(false)
-iconBox:SetPoint("LEFT", iconLabel, "RIGHT", 10, 0)
-local iconDesc = Desc(pageMac, L["Icon file name, e.g. ability_hunter_snipershot. Empty + Enter: automatic (crosshair, letter at turn-in)."])
-iconDesc:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 0, -6)
-mac:Place(iconLabel, 28, 12, iconDesc, 28)
-iconBox:SetScript("OnEnterPressed", function(self)
+---------------------------------------------------------------------------
+-- Makro ikonok allapotonkent + oldalra nyilo ikonvalaszto
+---------------------------------------------------------------------------
+-- Valaszthato ikonok (Interface\Icons\...). A nem letezo a valasztoban "?"-kent latszik.
+local ICON_CHOICES = {
+    -- vadaszat / celzas
+    "Ability_Hunter_SniperShot", "Ability_Hunter_AimedShot", "Ability_Marksmanship", "Ability_Hunter_EagleEye",
+    "Ability_Tracking", "Ability_DualWield", "Ability_Warrior_Charge", "Ability_Rogue_Ambush",
+    "Ability_Warrior_BattleShout", "INV_Sword_04", "INV_Axe_02", "INV_Weapon_Bow_02",
+    "INV_Misc_Bone_HumanSkull_01", "INV_Misc_Head_Dragon_01", "INV_Misc_Pelt_Wolf_01", "Ability_Hunter_Pet_Wolf",
+    -- gyujtes
+    "INV_Misc_Bag_08", "INV_Misc_Herb_10", "INV_Ore_Copper_01", "INV_Misc_Gear_01",
+    -- leadas / quest
+    "INV_Misc_Note_01", "INV_Misc_Note_02", "INV_Scroll_03", "INV_Letter_01",
+    "INV_Misc_Book_09", "INV_Misc_Coin_01", "INV_Misc_Bag_10", "Spell_Holy_Restoration",
+    -- terkep / keszenlet
+    "INV_Misc_Map_01", "INV_Misc_Spyglass_02", "INV_Misc_Spyglass_03", "INV_Misc_QuestionMark",
+}
+
+local function RefreshMacroIcon()
+    state.lastIcon = nil
+    if not InCombatLockdown() and ApplyMacro then
+        local body = state.lastBody
+        if not body and state.questId then
+            local ok, b = pcall(BuildMacroBody, state.objectives, state.objIndex)
+            body = ok and b or nil
+        end
+        if body then ApplyMacro(body) end
+    end
+    Panel_Update()
+end
+
+-- name = nil: alap ikon. noApply: tobbet allitunk egymas utan (a hivo frissit)
+local function SetMacroIcon(kind, name, noApply)
+    QuestFocusDB.macroIcons = QuestFocusDB.macroIcons or {}
+    if name == NS.MacroIconDefaults[kind] then name = nil end
+    QuestFocusDB.macroIcons[kind] = name
+    if not noApply then RefreshMacroIcon() end
+end
+NS.SetMacroIcon = function(kind, name, noApply)
+    SetMacroIcon(kind, name, true)
+    if noApply then
+        -- a /qf icon az utolso hivas utan frissit
+        C_Timer.After(0, RefreshMacroIcon)
+    else
+        RefreshMacroIcon()
+    end
+end
+
+local function IconTexPath(name)
+    return name and (name:find("[/\\]") and name or ("Interface\\Icons\\" .. name)) or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+-- Oldalra nyilo valaszto (egy kozos az osszes slotnak)
+local FLY_COLS, FLY_SIZE = 8, 26
+-- az opt-hoz kotve (nem a gorgetett oldalhoz), hogy a scroll ne vagja le
+local fly = CreateFrame("Frame", nil, opt, BackdropTemplateMixin and "BackdropTemplate" or nil)
+fly:SetFrameStrata("DIALOG")
+fly:EnableMouse(true)
+fly:Hide()
+if fly.SetBackdrop then
+    fly:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    fly:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
+    fly:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
+end
+fly.buttons = {}
+for i, name in ipairs(ICON_CHOICES) do
+    local b = CreateFrame("Button", nil, fly)
+    b:SetSize(FLY_SIZE - 2, FLY_SIZE - 2)
+    local col, row = (i - 1) % FLY_COLS, math.floor((i - 1) / FLY_COLS)
+    b:SetPoint("TOPLEFT", 8 + col * FLY_SIZE, -8 - row * FLY_SIZE)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetAllPoints()
+    b.tex:SetTexture(IconTexPath(name))
+    b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.sel = b:CreateTexture(nil, "OVERLAY")
+    b.sel:SetPoint("TOPLEFT", -2, 2)
+    b.sel:SetPoint("BOTTOMRIGHT", 2, -2)
+    b.sel:SetColorTexture(0.2, 1, 0.6, 0.45)
+    b.sel:SetDrawLayer("BACKGROUND")
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b.name = name
+    b:SetScript("OnClick", function()
+        if fly.kind then SetMacroIcon(fly.kind, name) end
+        fly:Hide()
+        mac:Refresh()
+    end)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(name, 1, 1, 1)
+        if fly.kind and NS.MacroIconDefaults[fly.kind] == name then
+            GameTooltip:AddLine(L["default for this state"], 0.6, 0.6, 0.6)
+        end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    fly.buttons[i] = b
+end
+local flyRows = math.ceil(#ICON_CHOICES / FLY_COLS)
+-- sajat ikon nev (barmely Interface\Icons fajl)
+local flyBox = CreateFrame("EditBox", nil, fly, "InputBoxTemplate")
+flyBox:SetSize(FLY_COLS * FLY_SIZE - 70, 18)
+flyBox:SetAutoFocus(false)
+flyBox:SetPoint("TOPLEFT", 14, -12 - flyRows * FLY_SIZE)
+local flyBoxHint = fly:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+flyBoxHint:SetPoint("LEFT", flyBox, "RIGHT", 6, 0)
+flyBoxHint:SetText(L["other + Enter"])
+flyBox:SetScript("OnEnterPressed", function(self)
     local v = self:GetText():match("^%s*(.-)%s*$")
-    SlashCmdList.QUESTFOCUS(v ~= "" and ("icon " .. v) or "icon")
-    self:SetText(QuestFocusDB.icon or "")
     self:ClearFocus()
+    if v == "" or not fly.kind then return end
+    if IconId(v) == C.ICON_FALLBACK then
+        NS.Loud(Print, L["Icon not found: %s (e.g. ability_hunter_snipershot)"], v)
+        return
+    end
+    SetMacroIcon(fly.kind, v)
+    fly:Hide()
+    mac:Refresh()
 end)
-iconBox:SetScript("OnEscapePressed", function(self) self:SetText(QuestFocusDB.icon or ""); self:ClearFocus() end)
-mac:OnRefresh(function() iconBox:SetText(QuestFocusDB.icon or "") end)
+flyBox:SetScript("OnEscapePressed", function(self) self:ClearFocus(); fly:Hide() end)
+local flyReset = CreateFrame("Button", nil, fly, "UIPanelButtonTemplate")
+flyReset:SetSize(FLY_COLS * FLY_SIZE, 20)
+flyReset:SetPoint("TOPLEFT", 8, -36 - flyRows * FLY_SIZE)
+flyReset:SetText(L["Default"])
+flyReset:SetScript("OnClick", function()
+    if fly.kind then SetMacroIcon(fly.kind, nil) end
+    fly:Hide()
+    mac:Refresh()
+end)
+fly:SetSize(16 + FLY_COLS * FLY_SIZE, 66 + flyRows * FLY_SIZE)
+
+local function OpenFly(slot)
+    if fly:IsShown() and fly.kind == slot.kind then fly:Hide() return end
+    fly.kind = slot.kind
+    local cur = NS.MacroIconName(slot.kind)
+    for _, b in ipairs(fly.buttons) do b.sel:SetShown(b.name:lower() == cur:lower()) end
+    flyBox:SetText("")
+    fly:ClearAllPoints()
+    fly:SetPoint("TOPLEFT", slot, "TOPRIGHT", 8, 4)
+    fly:Show()
+end
+pageMac:HookScript("OnHide", function() fly:Hide() end)
+
+mac:Header(L["Macro icons"])
+mac:Text(L["The QFocus macro (and the panel) changes its icon by state. Click an icon to choose another one from the list "]
+    .. L["opening to the side; right click: default."], 2)
+local ICON_KINDS = {
+    { kind = "hunt", label = L["Hunting: mobs / items to collect"] },
+    { kind = "turnin", label = L["Turn-in: quest complete, go to the NPC"] },
+    { kind = "idle", label = L["No quest selected"] },
+}
+for _, k in ipairs(ICON_KINDS) do
+    local s = CreateFrame("Button", nil, pageMac)
+    s:SetSize(30, 30)
+    s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    s.kind = k.kind
+    s.bg = s:CreateTexture(nil, "BACKGROUND")
+    s.bg:SetAllPoints()
+    s.bg:SetColorTexture(0, 0, 0, 0.5)
+    s.icon = s:CreateTexture(nil, "ARTWORK")
+    s.icon:SetPoint("TOPLEFT", 2, -2)
+    s.icon:SetPoint("BOTTOMRIGHT", -2, 2)
+    s.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    s:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    s.label = OptLabel(pageMac, k.label, "GameFontHighlight")
+    s.label:SetPoint("TOPLEFT", s, "TOPRIGHT", 10, -2)
+    s.name = OptLabel(pageMac, "", "GameFontDisableSmall")
+    s.name:SetPoint("TOPLEFT", s.label, "BOTTOMLEFT", 0, -3)
+    s:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            SetMacroIcon(self.kind, nil)
+            fly:Hide()
+            mac:Refresh()
+        else
+            OpenFly(self)
+        end
+    end)
+    s:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(k.label, 1, 1, 1)
+        GameTooltip:AddLine(NS.MacroIconName(self.kind), 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(L["Click: choose · Right click: default"], 0.45, 0.45, 0.45)
+        GameTooltip:Show()
+    end)
+    s:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    mac:Place(s, 28, 8)
+    mac:OnRefresh(function()
+        local n = NS.MacroIconName(s.kind)
+        s.icon:SetTexture(IconTexPath(n))
+        local isDef = n == NS.MacroIconDefaults[s.kind]
+        s.name:SetText(n .. (isDef and (" |cff808080(" .. L["default"] .. ")|r") or ""))
+    end)
+end
 
 mac:Header(L["Marker"])
 mac:Check(L["Own arrow"],
