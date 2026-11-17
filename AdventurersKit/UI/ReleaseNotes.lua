@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.26", date = "2026-11-17", items = {
+        "Panel with a focused quest: no icon in front of the title, and the map / clear focus buttons sit right after the quest name.",
+    } },
     { version = "0.6.25", date = "2026-11-17", items = {
         "Buff reminder out in the world: 'Vendor nearby' when a vendor / repairer is within ~150 yd and your bags are at "
             .. "least half full (or your gear is under 90%), e.g. 'bags 36/66, gear 85% - <vendor>'. Click: marker; X: hide until you move on.",

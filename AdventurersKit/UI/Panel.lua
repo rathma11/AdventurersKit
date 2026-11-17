@@ -152,8 +152,11 @@ local function MapButton(parent, size)
     return b
 end
 local mapBtn = MapButton(panel, 15)
-mapBtn:SetPoint("RIGHT", clearBtn, "LEFT", -5, 0)
+mapBtn:SetPoint("LEFT", panel.title, "RIGHT", 6, 0)
 mapBtn:Hide()
+-- a fokusz torles a terkep gomb utan, kozvetlenul a quest neve vegen
+clearBtn:ClearAllPoints()
+clearBtn:SetPoint("LEFT", mapBtn, "RIGHT", 4, 0)
 mapBtn:SetScript("OnClick", function() if NS.ShowObjectiveOnMap then NS.ShowObjectiveOnMap(state.objIndex) end end)
 mapBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
@@ -616,6 +619,17 @@ local function Panel_Update()
         return
     end
     clearBtn:SetShown(state.questId ~= nil)
+    -- cimsor: quest modban nincs ikon elol (a cim a bal szelen kezdodik), a terkep es a
+    -- fokusz torles gomb a quest neve utan jon; javaslat modban ikon + cim, mint eddig
+    panel.title:ClearAllPoints()
+    if state.questId then
+        iconFrame:Hide()
+        panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -12 - HEAD)
+    else
+        iconFrame:Show()
+        panel.title:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 8, -1)
+        panel.title:SetWidth(PW() - 100)
+    end
     if not state.questId then
         -- Nincs kijelolt quest: javaslatok (QuestFocusPlanner.lua)
         for i = 1, #panel.lines do panel.lines[i]:Hide() end
@@ -628,6 +642,10 @@ local function Panel_Update()
     end
     if NS.HideSuggestions then NS.HideSuggestions() end
     panel.title:SetText(state.title or ("Quest " .. state.questId))
+    -- a cim csak olyan szeles, mint a szoveg (max. a panel - a ket gomb helye), igy a gombok
+    -- a nev vegere kerulnek
+    panel.title:SetWidth(PW() - 28 - 48)
+    panel.title:SetWidth(math.min(math.ceil(panel.title:GetStringWidth()) + 2, PW() - 28 - 48))
     panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName(state.isComplete and "turnin" or "hunt"))
     local objs = state.objectives or {}
     local y = PanelChrome("quest", L["OBJECTIVES"])
