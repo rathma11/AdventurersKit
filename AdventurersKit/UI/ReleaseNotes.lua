@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.25", date = "2026-11-17", items = {
+        "Buff reminder out in the world: 'Vendor nearby' when a vendor / repairer is within ~150 yd and your bags are at "
+            .. "least half full (or your gear is under 90%), e.g. 'bags 36/66, gear 85% - <vendor>'. Click: marker; X: hide until you move on.",
+    } },
     { version = "0.6.24", date = "2026-11-17", items = {
         "Per character: the Buffs tab's ticks, chosen items, own buffs, minutes and class buff choices, and the city list's "
             .. "ignore list. Each character starts once from the old shared values, after that they are separate. "

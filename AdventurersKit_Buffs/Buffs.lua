@@ -799,7 +799,7 @@ NS.buffDismissed = dismissed
 local alertRows = {}
 local ROW_H = 26
 -- sorok: a beepitett tipusok + MAX_CUSTOM sajat item (a slot futas kozben valtozik: b.slot)
-for i = 1, #SLOTS + MAX_CUSTOM + 2 do -- +2: kinti figyelmeztetesek (taska, javitas)
+for i = 1, #SLOTS + MAX_CUSTOM + 3 do -- +3: kinti figyelmeztetesek (taska, javitas, arus a kozelben)
     local slot = SLOTS[i]
     local b = CreateFrame("Button", "QuestFocusBuffAlertBtn" .. i, alert, "SecureActionButtonTemplate")
     b:SetSize(22, 22)
@@ -995,12 +995,32 @@ local WARN_BAGS = { key = "w_bags", label = L["Bags"], names = {}, warnRow = tru
     icon = "Interface\\Icons\\INV_Misc_Bag_10" }
 local WARN_REPAIR = { key = "w_repair", label = L["Gear"], names = {}, warnRow = true, kind = "Repair",
     icon = "Interface\\Icons\\Trade_BlackSmithing" }
+-- Arus a kozelben (kis tabor, ut menti arus): ha VENDOR_R yardon belul van eladasra /
+-- javitasra alkalmas NPC, es a taska legalabb felig tele (vagy kopott a felszereles), szolunk,
+-- hogy itt eladhatsz / javithatsz. A keresest 5 mp-enkent frissitjuk.
+local WARN_VENDOR = { key = "w_vendor", label = L["Vendor nearby"], names = {}, warnRow = true, kind = "Sell",
+    icon = "Interface\\Icons\\INV_Misc_Coin_01" }
+local VENDOR_R, VENDOR_BAG_PCT, VENDOR_REPAIR = 150, 50, 0.9
+local vendCache = { at = -10 }
+local function NearVendors()
+    if GetTime() - vendCache.at < 5 then return vendCache end
+    vendCache = { at = GetTime() }
+    if NS.NearestTownsfolk then
+        local ok, p, d = pcall(NS.NearestTownsfolk, "Sell")
+        if ok and p and d and d <= VENDOR_R then vendCache.sell, vendCache.sellD = p, d end
+        ok, p, d = pcall(NS.NearestTownsfolk, "Repair")
+        if ok and p and d and d <= VENDOR_R then vendCache.rep, vendCache.repD = p, d end
+    end
+    return vendCache
+end
+
 local function OutsideWarnings()
     local out = {}
     if QuestFocusDB.noOutWarn or not NS.CityLimit or (NS.InTown and NS.InTown()) or (IsResting and IsResting()) then
-        dismissed.w_bags, dismissed.w_repair = nil, nil -- varosban: kint legkozelebb ujra szolhat
+        dismissed.w_bags, dismissed.w_repair, dismissed.w_vendor = nil, nil, nil -- varosban: kint legkozelebb ujra szolhat
         return out
     end
+    local v = NearVendors()
     local free, total = 0, 0
     if NS.CityBagSlots then free, total = NS.CityBagSlots() end
     local pctLimit, freeLimit = NS.CityLimit("bagPct"), NS.CityLimit("bagFree")
@@ -1022,6 +1042,21 @@ local function OutsideWarnings()
             info = (L["most worn item at %d%% - repair"]):format(math.floor(worst * 100 + 0.5)) }
     else
         dismissed.w_repair = nil
+    end
+    -- arus a kozelben: ha a taska legalabb felig tele, vagy javitani kellene (es itt lehet)
+    local wantSell = total > 0 and used >= VENDOR_BAG_PCT and v.sell
+    local wantRep = worst and worst < VENDOR_REPAIR and v.rep
+    if wantSell or wantRep then
+        local p, d = wantRep and v.rep or v.sell, wantRep and v.repD or v.sellD
+        local parts = {}
+        if total > 0 then parts[#parts + 1] = (L["bags %d/%d"]):format(total - free, total) end
+        if worst and worst < 1 then parts[#parts + 1] = (L["gear %d%%"]):format(math.floor(worst * 100 + 0.5)) end
+        -- a kattintas a javitora visz, ha javitani kell, kulonben barmelyik arusra
+        WARN_VENDOR.kind = wantRep and "Repair" or "Sell"
+        out[#out + 1] = { slot = WARN_VENDOR, status = ("|cff99ccff%d yd|r"):format(math.floor(d + 0.5)),
+            info = table.concat(parts, ", ") .. " - " .. (p.name or "?") }
+    else
+        dismissed.w_vendor = nil
     end
     return out
 end
