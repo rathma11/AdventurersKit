@@ -1092,7 +1092,8 @@ local function NearVendors()
         end
     end
     local out = {}
-    local pc, px, py = NS.PlayerWorldPos and NS.PlayerWorldPos()
+    local pc, px, py
+    if NS.PlayerWorldPos then pc, px, py = NS.PlayerWorldPos() end
     local function live(p)
         if not (p and pc and p.wc == pc and p.wx) then return end
         local d = math.sqrt((p.wx - px) ^ 2 + (p.wy - py) ^ 2)

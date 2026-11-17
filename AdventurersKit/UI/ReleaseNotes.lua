@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.47", date = "2026-11-17", items = {
+        "Fixed a Lua error outside towns (vendor distance in the buff reminder). Also fixed the raid-quest tag in "
+            .. "tooltips and the travel steps of the next-zone suggestion, which were never filled in.",
+    } },
     { version = "0.6.46", date = "2026-11-17", items = {
         "Tracking a quest (the tick in the quest log / map list, shift-click) focuses it: marker and arrow go to the "
             .. "newly tracked quest. Auto-tracking right after accepting a quest doesn't switch focus.",

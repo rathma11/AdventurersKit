@@ -118,7 +118,8 @@ local function BestTarget(list)
     local best
     for i, e in ipairs(list) do
         if i > 6 then break end -- eleg nehany pont zonankent (utvonal kereses: kis, de nem ingyen)
-        local t, steps = NS.TravelTime and NS.TravelTime(e.point)
+        local t, steps
+        if NS.TravelTime then t, steps = NS.TravelTime(e.point) end
         if t and (not best or t < best.time) then best = { point = e.point, time = t, steps = steps } end
     end
     return best
