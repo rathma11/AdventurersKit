@@ -324,7 +324,7 @@ grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
 -- Jobb klikk: alapmeret. Mentve: QuestFocusDB.panelW / panelH
 grip:RegisterForClicks("RightButtonUp")
 grip:SetScript("OnClick", function()
-    QuestFocusDB.panelW, QuestFocusDB.panelH = nil, nil
+    QuestFocusDB.panelW, QuestFocusDB.panelH, QuestFocusDB.questPanelH = nil, nil, nil
     ApplyPanelWidth()
     if NS.Panel_Update then NS.Panel_Update() end
 end)
@@ -339,9 +339,21 @@ grip:SetScript("OnMouseDown", function(self, button)
         local w = self.drag.w + (cx - self.drag.x) / es
         local h = self.drag.h + (self.drag.y - cy) / es
         QuestFocusDB.panelW = math.floor(math.max(240, math.min(600, w)))
-        QuestFocusDB.panelH = math.floor(math.max(120, math.min(900, h)))
+        h = math.floor(math.max(120, math.min(900, h)))
         ApplyPanelWidth()
-        panel:SetHeight(QuestFocusDB.panelH)
+        if state.questId then
+            -- quest modban a huzott magassag a panel felso hatara (QuestFocusDB.questPanelH):
+            -- huzas kozben ujrarendezzuk, igy az utvonal sorai 5 -> 4 -> 3 ... -> becsukva
+            QuestFocusDB.questPanelH = h
+            local bucket = math.floor(h / RowH())
+            if bucket ~= self.drag.bucket then
+                self.drag.bucket = bucket
+                if NS.Panel_Update then NS.Panel_Update() end
+            end
+        else
+            QuestFocusDB.panelH = h
+            panel:SetHeight(h)
+        end
     end)
 end)
 grip:SetScript("OnMouseUp", function(self)
@@ -655,11 +667,12 @@ end
 
 -- A panel maximalis magassaga quest modban: fejlec + statisztika + kb. 11 sornyi tartalom
 -- (objective-ek, kozeli questek, utvonal) + lablec. Az utvonal azt kapja, ami ebbol marad.
--- Ha a panelt nagyobbra huztad (QuestFocusDB.panelH), az a hatar.
+-- Ha quest modban atmeretezted a panelt (QuestFocusDB.questPanelH), az a hatar.
 local function MaxPanelHeight()
+    local h = tonumber(QuestFocusDB.questPanelH)
+    if h then return h end
     local rh = RowH()
-    local base = 112 + HEAD + 15 + 11 * (rh + 1) + 2 * 19 + 4 + (8 + rh + 12)
-    return math.max(base, tonumber(QuestFocusDB.panelH) or 0)
+    return 112 + HEAD + 15 + 11 * (rh + 1) + 2 * 19 + 4 + (8 + rh + 12)
 end
 
 local function Panel_Update()

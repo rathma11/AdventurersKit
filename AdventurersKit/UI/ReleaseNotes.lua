@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.53", date = "2026-11-17", items = {
+        "Quest panel: dragging the resize handle now sets the panel's maximum height, and the content is rearranged "
+            .. "while you drag. The route list shrinks to 4, then 3 rows and so on, and collapses to its header when "
+            .. "nothing fits. Right click on the handle resets it.",
+        "The route header's [+] / [-] toggle is visible now (the icon didn't show before). It reads \"+N hidden - click\"; "
+            .. "expanded, the scrollable list is as tall as the space left (at least 3 rows).",
+    } },
     { version = "0.6.52", date = "2026-11-17", items = {
         "The quest panel keeps a steady maximum height. The \"Route (quest log)\" list gets only the rows that still "
             .. "fit below the objectives and nearby quests. If some stops don't fit, its header shows \"+N hidden\": "

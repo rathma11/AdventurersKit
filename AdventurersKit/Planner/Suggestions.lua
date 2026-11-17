@@ -274,7 +274,7 @@ end
 -- fix magassagu listaban. Az allapot: QuestFocusDB.routeExpanded.
 -- y-tol rajzol, visszaadja az uj y-t. A Panel_Update hivja (UI\Panel.lua).
 local TURNIN_ROUTE = 5
-local TURNIN_SCROLL_ROWS = 4 -- lenyitva legalabb ennyi sor magas a gorgetheto lista
+local TURNIN_SCROLL_ROWS = 3 -- lenyitva legalabb ennyi sor magas a gorgetheto lista (amugy amennyi kifer)
 local tiRoute, tiKey = {}, ""
 local function TurnInRoute()
     local pc, px, py = NS.PlayerWorldPos()
@@ -304,8 +304,8 @@ local function RouteText(i, s)
     return ("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or "")
 end
 
-local ICON_PLUS = "|TInterface\Buttons\UI-PlusButton-Up:12:12|t "
-local ICON_MINUS = "|TInterface\Buttons\UI-MinusButton-Up:12:12|t "
+local ICON_PLUS = "|cffffd100[+]|r "
+local ICON_MINUS = "|cffffd100[-]|r "
 local function TiToggle()
     local b = panel.tiToggle
     if b then return b end
@@ -369,7 +369,7 @@ NS.ShowTurnInPickups = function(y, maxRows)
     local t = TiToggle()
     t.text:SetText(expanded
         and (ICON_MINUS .. (L["Route (quest log, %d - scroll):"]):format(#tiRoute))
-        or (ICON_PLUS .. L["Route (quest log):"] .. "  |cff999999" .. (L["+%d hidden"]):format(#tiRoute - shown) .. "|r"))
+        or (ICON_PLUS .. L["Route (quest log):"] .. "  |cff999999" .. (L["+%d hidden - click"]):format(#tiRoute - shown) .. "|r"))
     t:SetSize(math.min(w, math.ceil(t.text:GetStringWidth()) + 4), 14)
     t:ClearAllPoints()
     t:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y + 1)
@@ -386,7 +386,7 @@ NS.ShowTurnInPickups = function(y, maxRows)
             r:SetSize(w, rowH)
             r:Show()
         end
-        local visible = math.min(#tiRoute, math.max(shown, TURNIN_SCROLL_ROWS))
+        local visible = math.min(#tiRoute, math.max(maxRows or shown, TURNIN_SCROLL_ROWS))
         tiChild:SetSize(w, #tiRoute * rowH)
         tiScroll:ClearAllPoints()
         tiScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
