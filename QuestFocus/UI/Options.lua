@@ -497,7 +497,7 @@ pageMac:HookScript("OnShow", function() mac:Refresh() end)
 local pageZone = AddOptionsTab(L["Zone focus"], 50)
 local zon = OptFlow(pageZone)
 zon:Text(L["Only quests of the current zone stay in the Questie tracker (plus the selected QFocus quest). "]
-    .. L["Follows you when you change zones; turning it off restores everything. Minimap: right click."], 2)
+    .. L["When you change zones it asks whether to switch to the new zone; turning it off restores everything. Minimap: right click."], 2)
 local zoneBtn = zon:Button("", 220, nil, function() end, 2)
 local zoneState = OptLabel(pageZone, "", "GameFontHighlightSmall")
 zoneState:SetPoint("LEFT", zoneBtn, "RIGHT", 10, 0)
@@ -514,10 +514,15 @@ local function RefreshZoneBtn()
 end
 zoneBtn:SetScript("OnClick", function() ToggleZoneFocus(); RefreshZoneBtn() end)
 zon:OnRefresh(RefreshZoneBtn)
-zon:Check(L["Ask when entering a new zone"],
-    L["When you enter a zone where you have quests, a popup asks whether to focus on that zone."],
+zon:Check(L["Ask when entering a new zone (focus off)"],
+    L["Zone focus is off and you enter a zone where you have quests: a popup asks whether to focus on that zone."],
     function() return not QuestFocusDB.noZonePrompt end,
     function(v) QuestFocusDB.noZonePrompt = not v end)
+zon:Check(L["Switch without asking (focus on)"],
+    L["Zone focus is on and you enter another zone where you have quests. Off: a popup asks Switch / Keep / Turn off focus. "]
+    .. L["On: the tracker switches to the new zone right away. Zones without your quests never change the focus."],
+    function() return QuestFocusDB.zoneAutoFollow end,
+    function(v) QuestFocusDB.zoneAutoFollow = v end)
 pageZone:HookScript("OnShow", function() zon:Refresh() end)
 
 ---------------------------------------------------------------------------

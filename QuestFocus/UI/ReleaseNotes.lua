@@ -8,6 +8,7 @@ local NOTES = {
         "Options reorganized into feature tabs (General, Macro & marker, Route & progress, Quest pickup, Zone focus, Bags, Buffs) with a short description under every option.",
         "Chat messages can be turned off (General tab or /qf chat): then only one line at login and the replies to your own commands.",
         "Release notes tab (this page) and a what's-new line at login after an update.",
+        "Zone focus: entering another zone with quests asks Switch / Keep / Turn off focus (or switch without asking: Zone focus tab).",
         "City list: scrollable, XP reward, quest chain position (e.g. 2/10), item-start tag; 'Ignore this place' and 'Disable city list' buttons; reopens after relog.",
         "Bag list collapsed: a slim tab on top of the bag frame.",
         "Buff reminder: no raid warning sound, a short gold flash only the first time a buff goes missing.",

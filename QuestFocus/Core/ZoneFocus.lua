@@ -118,14 +118,52 @@ StaticPopupDialogs["QUESTFOCUS_ZONEFOCUS"] = {
     preferredIndex = 3,
 }
 
-local function MaybeAskZone()
-    if QuestFocusDB.noZonePrompt or QuestFocusDB.zoneFocus then return end
-    local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
-    if not zone or zone == "" or askedZone[zone] then return end
+-- Fokusz be van kapcsolva, es masik zonaba ertel: rakerdezunk, hogy valtson-e
+-- (QuestFocusDB.zoneAutoFollow eseten kerdes nelkul valt, mint regen)
+local SWITCH_TEXT = L["QuestFocus: you have %d quest(s) in |cffffff00%s|r.\nSwitch the Questie tracker to this zone? (zone focus is now on |cffffff00%s|r)"]
+StaticPopupDialogs["QUESTFOCUS_ZONESWITCH"] = {
+    text = "",
+    button1 = L["Switch"],
+    button2 = L["Keep"],
+    button3 = L["Turn off focus"],
+    OnAccept = function() ZoneFocusOn() end,
+    OnAlt = function() ZoneFocusOff() end,
+    timeout = 30,
+    whileDead = false,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+local function QuestsHere(zone)
     local here, other = 0, 0
     for _, e in pairs(LogQuests()) do
         if e.header == zone then here = here + 1 else other = other + 1 end
     end
+    return here, other
+end
+
+local function MaybeAskZone()
+    local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
+    if not zone or zone == "" then return end
+    local zf = QuestFocusDB.zoneFocus
+    if zf then
+        -- mar erre a zonara fokuszalunk
+        if zf.zone == zone then return end
+        local here = QuestsHere(zone)
+        -- itt nincs questunk: a fokusz marad (kulonben ures lenne a tracker)
+        if here == 0 then return end
+        if QuestFocusDB.zoneAutoFollow then ZoneFocusOn() return end
+        if askedZone[zone] then return end
+        if InCombatLockdown() then state.askZoneAfterCombat = true return end
+        askedZone[zone] = true
+        StaticPopup_Hide("QUESTFOCUS_ZONEFOCUS")
+        -- 3 parameter kell a szovegbe, a StaticPopup csak 2-t ad at: elore formazzuk
+        StaticPopupDialogs.QUESTFOCUS_ZONESWITCH.text = SWITCH_TEXT:format(here, zone, zf.zone or "?")
+        StaticPopup_Show("QUESTFOCUS_ZONESWITCH")
+        return
+    end
+    if QuestFocusDB.noZonePrompt or askedZone[zone] then return end
+    local here, other = QuestsHere(zone)
     -- csak ha van itt quest, es van mas is, amit el lehetne rejteni
     if here == 0 or other == 0 then return end
     if InCombatLockdown() then
@@ -133,6 +171,7 @@ local function MaybeAskZone()
         return
     end
     askedZone[zone] = true
+    StaticPopup_Hide("QUESTFOCUS_ZONESWITCH")
     StaticPopup_Show("QUESTFOCUS_ZONEFOCUS", here, zone)
 end
 NS.MaybeAskZone = MaybeAskZone
@@ -146,13 +185,7 @@ zoneWatcher:SetScript("OnEvent", function(_, event)
         return
     end
     C_Timer.After(1, function()
-        local zf = QuestFocusDB and QuestFocusDB.zoneFocus
-        local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
-        if zf and zone and zone ~= "" and zf.zone ~= zone then
-            ZoneFocusOn()
-        elseif not zf then
-            MaybeAskZone()
-        end
+        if QuestFocusDB then MaybeAskZone() end
     end)
 end)
 
