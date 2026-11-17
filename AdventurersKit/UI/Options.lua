@@ -45,6 +45,14 @@ end
 
 local optTitle = OptLabel(opt, "Adventurer's Kit", "GameFontNormalLarge")
 optTitle:SetPoint("TOPLEFT", 16, -16)
+-- verzioszam kicsiben a nev utan (a .toc Version sorabol)
+do
+    local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    local ok, ver = pcall(getMeta, ADDON_NAME, "Version")
+    local v = opt:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    v:SetPoint("BOTTOMLEFT", optTitle, "BOTTOMRIGHT", 6, 1)
+    v:SetText(ok and ver and ("v" .. ver) or "")
+end
 local optSub = OptLabel(opt, L["Settings grouped by feature. Every option has a short description; hover it for a tooltip too."],
     "GameFontHighlightSmall")
 optSub:SetPoint("TOPLEFT", optTitle, "BOTTOMLEFT", 0, -6)
