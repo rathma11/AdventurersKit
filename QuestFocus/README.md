@@ -119,7 +119,7 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 - **grey:** no active quest needs it;
 - **IN BANK:** an active quest needs it and it is in your bank (based on Bagnon/BagBrother's last bank snapshot). If you also have some in your bags, the name shows "+N bank".
 
-Hover a row to see the item tooltip; click it to select the quest (marker + QFocus macro). Turn off with `/qf bags` or in the settings.
+Hover a row to see the item tooltip. Click it to highlight the item in the bag: its name goes into the Bagnon search, so the item lights up and the rest dim. Click the same row again to clear the search. The click also selects the quest (marker + QFocus macro). Turn off with `/qf bags` or in the settings.
 
 **Coloring in Bagnon.** Quest item slots get the same border colors (yellow, green, blue, grey). Can be turned off in the settings.
 

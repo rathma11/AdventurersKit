@@ -65,6 +65,31 @@ local function Bags()
     if B and B.Frames then return B end
 end
 
+-- Bagnon kereso: a megadott szoveget beirja (a talalat kiemelodik, a tobbi elhalvanyul).
+-- Ugyanarra masodszor: torli a keresest. A Bagnon/BagBrother nevter jelzeseit hasznalja.
+NS.BagnonSearch = function(text)
+    local done = false
+    for _, A in ipairs({ _G.BagBrother, _G.Bagnon }) do
+        if type(A) == "table" and type(A.SendSignal) == "function" then
+            local clear = A.canSearch and A.search == text
+            pcall(function()
+                if clear then
+                    A.canSearch, A.search = nil, nil
+                    A:SendSignal("SEARCH_TOGGLED", nil)
+                    A:SendSignal("SEARCH_CHANGED", nil)
+                else
+                    A.canSearch, A.search = true, text
+                    -- nem a frame ID-t kuldjuk, igy a keresomezo nem kapja meg a billentyuzetet
+                    A:SendSignal("SEARCH_TOGGLED", "questfocus")
+                    A:SendSignal("SEARCH_CHANGED", text)
+                end
+            end)
+            done = true
+        end
+    end
+    return done
+end
+
 ---------------------------------------------------------------------------
 -- Adatgyujtes
 ---------------------------------------------------------------------------
@@ -320,12 +345,19 @@ local function GetRow(i)
         if e.kind == "leftover" then
             GameTooltip:AddLine(e.noValue and L["Unsellable: /qf junk can destroy it"] or L["Can be sold to a vendor"], 0.6, 0.6, 0.6)
         end
-        if e.needs then GameTooltip:AddLine(L["Click: select the quest (QFocus marker + macro)"], 0.5, 0.5, 0.5) end
+        GameTooltip:AddLine(L["Click: highlight it in the bag (Bagnon search); again: clear"], 0.5, 0.5, 0.5)
+        if e.needs then GameTooltip:AddLine(L["...and select the quest (QFocus marker + macro)"], 0.5, 0.5, 0.5) end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     r:SetScript("OnClick", function(self)
-        local n = self.entry and self.entry.needs and self.entry.needs[1]
+        local e = self.entry
+        -- Kiemeles a taskaban: a Bagnon keresojebe beirjuk az item nevet
+        if e and NS.BagnonSearch then
+            local name = GetItemInfo(e.id)
+            if name then NS.BagnonSearch(name) end
+        end
+        local n = e and e.needs and e.needs[1]
         if n then
             local title, done = NS.FindQuestInLog(n.qid)
             NS.SelectQuest(n.qid, title or n.title, done, true)
