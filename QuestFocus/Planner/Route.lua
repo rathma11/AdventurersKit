@@ -180,6 +180,34 @@ end
 local BG_ZONES = { [2597] = true, [3277] = true, [3358] = true } -- Alterac Valley, Warsong Gulch, Arathi Basin
 local BG_SORTS = { [-25] = true }                                -- QuestSort: Battlegrounds
 local BG_ITEMS = { [20558] = true, [20559] = true, [20560] = true } -- WSG / AB / AV Mark of Honor
+
+-- Dungeon / raid questek: a Questie zoneOrSort a dungeon area ID-ja. Teljes nev + raid-e.
+local DUNGEONS = {
+    [2437] = "Ragefire Chasm", [718] = "Wailing Caverns", [1581] = "The Deadmines", [209] = "Shadowfang Keep",
+    [719] = "Blackfathom Deeps", [717] = "The Stockade", [133] = "Gnomeregan", [491] = "Razorfen Kraul",
+    [796] = "Scarlet Monastery", [722] = "Razorfen Downs", [1337] = "Uldaman", [1176] = "Zul'Farrak",
+    [2100] = "Maraudon", [1477] = "Sunken Temple", [1584] = "Blackrock Depths", [1583] = "Blackrock Spire",
+    [2557] = "Dire Maul", [2057] = "Scholomance", [2017] = "Stratholme",
+}
+local RAIDS = {
+    [2717] = "Molten Core", [2159] = "Onyxia's Lair", [1977] = "Zul'Gurub", [2677] = "Blackwing Lair",
+    [3429] = "Ruins of Ahn'Qiraj", [3428] = "Temple of Ahn'Qiraj", [3456] = "Naxxramas",
+}
+local function QuestDungeon(q)
+    local zs = type(q) == "table" and tonumber(q.zoneOrSort)
+    if not zs then return end
+    if DUNGEONS[zs] then return DUNGEONS[zs], false end
+    if RAIDS[zs] then return RAIDS[zs], true end
+end
+NS.QuestDungeon = QuestDungeon
+-- Listasor cimke: |cffff7040[Dungeon: Wailing Caverns]|r (raidnel lila); a sor elejere
+-- kerul (a hosszu quest nev a vegen vagodik le, igy a cimke mindig latszik)
+NS.DungeonTag = function(q)
+    local name, raid = QuestDungeon(q)
+    if not name then return "" end
+    return raid and ("|cffc070ff[" .. L["Raid"] .. ": " .. name .. "]|r ")
+        or ("|cffff7040[" .. L["Dungeon"] .. ": " .. name .. "]|r ")
+end
 local function EstimateQuestTime(q)
     if type(q) ~= "table" then return nil, "?" end
     local zs = tonumber(q.zoneOrSort)

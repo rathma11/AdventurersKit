@@ -86,9 +86,11 @@ local function ShowQuestPopup(d)
     local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
     local est = EstimateQuestTime(d.quest)
     qpop.data = d
+    -- dungeon quest: a teljes dungeon nev is kifer
+    qpop:SetWidth(NS.QuestDungeon(d.quest) and 400 or 270)
     qpop.right:SetText(("|cff99ccff%d yd|r"):format(d.dist + 0.5))
-    qpop.text:SetText(("%s[%s] %s|r  |cff999999%s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
-        est and (FormatTime(est) .. " " .. L["est."]) or L["length unknown"]))
+    qpop.text:SetText(("%s[%s]|r %s%s%s|r  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
+        NS.DungeonTag(d.quest), hex, d.name or "?", est and (FormatTime(est) .. " " .. L["est."]) or L["length unknown"]))
     qpop:ClearAllPoints()
     -- kozepen felul, a jatek sajat kiirasai alatt
     if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then

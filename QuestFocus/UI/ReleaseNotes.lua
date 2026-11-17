@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.10", date = "2026-11-17", items = {
+        "Dungeon and raid quests are highlighted in the city list (tinted row) and the pickup popup, with the dungeon's full name "
+            .. "in front of the quest, e.g. [Dungeon: Wailing Caverns]; the tooltip says it needs a group.",
+        "City list button renamed to 'Disable city list everywhere': it turns the list off in every city and inn, not just here.",
+    } },
     { version = "0.4.9", date = "2026-11-17", items = {
         "Weapon enchant rows only for a hand that holds a melee weapon: with a two-hander the off-hand row is gone "
             .. "(Buffs tab, setup popup, reminder); it comes back when you equip an off-hand weapon.",

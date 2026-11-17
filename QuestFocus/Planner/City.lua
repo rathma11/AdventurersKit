@@ -5,7 +5,7 @@ local P = NS.P
 local announced, BuildPickups, EstimateQuestTime, FormatTime, NEARBY_RADIUS, qpop, ShowQuestPopup, state = P.announced, P.BuildPickups, P.EstimateQuestTime, P.FormatTime, P.NEARBY_RADIUS, P.qpop, P.ShowQuestPopup, P.state
 
 local CITY_RADIUS, CITY_MAX, CITY_VISIBLE, CITY_ROW_H = 600, 40, 12, 19
-local CITY_W = 400
+local CITY_W = 470
 
 ---------------------------------------------------------------------------
 -- Quest extra info: XP jutalom (Questie QuestXP), lanc pozicio (preQuestSingle /
@@ -135,7 +135,7 @@ local function MakeBtn(text, w)
     return b
 end
 city.ignoreBtn = MakeBtn(L["Ignore this place"], 150)
-city.disableBtn = MakeBtn(L["Disable city list"], 150)
+city.disableBtn = MakeBtn(L["Disable city list everywhere"], 190)
 city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
     local i, e = IgnoredHere()
     if i then
@@ -161,12 +161,12 @@ city.ignoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 city.disableBtn:SetScript("OnClick", function()
     QuestFocusDB.noCityMode = true
     city:Hide()
-    NS.PrintAlways(L["City list disabled. Turn it back on: Options > Quest pickup > City mode."])
+    NS.PrintAlways(L["City list disabled everywhere (all cities and inns). Turn it back on: Options > Quest pickup > City mode."])
     NS.Panel_Update()
 end)
 city.disableBtn:SetScript("OnEnter", function(self)
-    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Disable city list"])
-    NS.TT.Note(tt, L["Turns off city mode everywhere. Turn it back on: Options > City mode."])
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Disable city list everywhere"])
+    NS.TT.Note(tt, L["Turns off the city list in every city and inn, not just here. Turn it back on: Options > Quest pickup > City mode."])
     NS.TT.Finish(tt)
 end)
 city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -200,6 +200,9 @@ local function CityRow(i)
     r.right:SetPoint("RIGHT")
     r.right:SetWidth(126)
     r.right:SetJustifyH("RIGHT")
+    r.bg = r:CreateTexture(nil, "BACKGROUND")
+    r.bg:SetAllPoints()
+    r.bg:Hide()
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
@@ -245,10 +248,18 @@ local function RefreshCityList()
         local col = GetQuestDifficultyColor and d.level and GetQuestDifficultyColor(d.level)
         local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
         local tags = ""
+        -- dungeon / raid quest: halvany voros (raid: lila) hatter a soron
+        local dAbbr, dRaid = NS.QuestDungeon(d.quest)
+        if dAbbr then
+            r.bg:SetColorTexture(dRaid and 0.55 or 0.75, 0.2, dRaid and 0.85 or 0.1, 0.18)
+            r.bg:Show()
+        else
+            r.bg:Hide()
+        end
         if info.chainPos then tags = tags .. (" |cffb48cff%d/%d|r"):format(info.chainPos, info.chainLen) end
         if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
-        r.text:SetText(("%s[%s] %s|r%s  |cff999999%s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
-            tags, FormatTime(EstimateQuestTime(d.quest))))
+        r.text:SetText(("%s[%s]|r %s%s%s|r%s  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
+            NS.DungeonTag(d.quest), hex, d.name or "?", tags, FormatTime(EstimateQuestTime(d.quest))))
         r.right:SetText(("|cffd8c070%s|r  |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", cContent, "TOPLEFT", 0, y)
