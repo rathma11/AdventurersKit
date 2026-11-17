@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.54", date = "2026-11-17", items = {
+        "Fix: after you expanded the route list, resizing and clicking near the bottom of the panel stopped working. "
+            .. "The list's off-screen rows were invisible but still caught the mouse. Only the visible rows are active now, "
+            .. "and the resize handle always stays on top.",
+    } },
     { version = "0.6.53", date = "2026-11-17", items = {
         "Quest panel: dragging the resize handle now sets the panel's maximum height, and the content is rearranged "
             .. "while you drag. The route list shrinks to 4, then 3 rows and so on, and collapses to its header when "

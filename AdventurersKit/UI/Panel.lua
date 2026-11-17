@@ -394,6 +394,8 @@ end
 local function PanelFinish(y, isList)
     -- A panel teteje maradjon a helyen (ne a kozepe korul nojon/zsugorodjon)
     AnchorTopLeft()
+    -- a meretezo fogantyu mindig a tartalom (sorok, gorgetheto lista) folott legyen
+    grip:SetFrameLevel(panel:GetFrameLevel() + 20)
     local fh = RowH()
     local h = -y + 8 + fh + 12
     if isList and tonumber(QuestFocusDB.panelH) then h = math.max(h, QuestFocusDB.panelH) end

@@ -29,10 +29,22 @@ local function ScrollList()
     sc:SetScript("OnMouseWheel", function(self, delta)
         local max = math.max(0, ch:GetHeight() - self:GetHeight())
         self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * NS.RowH() * 2)))
+        self.qfClip()
     end)
     sc:Hide()
+    -- A ScrollFrame csak a rajzolast vagja le, az egeret nem: a kilogo (nem lathato) sorok a
+    -- panel alja alatt elkaptak a kattintast (pl. a meretezo fogantyu elol). Ezert csak a
+    -- lathato ablakba eso sorok latszanak (qfCount: hany sor ervenyes).
+    sc.qfClip = function()
+        local rh, top, h = NS.RowH(), sc:GetVerticalScroll(), sc:GetHeight()
+        for i, r in ipairs(sc.qfList) do
+            local y0 = (i - 1) * rh
+            r:SetShown(i <= (sc.qfCount or 0) and y0 + rh > top + 0.5 and y0 < top + h - 0.5)
+        end
+    end
     ch.qfScroll = sc
     local list = {}
+    sc.qfList = list
     local function get(i)
         local r = list[i]
         if r then return r end
@@ -234,7 +246,9 @@ NS.ShowSuggestions = function()
         routeScroll:SetSize(w, visible * rowH)
         local maxScroll = math.max(0, #route * rowH - visible * rowH)
         if routeScroll:GetVerticalScroll() > maxScroll then routeScroll:SetVerticalScroll(maxScroll) end
+        routeScroll.qfCount = #route
         routeScroll:Show()
+        routeScroll.qfClip()
         shownRoute = #route
         y = y - visible * rowH - 4
     end
@@ -393,7 +407,9 @@ NS.ShowTurnInPickups = function(y, maxRows)
         tiScroll:SetSize(w, visible * rowH)
         local maxScroll = math.max(0, (#tiRoute - visible) * rowH)
         if tiScroll:GetVerticalScroll() > maxScroll then tiScroll:SetVerticalScroll(maxScroll) end
+        tiScroll.qfCount = #tiRoute
         tiScroll:Show()
+        tiScroll.qfClip()
         return y - visible * rowH
     end
     for i = 1, shown do
