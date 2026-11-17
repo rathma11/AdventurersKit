@@ -41,7 +41,10 @@ local function ScrollList()
             local y0 = (i - 1) * rh
             r:SetShown(i <= (sc.qfCount or 0) and y0 + rh > top + 0.5 and y0 < top + h - 0.5)
         end
+        if sc.qfBar then sc.qfBar.Update() end
     end
+    -- vekony arany gorgetosav a jobb szelen (UI\Panel.lua), csak ha nem fer ki minden
+    if NS.AttachScrollBar then sc.qfBar = NS.AttachScrollBar(sc, sc.qfClip) end
     ch.qfScroll = sc
     local list = {}
     sc.qfList = list
@@ -226,7 +229,7 @@ NS.ShowSuggestions = function()
         -- fejlec: hany allomas; ha tobb, mint ami latszik, gorgetheto
         local more = #route > nRoute
         local h = Header(L["Route (quest log):"])
-        h:SetText(more and (L["Route (quest log, %d - scroll):"]):format(#route) or L["Route (quest log):"])
+        h:SetText(more and (L["Route (quest log, %d):"]):format(#route) or L["Route (quest log):"])
         place(h)
         local rowH, w = NS.RowH(), NS.PW() - 24
         for _, r in ipairs(routeRows) do r:Hide() end
@@ -373,7 +376,7 @@ NS.ShowTurnInPickups = function(y, maxRows, prepared)
     h.visible = visible
     local hidden = #tiRoute - visible
     h.text:SetText(hidden > 0
-        and (L["Route (quest log):"] .. "  |cff999999" .. (visible > 0 and (L["%d stops - scroll"]):format(#tiRoute)
+        and (L["Route (quest log):"] .. "  |cff999999" .. (visible > 0 and (L["%d stops"]):format(#tiRoute)
             or (L["%d stops - hover"]):format(#tiRoute)) .. "|r")
         or L["Route (quest log):"])
     h:SetSize(math.min(w, math.ceil(h.text:GetStringWidth()) + 4), 14)

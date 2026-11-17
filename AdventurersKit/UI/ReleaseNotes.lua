@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.60", date = "2026-11-17", items = {
+        "Scrollable lists on the panel (objectives, route) get a thin gold scrollbar on the right edge instead of the "
+            .. "word \"scroll\". It only shows when the list doesn't fit; drag it, click the bar, or use the mouse wheel.",
+    } },
     { version = "0.6.59", date = "2026-11-17", items = {
         "Previous / next quest arrows next to the quest name on the panel. Next goes to the first stop of the route "
             .. "(ready-to-turn-in quests count too); the marker, the TomTom arrow and the QFocus macro switch over. "

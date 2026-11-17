@@ -494,6 +494,86 @@ end)
 
 local function PanelSelectObjective(i) return NS.SelectObjective(i) end -- Core\Selection.lua
 
+-- Vekony gorgetosav egy ScrollFrame jobb szelen (arany savon huzhato "thumb", a lathato resz
+-- aranyaban). Csak akkor latszik, ha a tartalom nem fer ki. onScroll: gorgetes utan (sorok
+-- elrejtese). Visszaadja a sav frame-et; bar.Update() a tartalom / gorgetes valtozasakor.
+local function AttachScrollBar(sc, onScroll)
+    local bar = CreateFrame("Frame", nil, sc:GetParent())
+    bar:SetWidth(8)
+    bar:SetPoint("TOPLEFT", sc, "TOPRIGHT", -2, 0)
+    bar:SetPoint("BOTTOMLEFT", sc, "BOTTOMRIGHT", -2, 0)
+    bar:SetFrameLevel(sc:GetFrameLevel() + 5)
+    bar:EnableMouse(true)
+    bar:EnableMouseWheel(true)
+    bar:Hide()
+    local track = bar:CreateTexture(nil, "BACKGROUND")
+    track:SetWidth(2)
+    track:SetPoint("TOP")
+    track:SetPoint("BOTTOM")
+    track:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.18)
+    local thumb = CreateFrame("Button", nil, bar)
+    thumb:SetWidth(8)
+    thumb:SetFrameLevel(bar:GetFrameLevel() + 1)
+    local tex = thumb:CreateTexture(nil, "ARTWORK")
+    tex:SetWidth(3)
+    tex:SetPoint("TOP")
+    tex:SetPoint("BOTTOM")
+    tex:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.75)
+    local function Range()
+        local child = sc:GetScrollChild()
+        local contentH, viewH = child and child:GetHeight() or 0, sc:GetHeight()
+        return contentH, viewH, math.max(0, contentH - viewH)
+    end
+    local function SetScroll(v)
+        local _, _, maxS = Range()
+        sc:SetVerticalScroll(math.max(0, math.min(maxS, v)))
+        if onScroll then onScroll() end
+        bar.Update()
+    end
+    bar.Update = function()
+        local contentH, viewH, maxS = Range()
+        if not sc:IsShown() or maxS < 0.5 then bar:Hide() return end
+        bar:Show()
+        local th = math.max(10, viewH * viewH / contentH)
+        thumb:SetHeight(th)
+        thumb:ClearAllPoints()
+        thumb:SetPoint("TOP", bar, "TOP", 0, -(viewH - th) * math.min(1, sc:GetVerticalScroll() / maxS))
+    end
+    thumb:SetScript("OnEnter", function() tex:SetColorTexture(1, 0.86, 0.5, 1) end)
+    thumb:SetScript("OnLeave", function() tex:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.75) end)
+    thumb:SetScript("OnMouseDown", function(self)
+        local _, cy = GetCursorPosition()
+        local startY, startS = cy, sc:GetVerticalScroll()
+        self:SetScript("OnUpdate", function()
+            local _, y = GetCursorPosition()
+            local _, viewH, maxS = Range()
+            local free = viewH - self:GetHeight()
+            if free <= 0 then return end
+            SetScroll(startS + (startY - y) / self:GetEffectiveScale() * maxS / free)
+        end)
+    end)
+    thumb:SetScript("OnMouseUp", function(self) self:SetScript("OnUpdate", nil) end)
+    -- kattintas a savon: oda ugrik (a thumb kozepe a kurzorhoz)
+    bar:SetScript("OnMouseDown", function(self)
+        local _, cy = GetCursorPosition()
+        local top = self:GetTop()
+        if not top then return end
+        local _, viewH, maxS = Range()
+        local free = viewH - thumb:GetHeight()
+        if free <= 0 then return end
+        local off = top - cy / self:GetEffectiveScale() - thumb:GetHeight() / 2
+        SetScroll(off / free * maxS)
+    end)
+    bar:SetScript("OnMouseWheel", function(_, delta)
+        local f = sc:GetScript("OnMouseWheel")
+        if f then f(sc, delta) end
+    end)
+    sc:HookScript("OnHide", function() bar:Hide() end)
+    sc:HookScript("OnShow", function() bar.Update() end)
+    return bar
+end
+NS.AttachScrollBar = AttachScrollBar
+
 -- Objective sorok: gorgetheto teruleten (ha sok az objective es nem fernek ki a fix magas
 -- panelben). A ScrollFrame csak rajzolast vag, egeret nem: a lathato ablakon kivuli sorokat
 -- elrejtjuk (a Bags item gombja is csak lathato sorra kerul).
@@ -509,7 +589,9 @@ local function ClipObjLines()
         local y0 = (i - 1) * step
         line:SetShown(i <= (sc.qfCount or 0) and y0 + step > top + 0.5 and y0 < top + h - 0.5)
     end
+    if sc.qfBar then sc.qfBar.Update() end
 end
+panel.objScroll.qfBar = AttachScrollBar(panel.objScroll, ClipObjLines)
 panel.objScroll:SetScript("OnMouseWheel", function(self, delta)
     local step = RowH() + 1
     local max = math.max(0, (self.qfCount or 0) * step - self:GetHeight())
