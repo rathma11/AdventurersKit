@@ -120,6 +120,15 @@ function TT.Pickup(owner, anchor, d, extraNote)
         d.dist and ("%d yd"):format(d.dist) or nil)
     TT.Sub(tt, (L["Quest giver: %s"]):format(d.point and d.point.name or "?"))
     TT.Info(tt, TT.Where(d.point))
+    -- XP, lanc, itemmel indul (Planner\City.lua: NS.QuestExtraInfo)
+    local info = NS.QuestExtraInfo and d.qid and NS.QuestExtraInfo(d.qid, d.quest)
+    if info then
+        if info.xp then TT.Info(tt, ("|cffd8c070%s|r"):format(NS.XpText(info.xp))) end
+        if info.chainPos then
+            TT.Info(tt, ("|cffb48cff" .. L["Quest chain: part %d of %d"] .. "|r"):format(info.chainPos, info.chainLen))
+        end
+        if info.byItem then TT.Info(tt, "|cffff9933" .. L["Can also be started by an item"] .. "|r") end
+    end
     TT.Note(tt, extraNote)
     TT.Finish(tt, L["Click: marker on the quest giver"])
 end

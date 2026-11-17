@@ -4,13 +4,72 @@ NS.P = NS.P or {}
 local P = NS.P
 local announced, BuildPickups, EstimateQuestTime, FormatTime, NEARBY_RADIUS, qpop, ShowQuestPopup, state = P.announced, P.BuildPickups, P.EstimateQuestTime, P.FormatTime, P.NEARBY_RADIUS, P.qpop, P.ShowQuestPopup, P.state
 
+local CITY_RADIUS, CITY_MAX, CITY_VISIBLE, CITY_ROW_H = 600, 40, 12, 19
+local CITY_W = 400
+
+---------------------------------------------------------------------------
+-- Quest extra info: XP jutalom (Questie QuestXP), lanc pozicio (preQuestSingle /
+-- nextQuestInChain) es hogy itemmel indul-e. Cache-elve (az XP a szintedtol fugg).
+---------------------------------------------------------------------------
+local infoCache, infoLevel = {}, nil
+local function ChainOf(qid)
+    local DB = NS.Module("QuestieDB")
+    if not (DB and DB.QueryQuestSingle) then return end
+    local function q(id, field)
+        local ok, v = pcall(DB.QueryQuestSingle, id, field)
+        return ok and v or nil
+    end
+    local before, seen, cur = 0, { [qid] = true }, qid
+    for _ = 1, 30 do
+        local pre = q(cur, "preQuestSingle")
+        local p = type(pre) == "table" and pre[1] or nil
+        if not p or seen[p] then break end
+        seen[p] = true
+        before, cur = before + 1, p
+    end
+    local after, nxt = 0, q(qid, "nextQuestInChain")
+    for _ = 1, 30 do
+        if not nxt or nxt == 0 or seen[nxt] then break end
+        seen[nxt] = true
+        after = after + 1
+        nxt = q(nxt, "nextQuestInChain")
+    end
+    if before + after == 0 then return end
+    return before + 1, before + 1 + after
+end
+
+local function QuestExtraInfo(qid, quest)
+    local lvl = UnitLevel("player")
+    if infoLevel ~= lvl then wipe(infoCache); infoLevel = lvl end
+    local c = infoCache[qid]
+    if c then return c end
+    c = {}
+    local XP = NS.Module("QuestXP")
+    if XP and XP.GetQuestLogRewardXP and XP.db then
+        local ok, xp = pcall(XP.GetQuestLogRewardXP, XP, qid)
+        if ok and tonumber(xp) and xp > 0 then c.xp = xp end
+    end
+    c.chainPos, c.chainLen = ChainOf(qid)
+    quest = quest or NS.GetQuestieQuest(qid)
+    c.byItem = quest and type(quest.Starts) == "table" and type(quest.Starts.Item) == "table"
+        and #quest.Starts.Item > 0 or nil
+    infoCache[qid] = c
+    return c
+end
+NS.QuestExtraInfo = QuestExtraInfo
+
+local function XpText(xp)
+    if not xp then return "" end
+    return xp >= 1000 and ("%.1fk xp"):format(xp / 1000) or ("%d xp"):format(xp)
+end
+NS.XpText = XpText
+
 ---------------------------------------------------------------------------
 -- Varos mod: varosban / fogadoban (IsResting) nem popupol questenkent, hanem egy listaban
--- mutatja az osszes felveheto questet. Belepeskor jon fel, kilepeskor eltunik.
+-- mutatja az osszes felveheto questet (gorgetheto). Belepeskor jon fel, kilepeskor eltunik.
 ---------------------------------------------------------------------------
-local CITY_RADIUS, CITY_MAX = 600, 12
 local city = CreateFrame("Frame", "QuestFocusCityList", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-city:SetSize(330, 80)
+city:SetSize(CITY_W, 80)
 city:SetPoint("TOP", UIParent, "TOP", 0, -190)
 city:SetFrameStrata("MEDIUM")
 city:EnableMouse(true)
@@ -42,21 +101,29 @@ cClose:SetSize(24, 24)
 cClose:SetPoint("TOPRIGHT", -4, -4)
 cClose:SetScript("OnClick", function() city.closedHere = true; city:Hide() end)
 city.foot = city:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-city.foot:SetText(L["Click: marker on the quest giver. Drag to move."])
+city.foot:SetText(L["Click: marker on the quest giver. Wheel: scroll. Drag to move."])
+
+-- Gorgetheto tartalom (egergorgo + csuszka)
+local cScroll = CreateFrame("ScrollFrame", "QuestFocusCityScroll", city, "UIPanelScrollFrameTemplate")
+cScroll:SetPoint("TOPLEFT", 12, -38)
+local cContent = CreateFrame("Frame", nil, cScroll)
+cContent:SetSize(CITY_W - 48, 10)
+cScroll:SetScrollChild(cContent)
 
 local cityRows = {}
 local function CityRow(i)
     local r = cityRows[i]
     if r then return r end
-    r = CreateFrame("Button", nil, city)
-    r:SetSize(306, 18)
+    r = CreateFrame("Button", nil, cContent)
+    r:SetSize(CITY_W - 48, CITY_ROW_H - 1)
     r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.text:SetPoint("LEFT")
-    r.text:SetPoint("RIGHT", -70, 0)
+    r.text:SetPoint("RIGHT", -128, 0)
     r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
     r.right = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.right:SetPoint("RIGHT")
+    r.right:SetWidth(126)
     r.right:SetJustifyH("RIGHT")
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
@@ -85,31 +152,43 @@ local function RefreshCityList()
     if QuestFocusDB.noCityMode or not NS.QuestieAvailable() then city:Hide() return end
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
-    local ok, list = pcall(BuildPickups, pc, px, py, 30)
+    local ok, list = pcall(BuildPickups, pc, px, py, CITY_MAX)
     if not ok or not list then return end
     for _, r in ipairs(cityRows) do r:Hide() end
-    local y, n = -38, 0
+    local y, n = 0, 0
     for _, d in ipairs(list) do
         if d.dist > CITY_RADIUS or n >= CITY_MAX then break end
         n = n + 1
         if announced then announced[d.qid] = true end -- kint mar ne popupoljon
+        local info = QuestExtraInfo(d.qid, d.quest)
         local r = CityRow(n)
         r.data = d
+        d.dist = math.floor(d.dist + 0.5)
         local col = GetQuestDifficultyColor and d.level and GetQuestDifficultyColor(d.level)
         local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
-        r.text:SetText(("%s[%s] %s|r  |cff999999%s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
-            FormatTime(EstimateQuestTime(d.quest))))
-        r.right:SetText(("|cff99ccff%d yd|r"):format(d.dist + 0.5))
+        local tags = ""
+        if info.chainPos then tags = tags .. (" |cffb48cff%d/%d|r"):format(info.chainPos, info.chainLen) end
+        if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
+        r.text:SetText(("%s[%s] %s|r%s  |cff999999%s|r"):format(hex, tostring(d.level or "?"), d.name or "?",
+            tags, FormatTime(EstimateQuestTime(d.quest))))
+        r.right:SetText(("|cffd8c070%s|r  |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
         r:ClearAllPoints()
-        r:SetPoint("TOPLEFT", city, "TOPLEFT", 12, y)
+        r:SetPoint("TOPLEFT", cContent, "TOPLEFT", 0, y)
         r:Show()
-        y = y - 19
+        y = y - CITY_ROW_H
     end
     if n == 0 then city:Hide() return end
     city.title:SetText((L["Quests to pick up here (%d)"]):format(n))
+    cContent:SetHeight(math.max(-y, 1))
+    local visH = math.min(n, CITY_VISIBLE) * CITY_ROW_H
+    -- csuszka csak ha tobb sor van, mint ami kifer
+    local needBar = n > CITY_VISIBLE
+    cScroll:SetPoint("BOTTOMRIGHT", city, "TOPLEFT", CITY_W - (needBar and 34 or 12), -38 - visH)
+    if cScroll.ScrollBar then cScroll.ScrollBar:SetShown(needBar) end
+    if not needBar then cScroll:SetVerticalScroll(0) end
     city.foot:ClearAllPoints()
-    city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, y - 4)
-    city:SetHeight(-y + 26)
+    city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, -38 - visH - 4)
+    city:SetHeight(38 + visH + 26)
     if not city:IsShown() and not city.closedHere then city:Show() end
 end
 
