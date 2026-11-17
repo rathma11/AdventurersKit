@@ -382,6 +382,13 @@ local function ReadAuras()
             -- mine: te tetted fel (vagy itembol jon); mas buffja (pl. paladin blessing / aura) nem
             -- szamit az itemes sorokhoz es nem "tanulodik meg" item buffkent
             local mine = src == nil or src == "player" or src == "pet" or src == "vehicle"
+            if not mine and type(src) == "string" then
+                -- mas unit token is lehet te (pl. "party1"/"raid3" = te magad, vagy secret ertek)
+                local okU, same = pcall(UnitIsUnit, src, "player")
+                mine = not okU or same == true
+            elseif not mine then
+                mine = true -- nem string (pl. secret): nem tudjuk, ne zarjuk ki
+            end
             local a = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0, count = tonumber(count) or 0,
                         index = i, spellId = tonumber(spellId), name = name, mine = mine }
             out[name] = a
@@ -422,7 +429,9 @@ local function IsXPAura(a)
     if not ok then return false end
     local lower = text:lower()
     local isXP = lower:find("experience", 1, true) ~= nil or lower:find("%f[%w]xp%f[%W]") ~= nil
-    xpAuraCache[a.spellId] = isXP
+    -- ha a leiras meg nem toltott be (csak a nev sor jott), a "nem XP"-t nem jegyezzuk meg
+    local _, lines = text:gsub("\n", "")
+    if isXP or lines >= 2 then xpAuraCache[a.spellId] = isXP end
     return isXP
 end
 
@@ -496,7 +505,8 @@ local function Remaining(slot, itemId, auras)
     -- aminek a leirasaban experience/XP van
     if slot.key == "food" then
         for _, a in pairs(auras) do
-            if a.duration > 60 and a.mine ~= false and IsXPAura(a) then
+            -- XP kajat mas nem tehet rad: itt a forrast (sourceUnit) nem nezzuk
+            if a.duration > 60 and IsXPAura(a) then
                 if not learned and itemId then DB().buffLearn[itemId] = a.name end
                 if a.expires == 0 then return math.huge end
                 return a.expires - GetTime()
@@ -507,7 +517,7 @@ local function Remaining(slot, itemId, auras)
         if slot.key == "food" and n == L["Well Fed"] then n = nil end
         local a = auras[n]
         -- a 30 mp-es "Food" evo aura nem az igazi buff; mas altal rad tett buff sem (itemes sor)
-        if a and a.mine ~= false and not (slot.key == "food" and a.duration > 0 and a.duration <= 60) then
+        if a and (a.mine ~= false or slot.key == "food") and not (slot.key == "food" and a.duration > 0 and a.duration <= 60) then
             if a.expires == 0 then return math.huge end
             return a.expires - GetTime()
         end
