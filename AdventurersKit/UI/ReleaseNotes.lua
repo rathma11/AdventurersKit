@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.59", date = "2026-11-17", items = {
+        "Previous / next quest arrows next to the quest name on the panel. Next goes to the first stop of the route "
+            .. "(ready-to-turn-in quests count too); the marker, the TomTom arrow and the QFocus macro switch over. "
+            .. "Previous goes back to the quests you focused before, like a browser's back button. Hover an arrow to "
+            .. "see where it takes you and how far it is.",
+        "A quest you skip with the next arrow moves to the end of the route (shown dimmed) until the quest you moved "
+            .. "to is ready to turn in, you turn in any quest, or a loading screen comes. Not saved between sessions.",
+        "Key Bindings: \"Next quest\" and \"Previous quest\" under Adventurer's Kit (with the Bags module's use-item key).",
+    } },
     { version = "0.6.58", date = "2026-11-17", items = {
         "The QFocus macro keeps the quest mob you clicked: if your target is a living enemy, pressing the macro no "
             .. "longer clears it or switches to another mob (in nameplate mode too). A dead or friendly target is still "

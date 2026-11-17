@@ -152,8 +152,30 @@ local function MapButton(parent, size)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return b
 end
+-- Elozo / kovetkezo quest nyilak (Planner\QuestNav.lua) a quest neve utan, a terkep elott
+local function NavButton(dir)
+    local b = CreateFrame("Button", nil, panel)
+    b:SetSize(18, 18)
+    local base = "Interface\\Buttons\\UI-SpellbookIcon-" .. (dir == "next" and "NextPage" or "PrevPage")
+    b:SetNormalTexture(base .. "-Up")
+    b:SetPushedTexture(base .. "-Down")
+    b:SetDisabledTexture(base .. "-Disabled")
+    b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+    b:SetScript("OnClick", function()
+        local fn = dir == "next" and NS.NextQuest or NS.PrevQuest
+        if fn then fn() end
+    end)
+    b:SetScript("OnEnter", function(self) if NS.QuestNavTooltip then NS.QuestNavTooltip(self, dir) end end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:Hide()
+    return b
+end
+local prevBtn, nextBtn = NavButton("prev"), NavButton("next")
+prevBtn:SetPoint("LEFT", panel.title, "RIGHT", 4, 0)
+nextBtn:SetPoint("LEFT", prevBtn, "RIGHT", 0, 0)
+panel.prevBtn, panel.nextBtn = prevBtn, nextBtn
 local mapBtn = MapButton(panel, 15)
-mapBtn:SetPoint("LEFT", panel.title, "RIGHT", 6, 0)
+mapBtn:SetPoint("LEFT", nextBtn, "RIGHT", 4, 0)
 mapBtn:Hide()
 -- a fokusz torles a terkep gomb utan, kozvetlenul a quest neve vegen
 clearBtn:ClearAllPoints()
@@ -166,8 +188,8 @@ mapBtn:SetScript("OnEnter", function(self)
     GameTooltip:Show()
 end)
 panel.mapBtn = mapBtn
-clearBtn:HookScript("OnShow", function() mapBtn:Show() end)
-clearBtn:HookScript("OnHide", function() mapBtn:Hide() end)
+clearBtn:HookScript("OnShow", function() mapBtn:Show(); prevBtn:Show(); nextBtn:Show() end)
+clearBtn:HookScript("OnHide", function() mapBtn:Hide(); prevBtn:Hide(); nextBtn:Hide() end)
 
 -- Ikonsor gombjai (jobbrol balra, az X mellett): dungeon, options
 local function ToolButton(icon, title, desc, onClick)
@@ -795,10 +817,11 @@ local function Panel_Update()
     end
     if NS.HideSuggestions then NS.HideSuggestions() end
     panel.title:SetText(state.title or ("Quest " .. state.questId))
-    -- a cim csak olyan szeles, mint a szoveg (max. a panel - a ket gomb helye), igy a gombok
-    -- a nev vegere kerulnek
-    panel.title:SetWidth(PW() - 28 - 48)
-    panel.title:SetWidth(math.min(math.ceil(panel.title:GetStringWidth()) + 2, PW() - 28 - 48))
+    -- a cim csak olyan szeles, mint a szoveg (max. a panel - a gombok helye: elozo / kovetkezo
+    -- nyil, terkep, fokusz torles), igy a gombok a nev vegere kerulnek
+    panel.title:SetWidth(PW() - 28 - 84)
+    panel.title:SetWidth(math.min(math.ceil(panel.title:GetStringWidth()) + 2, PW() - 28 - 84))
+    if prevBtn.SetEnabled and NS.HasQuestHistory then prevBtn:SetEnabled(NS.HasQuestHistory()) end
     panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName(state.isComplete and "turnin" or "hunt"))
     local objs = state.objectives or {}
     local y = PanelChrome("quest", L["OBJECTIVES"])

@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="ADVENTURERSKIT_NEXTQUEST" header="QUESTFOCUS" category="ADDONS">
+		AdventurersKit_NextQuest()
+	</Binding>
+	<Binding name="ADVENTURERSKIT_PREVQUEST" category="ADDONS">
+		AdventurersKit_PrevQuest()
+	</Binding>
+</Bindings>

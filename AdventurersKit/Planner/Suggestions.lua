@@ -100,6 +100,9 @@ MakeRow = function(parent)
             end
             local tt = TT.Begin(self, "ANCHOR_LEFT", d.title or "?", TT.Progress(objs, d.done))
             TT.Objectives(tt, objs)
+            if d.deferred then
+                tt:AddLine(L["Skipped with the next-quest arrow: at the end of the route for now."], 0.6, 0.6, 0.6, true)
+            end
             TT.Finish(tt, L["Click: focus this quest (marker + QFocus macro)"])
         elseif d.kind == "zone" then
             local z = d.zone
@@ -229,11 +232,12 @@ NS.ShowSuggestions = function()
         for _, r in ipairs(routeRows) do r:Hide() end
         for i, s in ipairs(route) do
             local r = RouteRow(i)
-            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
+            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs, deferred = s.deferred }
             local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
             local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
             local eta = not s.done and NS.QuestEta(s.objs)
             r.text:SetText(("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or ""))
+            r.text:SetAlpha(s.deferred and 0.45 or 1) -- atugorva (kovetkezo nyil): halvanyan, a vegen
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", routeChild, "TOPLEFT", 0, -(i - 1) * rowH)
             r:SetSize(w, rowH)
@@ -299,12 +303,14 @@ local function TurnInRoute()
     end
     return out
 end
+-- Az elozo / kovetkezo quest nyilaknak (Planner\QuestNav.lua): a tobbi quest utvonal-sorrendben
+NS.QuestNavRoute = TurnInRoute
 -- csak az elso par allomas (+ a darabszam) szamit: ha ez valtozik, ujrarajzolunk
 local function TurnInKey(list)
     local t = { #list }
     for i, s in ipairs(list) do
         if i > TURNIN_ROUTE then break end
-        t[#t + 1] = s.qid .. ":" .. math.floor((s.dist or 0) / 25)
+        t[#t + 1] = s.qid .. ":" .. math.floor((s.dist or 0) / 25) .. (s.deferred and "d" or "")
     end
     return table.concat(t, ",")
 end
@@ -331,7 +337,8 @@ local function RouteHeader()
         GameTooltip:SetText(L["Route (quest log)"], 1, 0.86, 0.5)
         for i, s in ipairs(tiRoute) do
             if i > 15 then GameTooltip:AddLine("...", 0.6, 0.6, 0.6) break end
-            GameTooltip:AddLine(RouteText(i, s), 1, 1, 1)
+            local a = s.deferred and 0.5 or 1
+            GameTooltip:AddLine(RouteText(i, s), a, a, a)
         end
         if (self.visible or 0) > 0 and #tiRoute > self.visible then
             GameTooltip:AddLine(L["Scroll the list with the mouse wheel."], 0.45, 0.45, 0.45, true)
@@ -377,8 +384,9 @@ NS.ShowTurnInPickups = function(y, maxRows, prepared)
     if visible == 0 then return y end
     for i, s in ipairs(tiRoute) do
         local r = TiRow(i)
-        r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
+        r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs, deferred = s.deferred }
         r.text:SetText(RouteText(i, s))
+        r.text:SetAlpha(s.deferred and 0.45 or 1) -- atugorva (kovetkezo nyil): halvanyan, a vegen
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", tiChild, "TOPLEFT", 0, -(i - 1) * rowH)
         r:SetSize(w, rowH)

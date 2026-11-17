@@ -45,6 +45,8 @@ local function SelectQuest(questId, title, isComplete, mark)
     local changed = questId ~= state.questId
     local hadQuest = state.questId ~= nil -- belepeskori visszaallitasnal (nem volt elotte) nem jelolunk
     if changed then state.extra = nil end -- a ticker 3 mp-en belul ujraszamolja
+    -- elozmeny a "vissza" nyilnak (Planner\QuestNav.lua): a quest, amirol most ellepsz
+    if changed and hadQuest and NS.OnFocusLeave then pcall(NS.OnFocusLeave, state.questId) end
     state.questId = questId
     state.title = title or state.title
     state.isComplete = isComplete and true or false
@@ -108,6 +110,7 @@ extraTicker:SetScript("OnUpdate", function(_, dt)
 end)
 
 local function ClearQuest()
+    if state.questId and NS.OnFocusLeave then pcall(NS.OnFocusLeave, state.questId) end
     state.questId, state.title, state.objectives, state.objIndex = nil, nil, nil, nil
     state.extra = nil
     state.escort, state.escortQid, state.escortFailed = nil, nil, nil
