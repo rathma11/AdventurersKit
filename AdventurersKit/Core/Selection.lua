@@ -196,6 +196,34 @@ local function InstallHooks()
         end)
     end
 
+    -- Kovetes (track pipa a quest logban / terkep melletti listaban, shift-klikk): a frissen
+    -- kovetett quest lesz a fokuszban, a nyil oda kerul. Quest felvetelkor az automatikus
+    -- kovetes (Questie / jatek) nem valt fokuszt (2 mp-en belul a QUEST_ACCEPTED utan).
+    local acceptedAt = 0
+    local acc = CreateFrame("Frame")
+    acc:RegisterEvent("QUEST_ACCEPTED")
+    acc:SetScript("OnEvent", function() acceptedAt = GetTime() end)
+    local function OnTracked(questId, index)
+        if GetTime() - acceptedAt < 2 or InCombatLockdown() then return end
+        if index then
+            SelectByLogIndex(index, true)
+        elseif questId and questId ~= 0 and questId ~= state.questId then
+            local title, done = FindQuestInLog(questId)
+            if title then SelectQuest(questId, title, done, true) end
+        end
+    end
+    if type(AddQuestWatch) == "function" then
+        hooksecurefunc("AddQuestWatch", function(index) OnTracked(nil, index) end)
+    end
+    if C_QuestLog and type(C_QuestLog.AddQuestWatch) == "function" then
+        hooksecurefunc(C_QuestLog, "AddQuestWatch", function(questId) OnTracked(questId) end)
+    end
+    pcall(acc.RegisterEvent, acc, "QUEST_WATCH_LIST_CHANGED") -- (nem minden kliensen van ilyen esemeny)
+    acc:SetScript("OnEvent", function(_, event, questId, added)
+        if event == "QUEST_ACCEPTED" then acceptedAt = GetTime() return end
+        if added and questId then OnTracked(questId) end
+    end)
+
     HookQuestLogButtons()
     if QuestLogFrame then
         QuestLogFrame:HookScript("OnShow", HookQuestLogButtons)
