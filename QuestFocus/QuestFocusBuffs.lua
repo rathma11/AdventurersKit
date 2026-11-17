@@ -633,27 +633,42 @@ for i, slot in ipairs(SLOTS) do
     alertRows[i] = b
 end
 
+-- X: a kovetkezo harcig nem mutatjuk (harc utan, ha meg kell, visszajon)
+local hiddenUntilCombat = false
 aClose:SetScript("OnClick", function()
-    for _, b in ipairs(alertRows) do if b:IsShown() then dismissed[b.slot.key] = true end end
+    hiddenUntilCombat = true
     if not InCombatLockdown() then alert:Hide() end
 end)
 
+-- Harcon kivul a panel tetejere tapad (sav, ugyanolyan szeles es meretaranyu), igy
+-- egyutt mozog vele. Harc elott (PLAYER_REGEN_DISABLED) leválasztjuk, kulonben a panel
+-- is vedett lenne es harcban nem lehetne mozgatni.
 local function PlaceAlert()
+    if InCombatLockdown() then return end
     alert:ClearAllPoints()
     local p = NS.panel
-    local r, t = NS.PanelEdge("right"), NS.PanelEdge("top")
-    if p:IsShown() and r and t then
-        alert:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", r, t + 4)
+    if p:IsShown() then
+        alert:SetScale(p:GetScale())
+        alert:SetWidth(p:GetWidth())
+        alert:SetPoint("BOTTOMLEFT", p, "TOPLEFT", 0, -3)
     else
+        alert:SetScale(1)
+        alert:SetWidth(250)
         alert:SetPoint("TOP", UIParent, "TOP", 0, -120)
     end
+end
+
+local function DetachAlert()
+    alert:Hide()
+    alert:ClearAllPoints()
+    alert:SetPoint("TOP", UIParent, "TOP", 0, -120)
 end
 
 -- Mely slotok kernek figyelmet: van item, es a buff hianyzik / hamarosan lejar
 local lastAlertKey
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end
-    if QuestFocusDB.noBuffAlert or UnitIsDeadOrGhost("player") then
+    if QuestFocusDB.noBuffAlert or hiddenUntilCombat or UnitIsDeadOrGhost("player") then
         if alert:IsShown() then alert:Hide() end
         lastAlertKey = nil
         return
@@ -705,6 +720,7 @@ local function UpdateAlert(auras)
         end
         alert:SetHeight(26 + #need * ROW_H)
         PlaceAlert()
+        alert.onPanel = NS.panel:IsShown()
         if not alert:IsShown() then
             alert:Show()
             if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then PlaySound(SOUNDKIT.RAID_WARNING) end
@@ -728,7 +744,12 @@ alertTicker:SetScript("OnUpdate", function(_, dt)
     local auras = HelpfulAuras()
     CheckWarnings(auras)
     UpdateAlert(auras)
-    if alert:IsShown() and not InCombatLockdown() then PlaceAlert() end
+    -- a panel ki/be: ujrahelyezes (a mozgatast az anchor magatol koveti)
+    if alert:IsShown() and not InCombatLockdown() and (alert.onPanel ~= NS.panel:IsShown()
+        or (NS.panel:IsShown() and math.abs(alert:GetScale() - NS.panel:GetScale()) > 0.01)) then
+        alert.onPanel = NS.panel:IsShown()
+        PlaceAlert()
+    end
 end)
 
 local ev = CreateFrame("Frame")
@@ -747,8 +768,10 @@ local function Soon()
 end
 ev:SetScript("OnEvent", function(_, event, unit)
     if event == "PLAYER_REGEN_DISABLED" then
-        -- meg a lockdown elott: a secure gombos ablakot harcban nem lehetne eltuntetni
-        if alert:IsShown() then alert:Hide() end
+        -- meg a lockdown elott: elrejtjuk es levalasztjuk a panelrol (harcban a secure
+        -- gombos ablakot nem lehetne eltuntetni, es a panel se lenne mozgathato)
+        DetachAlert()
+        hiddenUntilCombat = false -- az X csak a kovetkezo harcig szolt
         lastAlertKey = nil
     elseif event == "UNIT_AURA" then
         if unit ~= "player" then return end

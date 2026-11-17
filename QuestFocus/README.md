@@ -79,7 +79,7 @@ Each button shows the time left on its buff. When the buff is missing, or about 
 
 By default it casts the one you last had on (e.g. Blessing of Might). To choose, drag a spell from your spellbook onto its slot on the Buffs tab. Auras and aspects only count when they are missing. Timed buffs warn 1 min before they run out (you can change this).
 
-**Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. The X hides that reminder until the buff is applied again. The popup disappears when combat starts, because the game does not allow it to stay up in combat. It uses the same spot as the progress popup: if a progress popup is showing (e.g. right after combat), the reminder waits until it fades.
+**Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. It sits as a band on top of the panel and moves with it. The X hides it until your next fight; after that fight it comes back if still needed. It disappears when combat starts, because the game does not allow it to stay up (attached to the panel) in combat. It uses the same spot as the progress popup: if a progress popup is showing (e.g. right after combat), the reminder waits until it fades.
 
 ## Commands
 | Command | What it does |
