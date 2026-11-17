@@ -125,7 +125,20 @@ local function BankCounts()
     return counts
 end
 
-local scan = { items = {}, status = {}, leftovers = {}, bankOnly = {} }
+local function ItemHasUse(id)
+    if C_Item and C_Item.GetItemSpell then return C_Item.GetItemSpell(id) ~= nil end
+    return GetItemSpell and GetItemSpell(id) ~= nil
+end
+
+-- Hasznalhato (Use:) item egy meg nem leadhato aktiv queshez: ezek a panel melletti
+-- gombokra kerulnek, nem a taska melletti listaba
+local function IsPanelUseItem(e)
+    if QuestFocusDB.noUseButton or not e.needs or not ItemHasUse(e.id) then return false end
+    for _, n in ipairs(e.needs) do if not n.questDone then return true end end
+    return false
+end
+
+local scan = { items = {}, status = {}, leftovers = {}, bankOnly = {}, usable = {} }
 
 local function Scan()
     local needs, bank = QuestNeeds(), BankCounts()
@@ -185,7 +198,21 @@ local function Scan()
         if rank(a) ~= rank(b) then return rank(a) < rank(b) end
         return (a.needs and a.needs[1].title or "") < (b.needs and b.needs[1].title or "")
     end)
-    scan.items, scan.status, scan.leftovers, scan.bankOnly = items, status, leftovers, bankOnly
+    -- hasznalhato quest itemek: a panelre (a kijelolt quest elol), a listabol kimaradnak
+    local usable, listed = {}, {}
+    for _, e in ipairs(items) do
+        if IsPanelUseItem(e) then usable[#usable + 1] = e else listed[#listed + 1] = e end
+    end
+    local function forSel(e)
+        for _, n in ipairs(e.needs) do if n.qid == state.questId then return 0 end end
+        return 1
+    end
+    table.sort(usable, function(a, b)
+        if forSel(a) ~= forSel(b) then return forSel(a) < forSel(b) end
+        return (a.needs[1].title or "") < (b.needs[1].title or "")
+    end)
+    scan.items, scan.status, scan.leftovers, scan.bankOnly = listed, status, leftovers, bankOnly
+    scan.usable = usable
     return scan
 end
 
@@ -580,82 +607,87 @@ NS.DiscardLeftovers = DiscardLeftovers
 junkBtn:SetScript("OnClick", DiscardLeftovers)
 
 ---------------------------------------------------------------------------
--- Hasznalhato quest item gomb a panel mellett
+-- Hasznalhato quest itemek a panel bal szelen (egymas alatt, max USE_MAX).
+-- Az elso a kijelolt quest itemje (ha van); a tobbi a tobbi aktiv quest hasznalhato itemje.
+-- Ezek a taska melletti listabol kimaradnak (Scan: scan.usable).
 ---------------------------------------------------------------------------
-local useBtn = CreateFrame("Button", "QuestFocusUseItem", UIParent, "SecureActionButtonTemplate")
-useBtn:SetSize(36, 36)
-useBtn:RegisterForClicks("AnyUp", "AnyDown")
-useBtn:SetAttribute("type", "item")
-useBtn:Hide()
-useBtn.icon = useBtn:CreateTexture(nil, "ARTWORK")
-useBtn.icon:SetAllPoints()
-useBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-useBtn.count = useBtn:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-useBtn.count:SetPoint("BOTTOMRIGHT", -2, 2)
-useBtn.cd = CreateFrame("Cooldown", nil, useBtn, "CooldownFrameTemplate")
-useBtn.cd:SetAllPoints()
-useBtn.key = useBtn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmallGray")
-useBtn.key:SetPoint("TOPRIGHT", -2, -2)
-useBtn:SetScript("OnEnter", function(self)
-    if not self.itemId then return end
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetItemByID(self.itemId)
-    GameTooltip:AddLine(L["QuestFocus: item of the selected quest"], 0.2, 1, 0.6)
-    if not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
-        GameTooltip:AddLine(L["Key: Options > Keybindings > AddOns > QuestFocus"], 0.5, 0.5, 0.5)
-    end
-    GameTooltip:Show()
-end)
-useBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-local function ItemHasUse(id)
-    if C_Item and C_Item.GetItemSpell then return C_Item.GetItemSpell(id) ~= nil end
-    return GetItemSpell and GetItemSpell(id) ~= nil
+local USE_MAX, USE_SIZE = 4, 36
+local useBtns = {}
+local function MakeUseButton(i)
+    -- az elso neve marad (a keybind erre szol: CLICK QuestFocusUseItem:LeftButton)
+    local b = CreateFrame("Button", i == 1 and "QuestFocusUseItem" or ("QuestFocusUseItem" .. i), UIParent,
+        "SecureActionButtonTemplate")
+    b:SetSize(USE_SIZE, USE_SIZE)
+    b:RegisterForClicks("AnyUp", "AnyDown")
+    b:SetAttribute("type", "item")
+    b:Hide()
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b.border = b:CreateTexture(nil, "OVERLAY")
+    b.border:SetPoint("TOPLEFT", -2, 2)
+    b.border:SetPoint("BOTTOMRIGHT", 2, -2)
+    b.border:SetColorTexture(0.2, 1, 0.6, 0.5)
+    b.border:SetDrawLayer("BACKGROUND")
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    b.count:SetPoint("BOTTOMRIGHT", -2, 2)
+    b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
+    b.cd:SetAllPoints()
+    b.key = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmallGray")
+    b.key:SetPoint("TOPRIGHT", -2, -2)
+    b:SetScript("OnEnter", function(self)
+        if not self.itemId then return end
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetItemByID(self.itemId)
+        GameTooltip:AddLine(" ")
+        for _, n in ipairs(self.needs or {}) do
+            local sel = n.qid == state.questId
+            GameTooltip:AddLine((sel and "|cff33ff99> " or "|cffffd100") .. (n.title or "?") .. "|r", 1, 1, 1)
+        end
+        if i == 1 and not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
+            GameTooltip:AddLine(L["Key: Options > Keybindings > AddOns > QuestFocus"], 0.5, 0.5, 0.5)
+        end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    useBtns[i] = b
+    return b
 end
+for i = 1, USE_MAX do MakeUseButton(i) end
 
--- A kijelolt quest hasznalhato itemje (amibol van a taskaban)
-local function UsableQuestItem()
-    local qid = state.questId
-    if not qid then return end
-    local q = NS.GetQuestieQuest(qid)
-    if not q then return end
-    local cands = {}
-    if tonumber(q.sourceItemId) and q.sourceItemId > 0 then cands[#cands + 1] = q.sourceItemId end
-    for _, id in pairs(q.requiredSourceItems or {}) do cands[#cands + 1] = id end
-    for _, o in pairs(q.Objectives or {}) do
-        if type(o) == "table" and o.Type == "item" and o.Id then cands[#cands + 1] = o.Id end
-    end
-    for _, id in ipairs(cands) do
-        if GetItemCount(id) > 0 and ItemHasUse(id) then return id end
-    end
-end
-
+local useGeo
 local function UpdateUseButton()
     if InCombatLockdown() then return end
-    local id = (not QuestFocusDB.noUseButton) and UsableQuestItem() or nil
     local panel = NS.panel
-    if not id or not (panel and panel:IsShown()) then
-        if useBtn:IsShown() then useBtn:Hide() end
-        useBtn.itemId = nil
-        return
-    end
-    if useBtn.itemId ~= id then
-        useBtn.itemId = id
-        useBtn:SetAttribute("item", "item:" .. id)
-        useBtn.icon:SetTexture(select(5, GetItemInfoInstant(id)))
-    end
-    local n = GetItemCount(id)
-    useBtn.count:SetText(n > 1 and n or "")
-    local key = GetBindingKey("CLICK QuestFocusUseItem:LeftButton")
-    useBtn.key:SetText(key and GetBindingText and GetBindingText(key, true) or (key or ""))
+    local list = (not QuestFocusDB.noUseButton and panel and panel:IsShown()) and scan.usable or {}
     -- Nem a panelhez horgonyzunk (attol a panel vedett lenne): kepernyo-pozicio alapjan
     local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
-    if l and t then
-        useBtn:ClearAllPoints()
-        useBtn:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", l - 4, t)
-        useBtn.geo = math.floor(l) .. ":" .. math.floor(t)
+    useGeo = l and t and (math.floor(l) .. ":" .. math.floor(t)) or nil
+    local key = GetBindingKey("CLICK QuestFocusUseItem:LeftButton")
+    for i, b in ipairs(useBtns) do
+        local e = list[i]
+        if not e or not l then
+            if b:IsShown() then b:Hide() end
+            b.itemId, b.needs = nil, nil
+        else
+            if b.itemId ~= e.id then
+                b.itemId = e.id
+                b:SetAttribute("item", "item:" .. e.id)
+                b.icon:SetTexture(e.icon or select(5, GetItemInfoInstant(e.id)))
+            end
+            b.needs = e.needs
+            local sel = false
+            for _, n in ipairs(e.needs or {}) do if n.qid == state.questId then sel = true end end
+            b.border:SetShown(sel)
+            b:SetAlpha(sel and 1 or 0.8)
+            local n = GetItemCount(e.id)
+            b.count:SetText(n > 1 and n or "")
+            b.key:SetText(i == 1 and key and GetBindingText and GetBindingText(key, true) or "")
+            b:ClearAllPoints()
+            b:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", l - 4, t - (i - 1) * (USE_SIZE + 4))
+            b:Show()
+        end
     end
-    useBtn:Show()
 end
 
 local cdElapsed = 0
@@ -668,16 +700,19 @@ ticker:SetScript("OnUpdate", function(_, dt)
     local shown = NS.panel and NS.panel:IsShown()
     if state.questId ~= lastQuest or shown ~= lastPanelShown then
         lastQuest, lastPanelShown = state.questId, shown
+        if not InCombatLockdown() then Scan() end -- a kijelolt quest itemje kerul elore
         UpdateUseButton()
-    elseif useBtn:IsShown() and not InCombatLockdown() then
-        -- a panel elmozdult: a gomb koveti
+    elseif useBtns[1]:IsShown() and not InCombatLockdown() then
+        -- a panel elmozdult: a gombok kovetik
         local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
-        if l and t and useBtn.geo ~= (math.floor(l) .. ":" .. math.floor(t)) then UpdateUseButton() end
+        if l and t and useGeo ~= (math.floor(l) .. ":" .. math.floor(t)) then UpdateUseButton() end
     end
-    if useBtn:IsShown() and useBtn.itemId then
-        local getCD = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
-        local start, dur = getCD and getCD(useBtn.itemId)
-        if start and dur then useBtn.cd:SetCooldown(start, dur) end
+    local getCD = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+    for _, b in ipairs(useBtns) do
+        if b:IsShown() and b.itemId and getCD then
+            local start, dur = getCD(b.itemId)
+            if start and dur then b.cd:SetCooldown(start, dur) end
+        end
     end
 end)
 
@@ -756,11 +791,12 @@ fl:Check(L["Color quest items in Bagnon"],
         if B and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
     end)
 fl:Header(L["Using quest items"])
-fl:Check(L["Quest item button next to the panel"],
-    L["If the selected quest needs a usable item (e.g. to throw at a mob), a button appears left of the QuestFocus panel. "]
-    .. L["You can bind a key to it: Options > Keybindings > AddOns > QuestFocus."],
+fl:Check(L["Usable quest items on the panel"],
+    L["Quest items you have to use (e.g. throw at a mob) get a button on the left edge of the QuestFocus panel, "]
+    .. L["up to 4, the selected quest's item first (green frame). They are left out of the bag list. "]
+    .. L["Key for the first one: Options > Keybindings > AddOns > QuestFocus."],
     function() return not QuestFocusDB.noUseButton end,
-    function(v) QuestFocusDB.noUseButton = not v; UpdateUseButton() end)
+    function(v) QuestFocusDB.noUseButton = not v; RefreshBagList(); UpdateUseButton() end)
 fl:Button(L["Destroy leftover quest items"], 200,
     L["Unsellable quest items no active quest needs any more. Asks one by one before destroying. Same as /qf junk."],
     function() if NS.DiscardLeftovers then NS.DiscardLeftovers() end end, 28)
