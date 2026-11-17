@@ -292,6 +292,11 @@ local function Action(slot)
     end
     local id = FindItem(slot)
     if id and GetItemCount(id) > 0 then return { kind = "item", id = id } end
+    -- a beallitott XP kaja elfogyott: masik XP kaja a taskabol, ha van
+    if slot.key == "food" and NS.FoodCandidates then
+        local xp = NS.FoodCandidates()
+        if xp[1] then return { kind = "item", id = xp[1] } end
+    end
 end
 
 local function ActionIcon(a)
@@ -632,7 +637,10 @@ for i, slot in ipairs(SLOTS) do
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         local s = self.slot or slot
-        if self.spellName then
+        if self.info then
+            GameTooltip:SetText(s.label, 1, 1, 1)
+            GameTooltip:AddLine(self.info, 1, 0.82, 0, true)
+        elseif self.spellName then
             GameTooltip:SetText(self.spellName, 1, 1, 1)
             GameTooltip:AddLine(L["Click: cast it on yourself"], 0.5, 0.5, 0.5)
         else
@@ -701,6 +709,10 @@ local function UpdateAlert(auras)
             and (not left or (left ~= math.huge and left < limit) or short) then
             need[#need + 1] = { slot = slot, action = a, left = left, stacks = stacks }
             key = key .. slot.key .. tostring(a.id or a.name) .. ";"
+        elseif not a and slot.key == "food" and not left and not DB().noBuff_food then
+            -- nincs XP kaja a taskaban: csak szolunk, gomb nelkul
+            need[#need + 1] = { slot = slot, left = nil, info = L["no XP food in your bags - buy some at a vendor, or cook one if you can"] }
+            key = key .. "food:none;"
         end
     end
     if #need == 0 then
@@ -728,12 +740,21 @@ local function UpdateAlert(auras)
         if NS.HideBuffFlyout then NS.HideBuffFlyout() end
         for i, n in ipairs(need) do
             local b = alertRows[i]
-            b.slot, b.itemId, b.spellName = n.slot, n.action.id, n.action.name
-            b.icon:SetTexture(ActionIcon(n.action))
-            SetupSecure(b, n.slot, n.action)
-            local alts = NS.BuffAlternatives and NS.BuffAlternatives(n.slot)
-            b.alts = alts
-            b.arrow:SetShown(alts ~= nil and #alts >= 2)
+            if n.action then
+                b.slot, b.itemId, b.spellName = n.slot, n.action.id, n.action.name
+                b.icon:SetTexture(ActionIcon(n.action))
+                SetupSecure(b, n.slot, n.action)
+                local alts = NS.BuffAlternatives and NS.BuffAlternatives(n.slot)
+                b.alts = alts
+                b.arrow:SetShown(alts ~= nil and #alts >= 2)
+            else
+                -- csak informacio (pl. nincs XP kaja): nincs kattinthato ikon
+                b.slot, b.itemId, b.spellName, b.alts = n.slot, nil, nil, nil
+                b:SetAttribute("type", nil)
+                b.icon:SetTexture("Interface\\Icons\\INV_Misc_Food_15")
+            end
+            b.info = n.info
+            b.icon:SetDesaturated(n.info ~= nil)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
             b:Show()
@@ -748,10 +769,15 @@ local function UpdateAlert(auras)
         end
     end
     for i, n in ipairs(need) do
-        local name = ActionName(n.action, n.slot)
-        local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
-            .. StackText(n.slot, n.stacks)
-        alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
+        if n.info then
+            alertRows[i].text:SetText(("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(
+                n.slot.label, L["missing"], n.info))
+        else
+            local name = ActionName(n.action, n.slot)
+            local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
+                .. StackText(n.slot, n.stacks)
+            alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
+        end
     end
 end
 NS.BuffAlertFrame = alert
@@ -802,6 +828,9 @@ ev:SetScript("OnEvent", function(_, event, unit)
         if unit == "player" then Soon() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if bar.dirty then Rebuild() end
+    elseif event == "BAG_UPDATE_DELAYED" then
+        if NS.ClearFoodCache then NS.ClearFoodCache() end
+        Soon()
     elseif event == "PLAYER_LOGIN" then
         C_Timer.After(3, Rebuild)
         -- XP kaja valaszto: ha nincs beallitva (a panel betoltese utan)
@@ -833,7 +862,9 @@ local function TooltipText(bag, slot)
     return table.concat(parts, "\n")
 end
 
+local foodCache -- { xp, other }: taska valtozasig (BAG_UPDATE_DELAYED torli)
 local function FoodCandidates()
+    if foodCache then return foodCache[1], foodCache[2] end
     local xp, other, seen = {}, {}, {}
     for bag = 0, 4 do
         for s = 1, (GetSlots(bag) or 0) do
@@ -851,8 +882,11 @@ local function FoodCandidates()
             end
         end
     end
+    foodCache = { xp, other }
     return xp, other
 end
+NS.FoodCandidates = FoodCandidates
+NS.ClearFoodCache = function() foodCache = nil end
 
 local picker = CreateFrame("Frame", "QuestFocusFoodPicker", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
 picker:SetSize(280, 80)
@@ -972,8 +1006,9 @@ NS.BuffAlternatives = function(slot)
             if SpellKnown(c) and not seen[c] then seen[c] = true; out[#out + 1] = { kind = "spell", name = c } end
         end
     elseif slot.key == "food" then
-        local xp, other = FoodCandidates()
-        for _, id in ipairs(#xp > 0 and xp or other) do out[#out + 1] = { kind = "item", id = id } end
+        -- csak a valodi XP kajak (sima etel nem kell ide)
+        local xp = FoodCandidates()
+        for _, id in ipairs(xp) do out[#out + 1] = { kind = "item", id = id } end
     elseif #slot.names > 0 then
         for bag = 0, 4 do
             for s = 1, (GetSlots(bag) or 0) do
