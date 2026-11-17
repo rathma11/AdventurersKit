@@ -1226,6 +1226,7 @@ local function PickRow(i)
         lastAlertKey = nil
         Rebuild()
         if NS.RefreshBuffOptions then NS.RefreshBuffOptions() end
+        if NS.RefreshBuffList then NS.RefreshBuffList() end -- az Options lista pipaja is
     end)
     r:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1560,6 +1561,8 @@ local function OpenChooser(anchor, slot)
                 else
                     DB().buffItems[s.key] = act.id
                 end
+                -- ha kivalasztottal valamit, azt figyelni is akarod: a pipa bekapcsol
+                if not s.custom then DB()["noBuff_" .. s.key] = false end
                 chooser:Hide()
                 AfterChange()
                 RefreshList()
@@ -1715,11 +1718,13 @@ local function GetRow(i)
             if ok and name then
                 QuestFocusDB.classPref = QuestFocusDB.classPref or {}
                 QuestFocusDB.classPref[s.key] = name
+                DB()["noBuff_" .. s.key] = false -- rahuztad: figyelje is
             end
         elseif not s.custom then
             if kind ~= "item" then return end
             ClearCursor()
             DB().buffItems[s.key] = itemId
+            DB()["noBuff_" .. s.key] = false -- rahuztad: figyelje is
         else
             return
         end

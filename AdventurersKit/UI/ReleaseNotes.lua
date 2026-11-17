@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.3", date = "2026-11-17", items = {
+        "Buffs tab: choosing an item / spell for a row (icon click or drag) also ticks that row on.",
+    } },
     { version = "0.6.2", date = "2026-11-17", items = {
         "XP food picker: removed the leftover 'Don't ask again' button (it silently turned off the login setup question).",
     } },
