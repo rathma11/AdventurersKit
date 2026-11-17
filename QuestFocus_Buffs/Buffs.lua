@@ -18,10 +18,6 @@ local SLOTS = {
     { key = "weapon_off", label = L["Off-hand enchant"], hand = 17,
       names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
 }
--- Hunter: a fegyver enchant (main / off hand) alapbol ki van kapcsolva (ranged); bepipalhato.
-if select(2, UnitClass("player")) == "HUNTER" then
-    for _, s in ipairs(SLOTS) do if s.hand then s.defaultOff = true end end
-end
 -- Rogue: poisonok is (a nev alapjan keressuk a taskaban; kattintasra a fegyverre teszi)
 if select(2, UnitClass("player")) == "ROGUE" then
     for _, s in ipairs(SLOTS) do
@@ -1321,12 +1317,56 @@ NS.ToggleBuffFlyout = function(row, arrow)
     flyout:Show()
 end
 
--- Bejelentkezes utan egyszer felajanljuk, ha nincs XP kaja beallitva, de van etel a taskaban
+-- Elso bejelentkezeskor (karakterenkent egyszer): ha egy bepipalt itemes tipushoz (XP kaja,
+-- alvozsak, fegyver enchant) nem talalunk semmit a taskaban, megkerdezzuk, beallitja-e.
+-- Amit talalunk (XP kaja a leirasbol, ko / olaj / poison nev alapjan, class spell), az
+-- automatikus, azzal nem zavarunk.
+local function CharKey() return (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?") end
+local function MissingSetup()
+    local out = {}
+    for _, s in ipairs(SLOTS) do
+        if not s.isClass and not s.custom and not NS.BuffSlotOff(s) and not Action(s) then
+            local relevant = true
+            if s.hand == 17 then
+                -- off hand: csak ha ott fegyver van
+                local id = GetInventoryItemID("player", 17)
+                relevant = id and select(6, GetItemInfoInstant(id)) == 2 or false
+            end
+            if relevant then out[#out + 1] = s.label end
+        end
+    end
+    return out
+end
+StaticPopupDialogs["QUESTFOCUS_BUFFSETUP"] = {
+    text = "",
+    button1 = L["Set up"],
+    button2 = L["Later"],
+    button3 = L["Don't ask again"],
+    OnAccept = function() if NS.OpenOptionsTab then NS.OpenOptionsTab(L["Buffs"]) end end,
+    OnAlt = function()
+        QuestFocusDB.buffSetupDone = QuestFocusDB.buffSetupDone or {}
+        QuestFocusDB.buffSetupDone[CharKey()] = true
+    end,
+    timeout = 0,
+    whileDead = false,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
 local function MaybePromptFood()
-    if InCombatLockdown() or not On() or QuestFocusDB.noFoodPrompt or DB().buffItems.food or NS.BuffSlotOff("food") then return end
-    local xp = FoodCandidates()
-    if #xp == 0 then return end
-    ShowFoodPicker()
+    if InCombatLockdown() or not On() or QuestFocusDB.noFoodPrompt then return end
+    local done = QuestFocusDB.buffSetupDone and QuestFocusDB.buffSetupDone[CharKey()]
+    if done then return end
+    local missing = MissingSetup()
+    if #missing == 0 then
+        -- minden megvan (automatikusan): nem kerdezunk tobbet ezen a karakteren
+        QuestFocusDB.buffSetupDone = QuestFocusDB.buffSetupDone or {}
+        QuestFocusDB.buffSetupDone[CharKey()] = true
+        return
+    end
+    StaticPopupDialogs.QUESTFOCUS_BUFFSETUP.text =
+        (L["Adventurer's Kit - buff reminder: nothing found in your bags for: %s.\nChoose the items now? (Options > Buffs: click the icon, or drag an item onto it)"])
+        :format(table.concat(missing, ", "))
+    StaticPopup_Show("QUESTFOCUS_BUFFSETUP")
 end
 NS.MaybePromptFood = MaybePromptFood
 
@@ -1350,8 +1390,9 @@ fl:Check(L["Warn before a buff expires"],
     L["One chat message when a buff has less time left than its minutes in the list (needs chat messages on, General tab)."],
     function() return not QuestFocusDB.noBuffWarn end,
     function(v) QuestFocusDB.noBuffWarn = not v end)
-fl:Check(L["Ask for XP food at login"],
-    L["If XP food is watched but none is set and you have food in your bags, a picker opens once after login."],
+fl:Check(L["Ask to set up missing buffs"],
+    L["Once per character after login: if nothing is found in your bags for a ticked item buff (XP food, sleeping bag, weapon enchant), "]
+    .. L["it asks whether to choose the items. What can be found (XP food, stones / oils / poisons, class spells) is set automatically."],
     function() return not QuestFocusDB.noFoodPrompt end,
     function(v) QuestFocusDB.noFoodPrompt = not v end)
 

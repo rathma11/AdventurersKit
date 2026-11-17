@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.7", date = "2026-11-17", items = {
+        "XP food, sleeping bag, weapon enchants and class buffs are always on by default (hunters too); found items / spells are set automatically.",
+        "First login on a character: if nothing is found for a ticked item buff, a popup offers to set it up (Set up / Later / Don't ask again).",
+    } },
     { version = "0.4.6", date = "2026-11-17", items = {
         "Buff reminder: ticked item buffs (sleeping bag, weapon enchant, your own items) show up even when you have none in your bags; click the icon to choose one, or drag an item onto it.",
         "Buff reminder: a small X at the end of each row stops watching that buff (tick it again on the Buffs tab).",
