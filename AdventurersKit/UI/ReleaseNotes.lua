@@ -5,6 +5,19 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.56", date = "2026-11-17", items = {
+        "The quest panel has a fixed size now: its width and height follow the text size (Options), so the bottom never "
+            .. "moves. The resize handle only shows in the \"What next?\" list.",
+        "Space in the panel: \"Also nearby\" and the route get at least 3 rows each (when there are that many), the "
+            .. "objectives get the rest. If there are too many objectives to fit, they scroll with the mouse wheel. Spare "
+            .. "space goes to nearby quests (up to 4 rows), then the route (up to 5), then more of both.",
+        "The route (your other quests in route order) shows while hunting too, not only at turn-in. It scrolls in its "
+            .. "own area; if no row fits, hover its header to see the list. The [+]/[-] toggle is gone.",
+        "Shorter rows: a part repeated at the start of every objective (e.g. \"Green Hills of Stranglethorn - \") is "
+            .. "left out, so you see \"Chapter I\", \"Chapter II\"... The same goes for a quest's rows under Also nearby "
+            .. "(\"Page 8\", \"Page 14\"). The full text is in the tooltip.",
+        "The Buff Reminder bar always has the panel's width.",
+    } },
     { version = "0.6.55", date = "2026-11-17", items = {
         "After login the quest panel waits until its content has settled (objectives, nearby quests, route) and then "
             .. "appears at once, instead of rows sliding in one by one. Clicking a quest shows it right away.",

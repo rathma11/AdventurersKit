@@ -12,8 +12,9 @@ local panel = CreateFrame("Frame", "QuestFocusPanel", UIParent, BackdropTemplate
 local PANEL_W = 300 -- alap szelesseg; a fogantyuval allithato (QuestFocusDB.panelW / panelH)
 
 -- Szelesseg, sormagassag es betumeret (a betumeret kulon beallitas: QuestFocusDB.fontSize)
-local function PW() return math.max(240, math.min(600, tonumber(QuestFocusDB and QuestFocusDB.panelW) or PANEL_W)) end
 local function FontSize() return math.max(8, math.min(20, tonumber(QuestFocusDB and QuestFocusDB.fontSize) or 10)) end
+-- Fix szelesseg a betumeretbol (10-es betunel PANEL_W); nem huzhato, hogy a sorok kiferjenek
+local function PW() return math.max(240, math.min(600, math.floor(PANEL_W * FontSize() / 10 + 0.5))) end
 local function RowH() return math.max(16, FontSize() + 6) end
 NS.PW, NS.RowH, NS.FontSize = PW, RowH, FontSize
 
@@ -319,9 +320,9 @@ grip:SetPoint("BOTTOMRIGHT", -4, 4)
 grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
 grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
--- Atmeretezes: a panel szelesseget es (javaslat modban) magassagat allitja, a betumeret
--- NEM valtozik (az kulon beallitas). Nagyobb panel = tobb sor a javaslatokban.
--- Jobb klikk: alapmeret. Mentve: QuestFocusDB.panelW / panelH
+-- Atmeretezes (csak javaslat modban): a panel magassagat allitja (QuestFocusDB.panelH), a
+-- szelesseg fix (betumeretbol). Quest modban a panel merete fix, ott a fogantyu nem latszik.
+-- Jobb klikk: alapmeret.
 grip:RegisterForClicks("RightButtonUp")
 grip:SetScript("OnClick", function()
     QuestFocusDB.panelW, QuestFocusDB.panelH, QuestFocusDB.questPanelH = nil, nil, nil
@@ -331,29 +332,14 @@ end)
 grip:SetScript("OnMouseDown", function(self, button)
     if button ~= "LeftButton" then return end
     AnchorTopLeft()
-    local x, y = GetCursorPosition()
-    self.drag = { x = x, y = y, w = panel:GetWidth(), h = panel:GetHeight() }
+    local _, y = GetCursorPosition()
+    self.drag = { y = y, h = panel:GetHeight() }
     self:SetScript("OnUpdate", function()
-        local cx, cy = GetCursorPosition()
-        local es = panel:GetEffectiveScale()
-        local w = self.drag.w + (cx - self.drag.x) / es
-        local h = self.drag.h + (self.drag.y - cy) / es
-        QuestFocusDB.panelW = math.floor(math.max(240, math.min(600, w)))
+        local _, cy = GetCursorPosition()
+        local h = self.drag.h + (self.drag.y - cy) / panel:GetEffectiveScale()
         h = math.floor(math.max(120, math.min(900, h)))
-        ApplyPanelWidth()
-        if state.questId then
-            -- quest modban a huzott magassag a panel felso hatara (QuestFocusDB.questPanelH):
-            -- huzas kozben ujrarendezzuk, igy az utvonal sorai 5 -> 4 -> 3 ... -> becsukva
-            QuestFocusDB.questPanelH = h
-            local bucket = math.floor(h / RowH())
-            if bucket ~= self.drag.bucket then
-                self.drag.bucket = bucket
-                if NS.Panel_Update then NS.Panel_Update() end
-            end
-        else
-            QuestFocusDB.panelH = h
-            panel:SetHeight(h)
-        end
+        QuestFocusDB.panelH = h
+        panel:SetHeight(h)
     end)
 end)
 grip:SetScript("OnMouseUp", function(self)
@@ -389,16 +375,27 @@ local function PanelChrome(mode, sectionText)
     return y
 end
 
+-- Quest modban a panel magassaga fix (a betumeretbol): fejlec + statisztika + 11 sornyi
+-- tartalom (pl. 5 objective + 3 kozeli quest + 3 utvonal) + ket szekciofejlec + lablec.
+-- Igy a panel alja sosem mozdul; a tartalom ebben osztozik (Panel_Update).
+local function QuestH()
+    local rh = RowH()
+    return 112 + HEAD + 15 + 11 * (rh + 1) + 2 * 19 + 4 + (8 + rh + 12)
+end
+
 -- Tartalom utan: elvalaszto + lablec, panel magassag
--- isList: javaslat mod, ott a felhasznalo altal huzott magassag is szamit (tobb sor fer ki)
+-- isList: javaslat mod, ott a felhasznalo altal huzott magassag is szamit (tobb sor fer ki);
+-- quest modban a magassag fix (QuestH), a fogantyu nem latszik.
 local function PanelFinish(y, isList)
     -- A panel teteje maradjon a helyen (ne a kozepe korul nojon/zsugorodjon)
     AnchorTopLeft()
     -- a meretezo fogantyu mindig a tartalom (sorok, gorgetheto lista) folott legyen
     grip:SetFrameLevel(panel:GetFrameLevel() + 20)
+    grip:SetShown(isList and true or false)
     local fh = RowH()
     local h = -y + 8 + fh + 12
     if isList and tonumber(QuestFocusDB.panelH) then h = math.max(h, QuestFocusDB.panelH) end
+    if not isList and state.questId then h = QuestH() end
     panel:SetHeight(h)
     -- a lablec mindig a panel aljan
     panel.footer:ClearAllPoints()
@@ -475,12 +472,38 @@ end)
 
 local function PanelSelectObjective(i) return NS.SelectObjective(i) end -- Core\Selection.lua
 
+-- Objective sorok: gorgetheto teruleten (ha sok az objective es nem fernek ki a fix magas
+-- panelben). A ScrollFrame csak rajzolast vag, egeret nem: a lathato ablakon kivuli sorokat
+-- elrejtjuk (a Bags item gombja is csak lathato sorra kerul).
+panel.objScroll = CreateFrame("ScrollFrame", nil, panel)
+panel.objChild = CreateFrame("Frame", nil, panel.objScroll)
+panel.objChild:SetSize(10, 10)
+panel.objScroll:SetScrollChild(panel.objChild)
+panel.objScroll:EnableMouseWheel(true)
+local function ClipObjLines()
+    local sc, step = panel.objScroll, RowH() + 1
+    local top, h = sc:GetVerticalScroll(), sc:GetHeight()
+    for i, line in ipairs(panel.lines) do
+        local y0 = (i - 1) * step
+        line:SetShown(i <= (sc.qfCount or 0) and y0 + step > top + 0.5 and y0 < top + h - 0.5)
+    end
+end
+panel.objScroll:SetScript("OnMouseWheel", function(self, delta)
+    local step = RowH() + 1
+    local max = math.max(0, (self.qfCount or 0) * step - self:GetHeight())
+    self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * step)))
+    ClipObjLines()
+end)
+
 local function GetLine(i)
     local line = panel.lines[i]
     if line then return line end
-    line = CreateFrame("Button", nil, panel)
+    line = CreateFrame("Button", nil, panel.objChild)
     line:SetSize(PANEL_W - 24, 16)
     line:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- gorgetes a soron is (ha az objective-ek nem fernek ki)
+    line:EnableMouseWheel(true)
+    line:SetScript("OnMouseWheel", function(_, delta) panel.objScroll:GetScript("OnMouseWheel")(panel.objScroll, delta) end)
     line.text = line:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
     -- a sor vegen terkep gomb: a szoveg nem fut ala (a Bags hasznalhato item gombja ez ele kerul)
     line.qfMapInset = 18
@@ -667,14 +690,36 @@ local function GetExtraMoreRow()
     return r
 end
 
--- A panel maximalis magassaga quest modban: fejlec + statisztika + kb. 11 sornyi tartalom
--- (objective-ek, kozeli questek, utvonal) + lablec. Az utvonal azt kapja, ami ebbol marad.
--- Ha quest modban atmeretezted a panelt (QuestFocusDB.questPanelH), az a hatar.
-local function MaxPanelHeight()
-    local h = tonumber(QuestFocusDB.questPanelH)
-    if h then return h end
-    local rh = RowH()
-    return 112 + HEAD + 15 + 11 * (rh + 1) + 2 * 19 + 4 + (8 + rh + 12)
+-- Sorok rovidites: ha tobb szovegnek kozos az eleje egy " - " vagy ": " elvalasztoig
+-- (pl. "Green Hills of Stranglethorn - Chapter I" / "... - Chapter II"), az elmarad
+-- ("Chapter I", "Chapter II"). Egy szovegnel / kozos elotag nelkul valtozatlan.
+local function ShortDescs(list)
+    local out = {}
+    for i, s in ipairs(list) do out[i] = s end
+    if #list < 2 then return out end
+    local p = list[1]
+    for i = 2, #list do
+        local s, n = list[i], 0
+        local m = math.min(#p, #s)
+        while n < m and p:byte(n + 1) == s:byte(n + 1) do n = n + 1 end
+        p = p:sub(1, n)
+    end
+    local cut = 0
+    for _, sep in ipairs({ " - ", ": " }) do
+        local from = 1
+        while true do
+            local a, b = p:find(sep, from, true)
+            if not a then break end
+            if b > cut then cut = b end
+            from = a + 1
+        end
+    end
+    if cut < 6 then return out end
+    for i, s in ipairs(list) do
+        local r = s:sub(cut + 1)
+        if r ~= "" then out[i] = r end
+    end
+    return out
 end
 
 -- Belepeskor a panel rejtve marad, amig a tartalma be nem all (kulonben a sorok egymas utan
@@ -738,6 +783,7 @@ local function Panel_Update()
     if not state.questId then
         -- Nincs kijelolt quest: javaslatok (QuestFocusPlanner.lua)
         for i = 1, #panel.lines do panel.lines[i]:Hide() end
+        panel.objScroll:Hide()
         for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
         panel.extraHeader:Hide()
         if panel.extraMore then panel.extraMore:Hide() end
@@ -756,6 +802,57 @@ local function Panel_Update()
     panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName(state.isComplete and "turnin" or "hunt"))
     local objs = state.objectives or {}
     local y = PanelChrome("quest", L["OBJECTIVES"])
+    local rh = RowH()
+    local step = rh + 1 -- objective / kozeli quest sor
+    -- Escort quest: kit kisersz, hova, eletero (Core\Escort.lua)
+    local escTxt = state.escort and not state.isComplete and NS.Escort and NS.Escort.RowText()
+    -- Hearthstone tipp: hany kesz quest adhato le ott, ahova a HS visz
+    -- (leadas modban mar 1-tol, kulonben 2-tol mutatjuk)
+    local hsList, hsName, hsCd
+    if NS.HearthTurnIns then
+        local ok, a, b, c = pcall(NS.HearthTurnIns)
+        if ok then hsList, hsName, hsCd = a, b, c end
+    end
+    local hsShow = hsList and (#hsList >= 2 or state.isComplete)
+    -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel)
+    local extras = (state.objIndex == nil) and state.extra or nil
+    local nE = extras and #extras or 0
+    -- Utvonal (a quest log tobbi questje, Planner\Suggestions.lua), minden modban
+    local routeN = 0
+    if NS.PrepareTurnInRoute then
+        local ok, n = pcall(NS.PrepareTurnInRoute)
+        if ok and n then routeN = n end
+    end
+
+    -- Hely elosztasa a fix magas panelben (QuestH):
+    --   - "Also nearby" es az utvonal legalabb 3-3 sort kap (ha van annyi)
+    --   - az objective-ek a tobbit; ha igy sem fernek ki, gorgethetok (legalabb 3 latszik,
+    --     ehhez kell a hely eloszor az utvonaltol, aztan a kozeli questektol vesszuk el)
+    --   - ami marad: kozeli questek 4 sorig, utvonal 5 sorig, aztan mindketto tovabb
+    local avail = QuestH() - (8 + rh + 12) - (-y) - (escTxt and (rh + 3) or 0) - (hsShow and (rh + 5) or 0)
+        - (nE > 0 and 19 or 0) - (routeN > 0 and 19 or 0)
+    local nbRows, rRows = math.min(nE, 3), math.min(routeN, 3)
+    local oRows = #objs
+    local rest = avail - nbRows * step - rRows * rh
+    if oRows * step > rest then
+        oRows = math.max(math.min(#objs, 3), math.floor(rest / step))
+        local deficit = oRows * step - rest
+        while deficit > 0 and rRows > 1 do rRows = rRows - 1; deficit = deficit - rh end
+        while deficit > 0 and nbRows > 1 do nbRows = nbRows - 1; deficit = deficit - step end
+    end
+    rest = avail - oRows * step - nbRows * step - rRows * rh
+    local function grow(cur, cap, cost)
+        local add = math.max(0, math.min(cap - cur, math.floor(rest / cost)))
+        rest = rest - add * cost
+        return cur + add
+    end
+    nbRows = grow(nbRows, math.min(nE, EXTRA_SHOW + 1), step)
+    rRows = grow(rRows, math.min(routeN, 5), rh)
+    nbRows = grow(nbRows, nE, step)
+    rRows = grow(rRows, routeN, rh)
+
+    -- Objective-ek (gorgetheto teruleten). A kozos elotag (pl. "Green Hills of Stranglethorn - ")
+    -- lemarad, a teljes szoveg a tooltipben van.
     -- a quest "hasznalando" iteme (QuestFocus_Bags) a kijelolt / elso nyitott objective soraba kerul
     local firstOpen = state.objIndex
     if not firstOpen then
@@ -763,26 +860,39 @@ local function Panel_Update()
             if not o.completed and not o.turnIn then firstOpen = i break end
         end
     end
+    local descs, idx = {}, {}
+    for i, o in ipairs(objs) do
+        if not o.turnIn then descs[#descs + 1] = o.desc or ""; idx[#descs] = i end
+    end
+    local short = {}
+    for k, s in ipairs(ShortDescs(descs)) do short[idx[k]] = s end
+    local w = PW() - 24
     for i, o in ipairs(objs) do
         local line = GetLine(i)
         line.index = i
         line.useQid, line.useObj, line.useQuestItem = state.questId, o, (i == firstOpen)
-        line:SetSize(PW() - 24, RowH())
+        line:SetSize(w, rh)
         local icon = o.completed and ICON_DONE or (o.turnIn and ICON_TI) or (o.escort and ICON_ESC)
             or (state.objIndex == i and ICON_SEL) or ICON_TODO
         local color = o.completed and "|cff808080" or (o.turnIn and "|cffffff00")
             or (state.objIndex == i and "|cff33ff99") or "|cffffffff"
         local eta = not o.completed and NS.EtaShort and NS.EtaShort(o)
-        line.text:SetText(icon .. color .. o.desc .. "|r" .. (eta and ("  |cff999999" .. eta .. "|r") or ""))
+        line.text:SetText(icon .. color .. (short[i] or o.desc or "?") .. "|r" .. (eta and ("  |cff999999" .. eta .. "|r") or ""))
         line.mapBtn:SetShown(not o.completed and o.sources ~= nil and #o.sources > 0)
         line:ClearAllPoints()
-        line:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-        line:Show()
-        y = y - RowH() - 1
+        line:SetPoint("TOPLEFT", panel.objChild, "TOPLEFT", 0, -(i - 1) * step)
     end
-    for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
-    -- Escort quest: kit kisersz, hova, eletero (Core\Escort.lua)
-    local escTxt = state.escort and not state.isComplete and NS.Escort and NS.Escort.RowText()
+    local sc = panel.objScroll
+    sc.qfCount = #objs
+    panel.objChild:SetSize(w, math.max(1, #objs * step))
+    sc:ClearAllPoints()
+    sc:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    sc:SetSize(w, math.max(1, oRows * step))
+    local maxScroll = math.max(0, (#objs - oRows) * step)
+    if sc:GetVerticalScroll() > maxScroll then sc:SetVerticalScroll(maxScroll) end
+    sc:Show()
+    ClipObjLines()
+    y = y - oRows * step
     if escTxt then
         local r = panel.escortRow
         if not r then
@@ -808,84 +918,65 @@ local function Panel_Update()
             r:SetScript("OnLeave", function() GameTooltip:Hide() end)
             panel.escortRow = r
         end
-        r:SetSize(PW() - 24, RowH())
+        r:SetSize(w, rh)
         r.text:SetText(escTxt)
         y = y - 2
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
         r:Show()
-        y = y - RowH() - 1
+        y = y - rh - 1
     elseif panel.escortRow then
         panel.escortRow:Hide()
     end
-    -- Hearthstone tipp: hany kesz quest adhato le ott, ahova a HS visz
-    -- (leadas modban mar 1-tol, kulonben 2-tol mutatjuk). Elore szamoljuk: helyet foglal.
-    local hsList, hsName, hsCd
-    if NS.HearthTurnIns then
-        local ok, a, b, c = pcall(NS.HearthTurnIns)
-        if ok then hsList, hsName, hsCd = a, b, c end
-    end
-    local hsShow = hsList and (#hsList >= 2 or state.isComplete)
-    -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
-    local extras = (state.objIndex == nil) and state.extra or nil
-    local nE = extras and #extras or 0
-    -- Hely elosztasa a panel maximalis magassagaban (MaxPanelHeight, a fogantyuval allithato):
-    --   1. "Also nearby" legfeljebb EXTRA_SHOW + 1 sor (min. 2)
-    --   2. utvonal (leadas modban) legfeljebb 5 sor
-    --   3. ami meg marad, abbol tobb "Also nearby" sor
-    -- Osszehuzaskor igy eloszor az utvonal fogy el, utana a kozeli questek.
-    local rh = RowH()
-    local routeN = 0
-    if state.isComplete and NS.PrepareTurnInRoute then
-        local ok, n = pcall(NS.PrepareTurnInRoute)
-        if ok and n then routeN = n end
-    end
-    local avail = MaxPanelHeight() - (8 + rh + 12) - (-y) - (hsShow and (rh + 5) or 0)
-        - (routeN > 0 and 19 or 0) - (nE > 0 and 19 or 0)
-    local nbRows = math.max(math.min(nE, 2), math.min(nE, EXTRA_SHOW + 1, math.floor(avail / (rh + 1))))
-    avail = avail - nbRows * (rh + 1)
-    local rRows = math.max(0, math.min(5, routeN, math.floor(avail / rh)))
-    avail = avail - rRows * rh
-    if nbRows >= math.min(nE, EXTRA_SHOW + 1) then
-        nbRows = math.min(nE, nbRows + math.max(0, math.floor(avail / (rh + 1))))
-    end
+    -- Also nearby: nbRows sor; ha nem fer ki mind, az utolso helyen "+N tovabbi" sor
+    -- (a macro mindet targeteli). Egy quest sorainal a kozos elotag lemarad.
     local nExtra = 0
     local moreShown = false
-    if extras and #extras > 0 then
+    if nE > 0 then
         y = y - 4
         panel.extraHeader:ClearAllPoints()
         panel.extraHeader:SetPoint("TOPLEFT", 14, y)
         panel.extraHeader:Show()
         y = y - 15
+        local byQ = {}
+        for i, e in ipairs(extras) do
+            local g = byQ[e.qid]
+            if not g then g = { s = {}, i = {} }; byQ[e.qid] = g end
+            g.s[#g.s + 1] = e.desc or "?"
+            g.i[#g.s] = i
+        end
+        local eShort = {}
+        for _, g in pairs(byQ) do
+            for k, s in ipairs(ShortDescs(g.s)) do eShort[g.i[k]] = s end
+        end
         local seenQ = {}
-        -- ha nem fer ki mind: nbRows - 1 sor + egy "+N tovabbi" sor (a macro mindet targeteli)
-        local limit = nE > nbRows and math.max(1, nbRows - 1) or nE
+        local limit = nE > nbRows and math.max(0, nbRows - 1) or nE
         for i, e in ipairs(extras) do
             if i > limit then break end
             local r = GetExtraRow(i)
             r.extra = e
             r.useQid, r.useObj, r.useQuestItem = e.qid, e.obj, not seenQ[e.qid]
             seenQ[e.qid] = true
-            r:SetSize(PW() - 24, RowH())
+            r:SetSize(w, rh)
             local eta = NS.EtaShort and NS.EtaShort(e.obj)
             r.text:SetText(("|TInterface\\COMMON\\Indicator-Yellow:12:12|t |cffd8c8a0%s:|r %s%s"):format(
-                e.title or "?", e.desc or "?", eta and ("  |cff999999" .. eta .. "|r") or ""))
+                e.title or "?", eShort[i] or e.desc or "?", eta and ("  |cff999999" .. eta .. "|r") or ""))
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
             r:Show()
-            y = y - RowH() - 1
+            y = y - step
             nExtra = i
         end
-        if #extras > limit then
+        if nE > limit then
             local r = GetExtraMoreRow()
             r.hidden = {}
-            for i = limit + 1, #extras do r.hidden[#r.hidden + 1] = extras[i] end
-            r:SetSize(PW() - 24, RowH())
+            for i = limit + 1, nE do r.hidden[#r.hidden + 1] = extras[i] end
+            r:SetSize(w, rh)
             r.text:SetText(("|cff999999" .. L["+%d more (the macro targets them too)"] .. "|r"):format(#r.hidden))
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
             r:Show()
-            y = y - RowH() - 1
+            y = y - step
             moreShown = true
         end
     else
@@ -915,7 +1006,7 @@ local function Panel_Update()
             panel.hsRow = r
         end
         r.hsList, r.hsName = hsList, hsName
-        r:SetSize(PW() - 24, RowH())
+        r:SetSize(w, rh)
         local cdTxt = (hsCd and hsCd > 0) and ("  |cff999999" .. L["HS cooldown"] .. " " .. math.ceil(hsCd / 60) .. "m|r") or ""
         r.text:SetText(("|TInterface\\Icons\\INV_Misc_Rune_01:12:12|t |cff33ff99" .. L["Hearth home: %d quests to turn in at %s"] .. "|r%s")
             :format(#hsList, hsName or "?", cdTxt))
@@ -923,16 +1014,13 @@ local function Panel_Update()
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
         r:Show()
-        y = y - RowH() - 1
+        y = y - step
     elseif panel.hsRow then
         panel.hsRow:Hide()
     end
-    -- Leadas modban alul a quest log utvonala (Planner\Suggestions.lua): annyi sor, amennyi a
-    -- panel maximalis magassagaba meg belefer; a tobbi lenyithato (gorgetheto) listaban.
-    if state.isComplete and NS.ShowTurnInPickups then
-        local footer = 8 + RowH() + 12
-        local nFit = math.floor((MaxPanelHeight() - footer - (-y) - 4 - 15) / RowH())
-        local ok, ny = pcall(NS.ShowTurnInPickups, y, math.max(0, nFit), true)
+    -- Utvonal (quest log): rRows sor latszik, a tobbi gorgetheto (Planner\Suggestions.lua)
+    if routeN > 0 and NS.ShowTurnInPickups then
+        local ok, ny = pcall(NS.ShowTurnInPickups, y, rRows, true)
         if ok and ny then y = ny end
     end
     if #objs == 0 then

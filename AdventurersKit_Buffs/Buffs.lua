@@ -1104,11 +1104,18 @@ local WARN_BAGS = { key = "w_bags", label = L["Bags"], names = {}, warnRow = tru
 local WARN_REPAIR = { key = "w_repair", label = L["Gear"], names = {}, warnRow = true, kind = "Repair",
     icon = "Interface\\Icons\\Trade_BlackSmithing" }
 -- Arus a kozelben (kis tabor, ut menti arus): ha VENDOR_R yardon belul van eladasra /
--- javitasra alkalmas NPC, es a taska legalabb felig tele (vagy kopott a felszereles), szolunk,
--- hogy itt eladhatsz / javithatsz. A keresest 5 mp-enkent frissitjuk.
+-- javitasra alkalmas NPC, es a taska legalabb felig tele (vagy fogy a hely, vagy kopott a
+-- felszereles), egyetlen sorban szolunk, hogy itt eladhatsz / javithatsz. Ilyenkor a Bags sor
+-- (es ha javito is van a kozelben, a Gear sor) nem jelenik meg kulon: az infot ez a sor viszi.
+-- A keresest 5 mp-enkent frissitjuk.
 local WARN_VENDOR = { key = "w_vendor", label = L["Vendor nearby"], names = {}, warnRow = true, kind = "Sell",
     icon = "Interface\\Icons\\INV_Misc_Coin_01" }
 local VENDOR_R, VENDOR_BAG_PCT, VENDOR_REPAIR = 150, 50, 0.9
+-- Taska lepcsok kint (arustol tavol), a szabad helyek szama szerint:
+--   <= bagFree (Options, alap 10): enyhe, ha arus 300 yd-on belul van
+--   <= 5: ha arus 600 yd-on belul van
+--   <= 2 (vagy tele): surgos, mindig, a legkozelebbi arussal es tavolsaggal, erosebb szinnel
+local BAG_TIER2, BAG_URGENT = 5, 2
 local vendCache = { at = -10 }
 -- A legkozelebbi arus / javito keresese 5 mp-enkent (draga), a tavolsag viszont minden
 -- frissiteskor elo: ha elsetaltal (VENDOR_R folott), a sor azonnal eltunik.
@@ -1391,8 +1398,10 @@ alertTicker:SetScript("OnUpdate", function(_, dt)
     CheckWarnings(auras)
     UpdateAlert(auras)
     -- a panel ki/be: ujrahelyezes (a mozgatast az anchor magatol koveti)
+    -- (a panel szelessege a betumerettel valtozhat: a sav kovesse)
     if alert:IsShown() and not InCombatLockdown() and (alert.onPanel ~= NS.panel:IsShown()
-        or (NS.panel:IsShown() and math.abs(alert:GetScale() - NS.panel:GetScale()) > 0.01)) then
+        or (NS.panel:IsShown() and (math.abs(alert:GetScale() - NS.panel:GetScale()) > 0.01
+            or math.abs(alert:GetWidth() - NS.panel:GetWidth()) > 0.5))) then
         alert.onPanel = NS.panel:IsShown()
         PlaceAlert()
     end

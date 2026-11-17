@@ -58,7 +58,7 @@ end
 -- Utvonal (quest log): gorgetheto lista, az osszes allomassal; ListCounts-nyi sor latszik
 local ROUTE_ALL = 40
 local routeScroll, routeChild, routeRows, RouteRow = ScrollList()
--- Leadas modban ugyanez, ha az utvonal lenyitva (QuestFocusDB.routeExpanded)
+-- Quest modban ugyanez a panel aljan (a quest log tobbi questje), fix magassagu teruleten
 local tiScroll, tiChild, tiRows, TiRow = ScrollList()
 
 MakeRow = function(parent)
@@ -281,14 +281,12 @@ NS.ShowSuggestions = function()
     return true
 end
 
--- Leadas modban a panel aljan: a quest logod tobbi questje utvonal-sorrendben, ugyanugy mint a
--- javaslatoknal (kattintas: arra a questre valt). Legfeljebb TURNIN_ROUTE sor, de csak annyi,
--- amennyi a panel maximalis magassagaba belefer (maxRows, UI\Panel.lua szamolja). Ha nem fer ki
--- mind, a fejlec lenyithato kapcsolo ("+N rejtett"); lenyitva a teljes utvonal gorgetheto,
--- fix magassagu listaban. Az allapot: QuestFocusDB.routeExpanded.
+-- Quest modban a panel aljan: a quest logod tobbi questje utvonal-sorrendben, ugyanugy mint a
+-- javaslatoknal (kattintas: arra a questre valt). A panel fix magas: maxRows sor latszik
+-- (UI\Panel.lua osztja el a helyet), a tobbi gorgetheto. Ha 0 sor fer ki, csak a fejlec
+-- marad; arra az egeret vive tooltipben a lista.
 -- y-tol rajzol, visszaadja az uj y-t. A Panel_Update hivja (UI\Panel.lua).
 local TURNIN_ROUTE = 5
-local TURNIN_SCROLL_ROWS = 3 -- lenyitva legalabb ennyi sor magas a gorgetheto lista (amugy amennyi kifer)
 local tiRoute, tiKey = {}, ""
 local function TurnInRoute()
     local pc, px, py = NS.PlayerWorldPos()
@@ -318,9 +316,8 @@ local function RouteText(i, s)
     return ("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or "")
 end
 
-local ICON_PLUS = "|cffffd100[+]|r "
-local ICON_MINUS = "|cffffd100[-]|r "
-local function TiToggle()
+-- Fejlec: gomb, hogy tooltipben mutathassa a listat, ha nem latszik (vagy nem latszik mind)
+local function RouteHeader()
     local b = panel.tiToggle
     if b then return b end
     b = CreateFrame("Button", nil, panel)
@@ -329,20 +326,16 @@ local function TiToggle()
     b.text:SetPoint("LEFT")
     b.text:SetJustifyH("LEFT")
     b.text:SetTextColor(0.75, 0.65, 0.45)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.08)
-    b:SetScript("OnClick", function()
-        QuestFocusDB.routeExpanded = not QuestFocusDB.routeExpanded or nil
-        tiScroll:SetVerticalScroll(0)
-        if NS.Panel_Update then NS.Panel_Update() end
-    end)
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText(L["Route (quest log)"], 1, 0.86, 0.5)
-        GameTooltip:AddLine(QuestFocusDB.routeExpanded
-            and L["Click: collapse, so the panel keeps its size."]
-            or L["Not all stops fit in the panel. Click: show the whole route in a scrollable list."], 0.8, 0.8, 0.8, true)
+        for i, s in ipairs(tiRoute) do
+            if i > 15 then GameTooltip:AddLine("...", 0.6, 0.6, 0.6) break end
+            GameTooltip:AddLine(RouteText(i, s), 1, 1, 1)
+        end
+        if (self.visible or 0) > 0 and #tiRoute > self.visible then
+            GameTooltip:AddLine(L["Scroll the list with the mouse wheel."], 0.45, 0.45, 0.45, true)
+        end
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -367,74 +360,39 @@ NS.ShowTurnInPickups = function(y, maxRows, prepared)
     end
     if #tiRoute == 0 then return y end
     local rowH, w = NS.RowH(), NS.PW() - 24
-    local shown = math.min(TURNIN_ROUTE, maxRows or TURNIN_ROUTE)
+    local visible = math.max(0, math.min(#tiRoute, maxRows or TURNIN_ROUTE))
     y = y - 4
-    if #tiRoute <= shown then
-        -- minden kifer: sima fejlec + sorok, mint eddig
-        local h = Header(L["Route (quest log):"])
-        h:SetText(L["Route (quest log):"]) -- (a javaslat mod "N - scroll" szovege ne maradjon rajta)
-        h:ClearAllPoints()
-        h:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
-        h:Show()
-        y = y - 15
-        for i, s in ipairs(tiRoute) do
-            local r = Row(i)
-            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
-            r.text:SetText(RouteText(i, s))
-            r:ClearAllPoints()
-            r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-            r:SetSize(w, rowH)
-            r:Show()
-            y = y - rowH
-        end
-        return y
-    end
-    -- nem fer ki mind: lenyithato fejlec
-    local expanded = QuestFocusDB.routeExpanded
-    local t = TiToggle()
-    t.text:SetText(expanded
-        and (ICON_MINUS .. (L["Route (quest log, %d - scroll):"]):format(#tiRoute))
-        or (ICON_PLUS .. L["Route (quest log):"] .. "  |cff999999" .. (L["+%d hidden - click"]):format(#tiRoute - shown) .. "|r"))
-    t:SetSize(math.min(w, math.ceil(t.text:GetStringWidth()) + 4), 14)
-    t:ClearAllPoints()
-    t:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y + 1)
-    t:Show()
+    local h = RouteHeader()
+    h.visible = visible
+    local hidden = #tiRoute - visible
+    h.text:SetText(hidden > 0
+        and (L["Route (quest log):"] .. "  |cff999999" .. (visible > 0 and (L["%d stops - scroll"]):format(#tiRoute)
+            or (L["%d stops - hover"]):format(#tiRoute)) .. "|r")
+        or L["Route (quest log):"])
+    h:SetSize(math.min(w, math.ceil(h.text:GetStringWidth()) + 4), 14)
+    h:ClearAllPoints()
+    h:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y + 1)
+    h:Show()
     y = y - 15
-    if expanded then
-        for _, r in ipairs(tiRows) do r:Hide() end
-        for i, s in ipairs(tiRoute) do
-            local r = TiRow(i)
-            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
-            r.text:SetText(RouteText(i, s))
-            r:ClearAllPoints()
-            r:SetPoint("TOPLEFT", tiChild, "TOPLEFT", 0, -(i - 1) * rowH)
-            r:SetSize(w, rowH)
-            r:Show()
-        end
-        local visible = math.min(#tiRoute, math.max(maxRows or shown, TURNIN_SCROLL_ROWS))
-        tiChild:SetSize(w, #tiRoute * rowH)
-        tiScroll:ClearAllPoints()
-        tiScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-        tiScroll:SetSize(w, visible * rowH)
-        local maxScroll = math.max(0, (#tiRoute - visible) * rowH)
-        if tiScroll:GetVerticalScroll() > maxScroll then tiScroll:SetVerticalScroll(maxScroll) end
-        tiScroll.qfCount = #tiRoute
-        tiScroll:Show()
-        tiScroll.qfClip()
-        return y - visible * rowH
-    end
-    for i = 1, shown do
-        local s = tiRoute[i]
-        local r = Row(i)
+    if visible == 0 then return y end
+    for i, s in ipairs(tiRoute) do
+        local r = TiRow(i)
         r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
         r.text:SetText(RouteText(i, s))
         r:ClearAllPoints()
-        r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        r:SetPoint("TOPLEFT", tiChild, "TOPLEFT", 0, -(i - 1) * rowH)
         r:SetSize(w, rowH)
-        r:Show()
-        y = y - rowH
     end
-    return y
+    tiChild:SetSize(w, #tiRoute * rowH)
+    tiScroll:ClearAllPoints()
+    tiScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    tiScroll:SetSize(w, visible * rowH)
+    local maxScroll = math.max(0, (#tiRoute - visible) * rowH)
+    if tiScroll:GetVerticalScroll() > maxScroll then tiScroll:SetVerticalScroll(maxScroll) end
+    tiScroll.qfCount = #tiRoute
+    tiScroll:Show()
+    tiScroll.qfClip()
+    return y - visible * rowH
 end
 
 -- Javaslatok frissitese, amig latszanak (mozgas kozben valtozik a sorrend)
@@ -447,8 +405,8 @@ panel:HookScript("OnUpdate", function(_, dt)
     if panel:IsMouseOver() then return end
     if not state.questId then
         NS.ShowSuggestions()
-    elseif state.isComplete and NS.QuestieAvailable() then
-        -- leadas mod: csak akkor rajzoljuk ujra, ha a kozeli lista (vagy ~25 yd-os tavolsag) valtozott
+    elseif NS.QuestieAvailable() then
+        -- quest mod: csak akkor rajzoljuk ujra, ha az utvonal eleje (vagy ~25 yd-os tavolsag) valtozott
         local pc, px, py = NS.PlayerWorldPos()
         if not pc then return end
         if TurnInKey(TurnInRoute()) ~= tiKey and NS.Panel_Update then NS.Panel_Update() end

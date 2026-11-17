@@ -425,11 +425,12 @@ gen:Check(L["Show the panel"],
     function() return not QuestFocusDB.hidePanel end,
     function(v) QuestFocusDB.hidePanel = not v; Panel_Update() end)
 gen:Number(L["Font size"],
-    L["Text size on the panel (8-20, default 10). Resizing the panel does not change it. Press Enter to apply."],
+    L["Text size on the panel (8-20, default 10). The panel's width and height follow it. Press Enter to apply."],
     function() return NS.FontSize and NS.FontSize() or 10 end,
     function(v)
         QuestFocusDB.fontSize = math.max(8, math.min(20, v))
         if NS.ApplyFontSize then NS.ApplyFontSize() end
+        if NS.ApplyPanelWidth then NS.ApplyPanelWidth() end
         Panel_Update()
     end)
 gen:Header(L["Chat"])
