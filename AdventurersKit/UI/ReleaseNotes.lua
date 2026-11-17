@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.30", date = "2026-11-17", items = {
+        "What next: the quest log route lists every quest now (scroll with the mouse wheel; the header says how many). "
+            .. "Order: each next stop is the closest to the previous one; the yards are from you.",
+        "Quests whose items come from boxes / objects (e.g. Anything of Value) get their locations from Questie's item "
+            .. "data when the objective has none, so they show on the route and get a marker.",
+    } },
     { version = "0.6.29", date = "2026-11-17", items = {
         "Vendor nearby: disappears as soon as you are more than 150 yd from the vendor (live distance); the row's title stays "
             .. "put and only the part after it scrolls.",

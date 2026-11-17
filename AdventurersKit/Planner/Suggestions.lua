@@ -10,10 +10,38 @@ local BuildPickups, BuildRoute, PICKUP_LEN, ROUTE_LEN, state = P.BuildPickups, P
 local panel = NS.panel
 local rows = {}
 
+local MakeRow
 local function Row(i)
     local r = rows[i]
     if r then return r end
-    r = CreateFrame("Button", nil, panel)
+    r = MakeRow(panel)
+    rows[i] = r
+    return r
+end
+
+-- Utvonal (quest log): gorgetheto lista, az osszes allomassal; ListCounts-nyi sor latszik
+local ROUTE_ALL = 40
+local routeScroll = CreateFrame("ScrollFrame", nil, panel)
+local routeChild = CreateFrame("Frame", nil, routeScroll)
+routeChild:SetSize(10, 10)
+routeScroll:SetScrollChild(routeChild)
+routeScroll:EnableMouseWheel(true)
+routeScroll:SetScript("OnMouseWheel", function(self, delta)
+    local max = math.max(0, routeChild:GetHeight() - self:GetHeight())
+    self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * NS.RowH() * 2)))
+end)
+routeScroll:Hide()
+local routeRows = {}
+local function RouteRow(i)
+    local r = routeRows[i]
+    if r then return r end
+    r = MakeRow(routeChild)
+    routeRows[i] = r
+    return r
+end
+
+MakeRow = function(parent)
+    local r = CreateFrame("Button", nil, parent)
     r:SetSize(276, 16)
     r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
     r.text:SetAllPoints()
@@ -71,7 +99,11 @@ local function Row(i)
         end
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    rows[i] = r
+    -- gorgetes a soron is (a sor elkapja az egeret, a gorgo a listanak szol)
+    if parent == routeChild then
+        r:EnableMouseWheel(true)
+        r:SetScript("OnMouseWheel", function(_, delta) routeScroll:GetScript("OnMouseWheel")(routeScroll, delta) end)
+    end
     return r
 end
 
@@ -102,6 +134,7 @@ end
 
 NS.HideSuggestions = function()
     for _, r in ipairs(rows) do r:Hide() end
+    routeScroll:Hide()
     for _, h in pairs(panel.sugHeaders or {}) do h:Hide() end
 end
 
@@ -122,14 +155,17 @@ NS.ShowSuggestions = function()
     end
     local pc, px, py = NS.PlayerWorldPos()
     local route, pickups = {}, {}
+    local nRoute = ROUTE_LEN
     if pc then
-        local nRoute, nPick = ListCounts()
-        route = BuildRoute(pc, px, py, nRoute)
+        local nPick
+        nRoute, nPick = ListCounts()
+        route = BuildRoute(pc, px, py, ROUTE_ALL) -- mind (gorgetheto), nRoute sor latszik
         pickups = BuildPickups(pc, px, py, nPick)
     end
     panel.sub:SetText((L["%d on the route, %d to pick up"]):format(#route, #pickups))
 
     local n = 0
+    local shownRoute = 0
     local function place(fs)
         fs:ClearAllPoints()
         fs:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
@@ -160,22 +196,35 @@ NS.ShowSuggestions = function()
     end
 
     if #route > 0 then
-        place(Header(L["Route (quest log):"]))
+        -- fejlec: hany allomas; ha tobb, mint ami latszik, gorgetheto
+        local more = #route > nRoute
+        local h = Header(L["Route (quest log):"])
+        h:SetText(more and (L["Route (quest log, %d - scroll):"]):format(#route) or L["Route (quest log):"])
+        place(h)
+        local rowH, w = NS.RowH(), NS.PW() - 24
+        for _, r in ipairs(routeRows) do r:Hide() end
         for i, s in ipairs(route) do
-            n = n + 1
-            local r = Row(n)
+            local r = RouteRow(i)
             r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
             local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
             local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
             local eta = not s.done and NS.QuestEta(s.objs)
             r.text:SetText(("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or ""))
             r:ClearAllPoints()
-            r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+            r:SetPoint("TOPLEFT", routeChild, "TOPLEFT", 0, -(i - 1) * rowH)
+            r:SetSize(w, rowH)
             r:Show()
-            r:SetSize(NS.PW() - 24, NS.RowH())
-            y = y - NS.RowH()
         end
-        y = y - 4
+        local visible = math.min(#route, nRoute)
+        routeChild:SetSize(w, #route * rowH)
+        routeScroll:ClearAllPoints()
+        routeScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        routeScroll:SetSize(w, visible * rowH)
+        local maxScroll = math.max(0, #route * rowH - visible * rowH)
+        if routeScroll:GetVerticalScroll() > maxScroll then routeScroll:SetVerticalScroll(maxScroll) end
+        routeScroll:Show()
+        shownRoute = #route
+        y = y - visible * rowH - 4
     end
     if #pickups > 0 then
         place(Header(L["Pick up nearby:"]))
@@ -196,7 +245,7 @@ NS.ShowSuggestions = function()
         end
     end
 
-    if n == 0 then
+    if n == 0 and shownRoute == 0 then
         panel.footer:SetText(pc and L["Nothing nearby. Select a quest in the quest log (L)."]
             or L["Position unknown here (instance?)."])
     else
@@ -234,6 +283,7 @@ NS.ShowTurnInPickups = function(y)
     if #tiRoute == 0 then return y end
     y = y - 4
     local h = Header(L["Route (quest log):"])
+    h:SetText(L["Route (quest log):"]) -- (a javaslat mod "N - scroll" szovege ne maradjon rajta)
     h:ClearAllPoints()
     h:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
     h:Show()

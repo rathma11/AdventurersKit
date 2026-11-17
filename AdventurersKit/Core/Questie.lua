@@ -155,6 +155,27 @@ local function CollectTargets(quest, isComplete)
                 end
             end
 
+            -- Tartalek itemnel: ha a spawnList ures (pl. ladakbol / objectbol gyujtott item),
+            -- az item forrasai a Questie DB-bol (object / mob spawnokkal, vendor nelkul)
+            if #entry.sources == 0 and o.Type == "item" and o.Id then
+                local DB = Module("QuestieDB")
+                local ok, item = false, nil
+                if DB and type(DB.GetItem) == "function" then ok, item = pcall(DB.GetItem, DB, o.Id) end
+                if ok and type(item) == "table" and type(item.Sources) == "table" then
+                    for _, src in ipairs(item.Sources) do
+                        if src.Id and not src.Vendor then
+                            local isNpc = src.Type == "monster"
+                            local e = isNpc and GetNPC(src.Id) or (src.Type == "object" and GetObject(src.Id))
+                            local key = (isNpc and "m" or "o") .. tostring(src.Id)
+                            if e and type(e.spawns) == "table" and not seen[key] then
+                                seen[key] = true
+                                entry.sources[#entry.sources + 1] = { id = src.Id, name = e.name, spawns = e.spawns, isNpc = isNpc }
+                            end
+                        end
+                    end
+                end
+            end
+
             -- Tartalek: ha a Questie meg nem toltotte ki a spawnList-et
             if #entry.sources == 0 and o.Type == "monster" and o.Id then
                 local npc = GetNPC(o.Id)
