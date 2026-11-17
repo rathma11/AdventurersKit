@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Adventurer's Kit
 ## Notes: Questing kit: QFocus target macro, markers, route and pickup planner, city list, tooltips (Questie data)
-## Version: 0.6.35
+## Version: 0.6.36
 ## OptionalDeps: QuestFocus, Questie, TomTom, Bagnon, ForeverDungeonJournal
 ## SavedVariables: QuestFocusDB
 
@@ -18,6 +18,7 @@ Core\Events.lua
 Core\ZoneFocus.lua
 Core\Debug.lua
 UI\Options.lua
+UI\PingAsk.lua
 Core\Slash.lua
 
 # Tervezo: tempo, ETA, javaslatok, utazas, varos mod

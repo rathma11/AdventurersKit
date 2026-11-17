@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.36", date = "2026-11-17", items = {
+        "Ping in the QFocus macro has three settings (Macro & marker tab, /qf ping): always, never, or ask when you join a group. "
+            .. "The question window (ping in this group / no ping) can change the setting for next time too. Solo there's no ping in ask mode.",
+    } },
     { version = "0.6.35", date = "2026-11-17", items = {
         "Quest nearby popup can be dragged anywhere (the place is kept); right click puts it back to the default place.",
     } },

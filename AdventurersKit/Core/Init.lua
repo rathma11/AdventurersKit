@@ -125,6 +125,23 @@ NS.CharDB = function()
     return c
 end
 
+---------------------------------------------------------------------------
+-- Ping a QFocus makroban: "on" (mindig), "off" (soha), "ask" (csapatba lepeskor megkerdezi,
+-- az valasz az adott csapatra szol; egyedul nincs ping). Regi beallitas: noPing.
+---------------------------------------------------------------------------
+NS.PingMode = function()
+    local m = QuestFocusDB and QuestFocusDB.pingMode
+    if m == "on" or m == "off" or m == "ask" then return m end
+    return (QuestFocusDB and QuestFocusDB.noPing) and "off" or "on"
+end
+NS.pingSession = nil -- "ask" modban a mostani csapatra adott valasz (true / false)
+NS.UsePing = function()
+    local m = NS.PingMode()
+    if m == "on" then return true end
+    if m == "off" then return false end
+    return NS.pingSession == true and IsInGroup and IsInGroup() or false
+end
+
 -- belso exportok a tobbi core fajlnak
 NS.C = NS.C or {}
 NS.C.ICON_FALLBACK, NS.C.ICON_HUNT, NS.C.ICON_IDLE, NS.C.ICON_TURNIN, NS.C.MACRO_MAX, NS.C.MACRO_NAME, NS.C.Print, NS.C.QF = ICON_FALLBACK, ICON_HUNT, ICON_IDLE, ICON_TURNIN, MACRO_MAX, MACRO_NAME, Print, QF

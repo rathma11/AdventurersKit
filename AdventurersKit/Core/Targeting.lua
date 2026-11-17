@@ -71,7 +71,7 @@ pickTicker:SetScript("OnUpdate", function(_, dt)
 end)
 
 local function BuildMacroBody(objectives, onlyIndex)
-    local usePing = not (QuestFocusDB and QuestFocusDB.noPing)
+    local usePing = NS.UsePing()
     -- Nameplate-ekkel: /target nameplateN (elo, nem tapolt mob). Ha nincs latszo quest mob
     -- (vagy harc): /targetexact nev szerint, a hullat eldobjuk, a tapoltat itt nem tudjuk kiszurni.
     -- Leadasnal baratsagos NPC kell: ott mindig nev szerint

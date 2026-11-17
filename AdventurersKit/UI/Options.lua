@@ -520,10 +520,24 @@ mac:Check(L["Auto attack (/startattack)"],
     L["Also starts auto attack after targeting (melee / wand / bow)."],
     function() return QuestFocusDB.startAttack end,
     function(v) QuestFocusDB.startAttack = v; RebuildMacro() end)
-mac:Check(L["Ping the target"],
-    L["The macro pings the target at the end (ping system); party members see it too."],
-    function() return not QuestFocusDB.noPing end,
-    function(v) QuestFocusDB.noPing = not v; RebuildMacro() end)
+-- Ping: harom valasztas (egyszerre egy): kerdezze csapatba lepeskor / mindig / soha
+do
+    local PING_DESC = {
+        ask = L["When you join a group, a small window asks whether to ping in that group (you can change this setting there too). Solo: no ping."],
+        on = L["The macro always pings the target at the end (ping system); party members see it too."],
+        off = L["The macro never pings."],
+    }
+    local PING_LABEL = { ask = L["Ping: ask when I join a group"], on = L["Ping: always"], off = L["Ping: never"] }
+    for _, m in ipairs({ "ask", "on", "off" }) do
+        mac:Check(PING_LABEL[m], PING_DESC[m],
+            function() return NS.PingMode() == m end,
+            function()
+                if NS.SetPingMode then NS.SetPingMode(m) else QuestFocusDB.pingMode = m end
+                mac:Refresh()
+            end)
+    end
+    NS.RefreshPingUI = function() mac:Refresh() end
+end
 mac:Check(L["Also target mobs of other nearby quests"],
     L["Mobs of other quests in your log within ~200 yards are added to the macro too, "]
     .. L["and listed on the panel under ALSO NEARBY (click one to focus that quest)."],

@@ -88,8 +88,13 @@ local function SlashHandler(msg)
         Print(L["Own arrow: %s"], QuestFocusDB.noArrow and L["off"] or L["on"])
         if QuestFocusDB.noArrow then arrow:Hide() elseif state.waypoint and UseOwnArrow() then arrow:Show() end
     elseif msg == "ping" then
-        QuestFocusDB.noPing = not QuestFocusDB.noPing
-        Print(L["Ping in the QFocus macro: %s"], QuestFocusDB.noPing and L["off"] or L["on"])
+        -- korbe: ask -> on -> off -> ask
+        local nextMode = ({ ask = "on", on = "off", off = "ask" })[NS.PingMode()] or "on"
+        QuestFocusDB.pingMode = nextMode
+        QuestFocusDB.noPing = (nextMode == "off") or nil
+        if NS.RefreshPingUI then NS.RefreshPingUI() end
+        Print(L["Ping in the QFocus macro: %s"], nextMode == "ask" and L["ask when joining a group"]
+            or nextMode == "on" and L["on"] or L["off"])
         state.lastBody = nil
         if state.questId then UpdateMacro() Panel_Update() end
     elseif msg == "icon" or msg:match("^icon%s") then
