@@ -505,7 +505,14 @@ local function GetExtraRow(i)
     hl:SetColorTexture(1, 1, 1, 0.08)
     r:SetScript("OnClick", function(self)
         local e = self.extra
-        if e and SelectQuestRef then SelectQuestRef(e.qid, e.title, false, true) end
+        if not (e and SelectQuestRef) then return end
+        -- atvaltunk erre a questre, es rogton erre az objective-re (marker + nyil + makro)
+        SelectQuestRef(e.qid, e.title, false, true)
+        if state.questId == e.qid and state.objectives then
+            for i, o in ipairs(state.objectives) do
+                if o.desc == e.desc then PanelSelectObjective(i) break end
+            end
+        end
     end)
     r:SetScript("OnEnter", function(self)
         local e = self.extra
@@ -515,7 +522,7 @@ local function GetExtraRow(i)
         TT.Objective(tt, e.obj)
         TT.Note(tt, NS.EtaLine and NS.EtaLine(e.obj) or nil)
         TT.Note(tt, L["The QFocus macro targets these mobs too."])
-        TT.Finish(tt, L["Click: focus this quest"])
+        TT.Finish(tt, L["Click: focus this quest and objective (marker + arrow + macro)"])
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     panel.extraRows[i] = r
@@ -543,9 +550,17 @@ local function Panel_Update()
     panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName(state.isComplete and "turnin" or "hunt"))
     local objs = state.objectives or {}
     local y = PanelChrome("quest", L["OBJECTIVES"])
+    -- a quest "hasznalando" iteme (QuestFocus_Bags) a kijelolt / elso nyitott objective soraba kerul
+    local firstOpen = state.objIndex
+    if not firstOpen then
+        for i, o in ipairs(objs) do
+            if not o.completed and not o.turnIn then firstOpen = i break end
+        end
+    end
     for i, o in ipairs(objs) do
         local line = GetLine(i)
         line.index = i
+        line.useQid, line.useObj, line.useQuestItem = state.questId, o, (i == firstOpen)
         line:SetSize(PW() - 24, RowH())
         local icon = o.completed and ICON_DONE or (o.turnIn and ICON_TI)
             or (state.objIndex == i and ICON_SEL) or ICON_TODO
@@ -568,9 +583,12 @@ local function Panel_Update()
         panel.extraHeader:SetPoint("TOPLEFT", 14, y)
         panel.extraHeader:Show()
         y = y - 15
+        local seenQ = {}
         for i, e in ipairs(extras) do
             local r = GetExtraRow(i)
             r.extra = e
+            r.useQid, r.useObj, r.useQuestItem = e.qid, e.obj, not seenQ[e.qid]
+            seenQ[e.qid] = true
             r:SetSize(PW() - 24, RowH())
             local eta = NS.EtaShort and NS.EtaShort(e.obj)
             r.text:SetText(("|TInterface\\COMMON\\Indicator-Yellow:12:12|t |cffd8c8a0%s:|r %s%s"):format(

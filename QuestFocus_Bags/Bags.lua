@@ -138,16 +138,9 @@ end
 -- Csak az, amit HASZNALNI kell a queshez: a quest altal adott / megkovetelt item (n.use:
 -- sourceItemId, requiredSourceItems), vagy egy meg nem kesz objective quest-tipusu itemje.
 -- Gyujtendo fogyaszthato (pl. ital, kaja) NEM kerul ide, akkor sem, ha van Use: hatasa.
+-- Most ez a gombkent a panel egy objective soraban van (lent: UpdateUseButton)
 local function IsPanelUseItem(e)
-    if not On() or QuestFocusDB.noUseButton or not e.needs or not ItemHasUse(e.id) then return false end
-    local classID = select(6, GetItemInfoInstant(e.id))
-    for _, n in ipairs(e.needs) do
-        if not n.questDone then
-            if n.use then return true end
-            if not n.done and classID == QUEST_CLASS then return true end
-        end
-    end
-    return false
+    return On() and NS.panelUseShown and NS.panelUseShown[e.id] and true or false
 end
 
 local scan = { items = {}, status = {}, leftovers = {}, bankOnly = {}, usable = {} }
@@ -721,45 +714,62 @@ NS.DiscardLeftovers = DiscardLeftovers
 junkBtn:SetScript("OnClick", DiscardLeftovers)
 
 ---------------------------------------------------------------------------
--- Hasznalhato quest itemek a panel bal szelen (egymas alatt, max USE_MAX).
--- Az elso a kijelolt quest itemje (ha van); a tobbi a tobbi aktiv quest hasznalhato itemje.
--- Ezek a taska melletti listabol kimaradnak (Scan: scan.usable).
+-- Hasznalhato quest item a panel objective soraban (a sor jobb szelen egy kis gomb):
+--  - a kijelolt quest objective-jei, es az ALSO NEARBY (kozeli) objective-ek;
+--  - az objective sajat itemje, ha quest-tipusu es hasznalhato, vagy a quest altal adott /
+--    megkovetelt item (sourceItemId, requiredSourceItems) - ez a kijelolt / elso nyitott sorba.
+-- A secure gombot nem horgonyozzuk a panelhez (attol a panel vedett lenne): kepernyo-pozicio.
+-- Ami itt latszik, az a taska melletti listabol kimarad (NS.panelUseShown).
 ---------------------------------------------------------------------------
-local USE_MAX, USE_SIZE = 4, 36
+local USE_MAX = 6
+NS.panelUseShown = {}
+
+local function ObjectiveUseItem(qid, o, questLevel)
+    if not On() or QuestFocusDB.noUseButton or not o or o.completed or o.turnIn then return end
+    if o.itemId and GetItemCount(o.itemId) > 0 and ItemHasUse(o.itemId)
+        and select(6, GetItemInfoInstant(o.itemId)) == QUEST_CLASS then
+        return o.itemId
+    end
+    if not questLevel then return end
+    local q = qid and NS.GetQuestieQuest(qid)
+    if not q then return end
+    local cands = {}
+    if tonumber(q.sourceItemId) and q.sourceItemId > 0 then cands[#cands + 1] = q.sourceItemId end
+    for _, id in pairs(q.requiredSourceItems or {}) do cands[#cands + 1] = id end
+    for _, id in ipairs(cands) do
+        if GetItemCount(id) > 0 and ItemHasUse(id) then return id end
+    end
+end
+NS.ObjectiveUseItem = ObjectiveUseItem
+
 local useBtns = {}
 local function MakeUseButton(i)
     -- az elso neve marad (a keybind erre szol: CLICK QuestFocusUseItem:LeftButton)
     local b = CreateFrame("Button", i == 1 and "QuestFocusUseItem" or ("QuestFocusUseItem" .. i), UIParent,
         "SecureActionButtonTemplate")
-    b:SetSize(USE_SIZE, USE_SIZE)
+    b:SetSize(18, 18)
+    b:SetFrameStrata("MEDIUM")
     b:RegisterForClicks("AnyUp", "AnyDown")
     b:SetAttribute("type", "item")
     b:Hide()
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints()
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    b.border = b:CreateTexture(nil, "OVERLAY")
-    b.border:SetPoint("TOPLEFT", -2, 2)
-    b.border:SetPoint("BOTTOMRIGHT", 2, -2)
-    b.border:SetColorTexture(0.2, 1, 0.6, 0.5)
-    b.border:SetDrawLayer("BACKGROUND")
-    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-    b.count:SetPoint("BOTTOMRIGHT", -2, 2)
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    b.count:SetPoint("BOTTOMRIGHT", 2, -2)
     b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
     b.cd:SetAllPoints()
-    b.key = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmallGray")
-    b.key:SetPoint("TOPRIGHT", -2, -2)
     b:SetScript("OnEnter", function(self)
         if not self.itemId then return end
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetItemByID(self.itemId)
         GameTooltip:AddLine(" ")
-        for _, n in ipairs(self.needs or {}) do
-            local sel = n.qid == state.questId
-            GameTooltip:AddLine((sel and "|cff33ff99> " or "|cffffd100") .. (n.title or "?") .. "|r", 1, 1, 1)
-        end
-        if i == 1 and not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
-            GameTooltip:AddLine(L["Key: Options > Keybindings > AddOns > Adventurer's Kit"], 0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Click: use it"], 0.5, 0.5, 0.5)
+        if i == 1 then
+            local key = GetBindingKey("CLICK QuestFocusUseItem:LeftButton")
+            GameTooltip:AddLine(key and ((L["Key: %s"]):format(GetBindingText and GetBindingText(key) or key))
+                or L["Key: Options > Keybindings > AddOns > Adventurer's Kit"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
@@ -769,57 +779,103 @@ local function MakeUseButton(i)
 end
 for i = 1, USE_MAX do MakeUseButton(i) end
 
-local useGeo
+-- Mely sorokhoz kell gomb: { row, id }
+local function UseRows()
+    local out, seen = {}, {}
+    local panel = NS.panel
+    if not (panel and panel:IsShown()) then return out end
+    local function add(list)
+        for _, r in ipairs(list or {}) do
+            if r:IsShown() and r.useObj and #out < USE_MAX then
+                local id = ObjectiveUseItem(r.useQid, r.useObj, r.useQuestItem)
+                if id and not seen[id] then
+                    seen[id] = true
+                    out[#out + 1] = { row = r, id = id }
+                end
+            end
+        end
+    end
+    add(panel.lines)
+    add(panel.extraRows)
+    return out
+end
+
+local function RowRect(r)
+    local s = r:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local right, top, h = r:GetRight(), r:GetTop(), r:GetHeight()
+    if not (right and top) then return end
+    return right * s, top * s, h * s
+end
+
+local useKey = ""
 local function UpdateUseButton()
     if InCombatLockdown() then return end
+    local rows = UseRows()
+    local key, shown = {}, {}
+    -- sorszoveg: ahol gomb van, ott a szoveg ne fusson ala
     local panel = NS.panel
-    local list = (On() and not QuestFocusDB.noUseButton and panel and panel:IsShown()) and scan.usable or {}
-    -- Nem a panelhez horgonyzunk (attol a panel vedett lenne): kepernyo-pozicio alapjan
-    local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
-    useGeo = l and t and (math.floor(l) .. ":" .. math.floor(t)) or nil
-    local key = GetBindingKey("CLICK QuestFocusUseItem:LeftButton")
+    for _, list in ipairs({ panel and panel.lines or {}, panel and panel.extraRows or {} }) do
+        for _, r in ipairs(list) do
+            if r.text and r.qfUseInset then
+                r.text:ClearAllPoints()
+                r.text:SetAllPoints()
+                r.qfUseInset = nil
+            end
+        end
+    end
     for i, b in ipairs(useBtns) do
-        local e = list[i]
-        if not e or not l then
+        local e = rows[i]
+        local rx, ry, rh = nil, nil, nil
+        if e then rx, ry, rh = RowRect(e.row) end
+        if not e or not rx then
             if b:IsShown() then b:Hide() end
-            b.itemId, b.needs = nil, nil
+            b.itemId = nil
         else
             if b.itemId ~= e.id then
                 b.itemId = e.id
                 b:SetAttribute("item", "item:" .. e.id)
-                b.icon:SetTexture(e.icon or select(5, GetItemInfoInstant(e.id)))
+                b.icon:SetTexture(select(5, GetItemInfoInstant(e.id)))
             end
-            b.needs = e.needs
-            local sel = false
-            for _, n in ipairs(e.needs or {}) do if n.qid == state.questId then sel = true end end
-            b.border:SetShown(sel)
-            b:SetAlpha(sel and 1 or 0.8)
             local n = GetItemCount(e.id)
             b.count:SetText(n > 1 and n or "")
-            b.key:SetText(i == 1 and key and GetBindingText and GetBindingText(key, true) or "")
+            local size = math.max(14, math.floor(rh + 0.5))
+            b:SetSize(size, size)
             b:ClearAllPoints()
-            b:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", l - 4, t - (i - 1) * (USE_SIZE + 4))
+            b:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", rx, ry)
             b:Show()
+            if e.row.text then
+                e.row.text:ClearAllPoints()
+                e.row.text:SetPoint("TOPLEFT")
+                e.row.text:SetPoint("BOTTOMRIGHT", -(size + 4), 0)
+                e.row.qfUseInset = true
+            end
+            shown[e.id] = true
+            key[#key + 1] = e.id .. "@" .. math.floor(rx) .. ":" .. math.floor(ry)
         end
     end
+    useKey = table.concat(key, ",")
+    -- ami a panelen van, az a taska melletti listabol kimarad
+    local changed = false
+    for id in pairs(shown) do if not NS.panelUseShown[id] then changed = true end end
+    for id in pairs(NS.panelUseShown) do if not shown[id] then changed = true end end
+    NS.panelUseShown = shown
+    if changed and list and list:IsShown() then RefreshBagList() end
 end
 
 local cdElapsed = 0
 local ticker = CreateFrame("Frame")
-local lastQuest, lastPanelShown
 ticker:SetScript("OnUpdate", function(_, dt)
     cdElapsed = cdElapsed + dt
-    if cdElapsed < 0.5 then return end
+    if cdElapsed < 0.4 then return end
     cdElapsed = 0
-    local shown = NS.panel and NS.panel:IsShown()
-    if state.questId ~= lastQuest or shown ~= lastPanelShown then
-        lastQuest, lastPanelShown = state.questId, shown
-        if not InCombatLockdown() then Scan() end -- a kijelolt quest itemje kerul elore
-        UpdateUseButton()
-    elseif useBtns[1]:IsShown() and not InCombatLockdown() then
-        -- a panel elmozdult: a gombok kovetik
-        local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
-        if l and t and useGeo ~= (math.floor(l) .. ":" .. math.floor(t)) then UpdateUseButton() end
+    if not InCombatLockdown() then
+        -- sorok / panel elmozdult, uj item, masik quest: ujrarakjuk
+        local rows, k = UseRows(), {}
+        for _, e in ipairs(rows) do
+            local rx, ry = RowRect(e.row)
+            k[#k + 1] = e.id .. "@" .. math.floor(rx or 0) .. ":" .. math.floor(ry or 0)
+        end
+        if table.concat(k, ",") ~= useKey then UpdateUseButton() end
     end
     local getCD = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
     for _, b in ipairs(useBtns) do
@@ -913,8 +969,8 @@ fl:Check(L["Color quest items in Bagnon"],
     end)
 fl:Header(L["Using quest items"])
 fl:Check(L["Usable quest items on the panel"],
-    L["Quest items you have to use (e.g. throw at a mob) get a button on the left edge of the panel, "]
-    .. L["up to 4, the selected quest's item first (green frame). They are left out of the bag list. "]
+    L["A quest item you have to use (e.g. throw at a mob) gets a small button at the end of its objective row on the panel: "]
+    .. L["for the selected quest and for the nearby (ALSO NEARBY) objectives. Those are left out of the bag list. "]
     .. L["Key for the first one: Options > Keybindings > AddOns > Adventurer's Kit."],
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; RefreshBagList(); UpdateUseButton() end)

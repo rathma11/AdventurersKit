@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.3", date = "2026-11-17", items = {
+        "Usable quest items: only for the selected quest and nearby objectives, as a small button at the end of the objective row on the panel.",
+        "ALSO NEARBY row click: focuses that quest and that objective (marker + arrow + macro).",
+    } },
     { version = "0.4.2", date = "2026-11-17", items = {
         "Usable quest item buttons: only items the quest gives you to use (or quest-type objective items), not collected consumables like drinks or food.",
         "Options: when a module is off, the rest of its tab is greyed out and can't be clicked.",
