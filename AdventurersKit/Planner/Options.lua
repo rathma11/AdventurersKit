@@ -73,7 +73,7 @@ pagePick:HookScript("OnShow", function() pk:Refresh() end)
 ---------------------------------------------------------------------------
 local pageCity = NS.AddOptionsTab(L["City list"], 45)
 local cl = NS.OptFlow(pageCity)
-cl:Text(L["While resting (city or inn) a list opens with every quest you can pick up nearby (XP, chain position, "]
+cl:Text(L["In a city, or in a village with an inn (innkeeper within ~250 yd), a list opens with every quest you can pick up nearby (XP, chain position, "]
     .. L["dungeon tag), plus a to-do section on top (repair, sell, ammo, XP food) and Bank / AH / Trainer buttons."], 0)
 cl:Header(L["On / off"])
 cl:Check(L["City list"],

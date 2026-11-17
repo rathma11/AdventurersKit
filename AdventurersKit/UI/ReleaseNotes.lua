@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.22", date = "2026-11-17", items = {
+        "City list also opens in villages: within ~250 yd of an innkeeper counts as a town (not only resting in the inn); "
+            .. "it closes when you walk away, and never pops up on a flight path.",
+        "Directions only lists what is around (within ~700 yd): in a small village no Auction House or Bank line; "
+            .. "Profession Trainer only when one is nearby.",
+    } },
     { version = "0.6.21", date = "2026-11-17", items = {
         "What next: 'Next zone' line on top. 'Go to <zone>' when another zone has 5+ quests from your log (more than here); "
             .. "otherwise the nearest zone with 5+ quests to pick up for your level. 'Hearth back to <zone>' when the "

@@ -994,7 +994,7 @@ local WARN_REPAIR = { key = "w_repair", label = L["Gear"], names = {}, warnRow =
     icon = "Interface\\Icons\\Trade_BlackSmithing" }
 local function OutsideWarnings()
     local out = {}
-    if QuestFocusDB.noOutWarn or not NS.CityLimit or (IsResting and IsResting()) then
+    if QuestFocusDB.noOutWarn or not NS.CityLimit or (NS.InTown and NS.InTown()) or (IsResting and IsResting()) then
         dismissed.w_bags, dismissed.w_repair = nil, nil -- varosban: kint legkozelebb ujra szolhat
         return out
     end

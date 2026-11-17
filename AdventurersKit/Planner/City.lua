@@ -629,7 +629,9 @@ local function Nearest(kind)
     if ok and p then return p, d end
 end
 
-local function ShowProfMenu(anchorRow)
+-- Csak ami itt, a telepulesen elerheto (GUIDE_R yardon belul): kis faluban nincs AH, bank...
+local GUIDE_R = 700
+local function ProfList()
     local mine = {}
     local QP = NS.Module("QuestieProfessions")
     if QP and QP.GetPlayerProfessions then
@@ -639,13 +641,21 @@ local function ShowProfMenu(anchorRow)
     local list = {}
     for _, pr in ipairs(PROFS) do
         local p, d = Nearest("Prof:" .. pr[1])
-        list[#list + 1] = { label = pr[2], icon = pr[3], crop = true, point = p, dist = d, mine = mine[pr[1]] ~= nil }
+        if p and d and d <= GUIDE_R then
+            list[#list + 1] = { label = pr[2], icon = pr[3], crop = true, point = p, dist = d, mine = mine[pr[1]] ~= nil }
+        end
     end
     -- a sajat szakmaid elol
     table.sort(list, function(a, b)
         if a.mine ~= b.mine then return a.mine end
         return a.label < b.label
     end)
+    return list
+end
+
+local function ShowProfMenu(anchorRow)
+    local list = ProfList()
+    if #list == 0 then subMenu:Hide() return end
     FillMenu(subMenu, list)
     subMenu:ClearAllPoints()
     subMenu:SetPoint("TOPLEFT", anchorRow, "TOPRIGHT", 8, 6)
@@ -658,9 +668,17 @@ local function ShowGuideMenu(anchor)
     for _, g in ipairs(GUIDE) do
         if not g.class or g.class == cls then
             local e = { label = g.label, icon = g.icon, sub = g.sub }
-            if not g.sub then e.point, e.dist = Nearest(g.kind) end
-            list[#list + 1] = e
+            if g.sub then
+                if #ProfList() > 0 then list[#list + 1] = e end
+            else
+                e.point, e.dist = Nearest(g.kind)
+                if e.point and e.dist and e.dist <= GUIDE_R then list[#list + 1] = e end
+            end
         end
+    end
+    if #list == 0 then
+        NS.Loud(NS.Print, L["Directions: nothing known around here."])
+        return
     end
     FillMenu(menu, list, function(row) ShowProfMenu(row) end)
     menu:ClearAllPoints()
@@ -762,8 +780,23 @@ city:HookScript("OnSizeChanged", function(self, w)
     if self.sizing then self.ApplyWidth(w) end
 end)
 
-local function InCity() return IsResting and IsResting() end
+-- Telepules: pihenes (varos / fogado epulete), vagy egy innkeeper INN_R yardon belul (kis
+-- falvak: ott csak a fogadoban pihensz, de a falu mar "varos"). Taxi repules kozben nem.
+local INN_R = 250
+local nearInn, nearInnAt = false, -10
+local function NearInn()
+    if GetTime() - nearInnAt < 3 then return nearInn end
+    nearInnAt = GetTime()
+    local ok, p, d = pcall(NS.NearestTownsfolk, "Innkeeper")
+    nearInn = (ok and p and d and d <= INN_R) and true or false
+    return nearInn
+end
+local function InCity()
+    if UnitOnTaxi and UnitOnTaxi("player") then return false end
+    return (IsResting and IsResting()) or NearInn()
+end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
+NS.InTown = InCity -- telepulesen vagy-e (a city list kapcsolotol fuggetlenul)
 
 local function RefreshCityList()
     if QuestFocusDB.noCityMode or not NS.QuestieAvailable() then city:Hide() return end
@@ -924,7 +957,17 @@ cityRetry:SetScript("OnUpdate", function(_, dt)
     cityRetryElapsed = cityRetryElapsed + dt
     if cityRetryElapsed < 4 then return end
     cityRetryElapsed = 0
-    if city:IsShown() or city.closedHere or QuestFocusDB.noCityMode or not InCity() then return end
+    -- falu (innkeeper kozelseg) be / ki: nincs ra esemeny, itt figyeljuk
+    local inNow = InCity() and true or false
+    if inNow ~= city.wasIn then
+        city.wasIn = inNow
+        if not inNow then
+            city.closedHere = nil -- kovetkezo telepulesen ujra feljon
+            if not city.forced then city:Hide() end
+        end
+        NS.Panel_Update()
+    end
+    if city:IsShown() or city.closedHere or QuestFocusDB.noCityMode or not inNow then return end
     if InCombatLockdown() or IgnoredHere() then return end
     RefreshCityList()
 end)
