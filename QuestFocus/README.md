@@ -58,7 +58,7 @@ When a marker is placed, the addon compares walking with your Hearthstone and wi
 - **Hearthstone position:** the game only gives the name of your bind location, not its coordinates. The addon learns the position when you bind at an innkeeper, or right after you arrive by Hearthstone. The Debug tab shows whether it is known.
 - **Turn-in mode:** the panel boxes show **Distance** (yards to the turn-in NPC), **Travel** (time at your current speed, like TomTom) and **Best way** (walk, Hearthstone or flight).
 - **Hearth home:** if completed quests can be turned in where your Hearthstone takes you, the panel shows e.g. "Hearth home: 3 quests to turn in at Booty Bay", with the cooldown if there is one. Hover it to see which quests. It shows from 1 quest in turn-in mode, otherwise from 2, and only when you are far from your Hearthstone location.
-- **Pick up nearby (turn-in mode):** while you head to turn in a finished quest, the bottom of the panel lists the 5 nearest quests you can pick up (same level range as the suggestions). Click one for a marker on its quest giver. The list refreshes as you move.
+- **Route in turn-in mode:** while you head to turn in a finished quest, the bottom of the panel lists your other quest-log quests in route order (max 5, nearest next stop first, with distance and ETA). Click one to focus it. The list refreshes as you move.
 - **Flight:** uses the flight points you know, if the client provides them (`C_TaxiMap`). The flight time is estimated in a straight line.
 
 ### Tracking (Find Minerals / Find Herbs)

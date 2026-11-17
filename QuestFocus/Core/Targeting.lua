@@ -1,0 +1,348 @@
+local ADDON_NAME, NS = ...
+local L = NS.L
+NS.C = NS.C or {}
+local C = NS.C
+local FindNearest, FindSpawnTarget, ICON_FALLBACK, ICON_HUNT, ICON_IDLE, ICON_TURNIN, MACRO_MAX, MACRO_NAME = C.FindNearest, C.FindSpawnTarget, C.ICON_FALLBACK, C.ICON_HUNT, C.ICON_IDLE, C.ICON_TURNIN, C.MACRO_MAX, C.MACRO_NAME
+local PlayerWorldPos, Print, state, ZoneName = C.PlayerWorldPos, C.Print, C.state, C.ZoneName
+
+---------------------------------------------------------------------------
+-- Macro
+---------------------------------------------------------------------------
+local PING_LINE = "/ping [@target,harm,nodead] attack; [@target,help,nodead] assist"
+
+-- Macro feltetellel nem lehet "tapped"-et vizsgalni, ezert harcon kivul az addon a
+-- nameplate-ek kozul kivalasztja az elo, meg senki altal meg nem tapolt quest mobot, es a
+-- macroba kozvetlenul azt irja: /target nameplateN. Harcban a macro nem irhato, ott a
+-- nev szerinti targetelés dolgozik.
+local targetNames = {}
+local pickTicker = CreateFrame("Frame")
+local UpdateMacro -- lent definialva
+
+local function NameplatesUsable()
+    return C_NamePlate and C_NamePlate.GetNamePlates and GetCVar
+        and GetCVar("nameplateShowEnemies") == "1"
+end
+
+local function TapDenied(unit)
+    if UnitIsTapDenied then return UnitIsTapDenied(unit) end
+    if UnitIsTapped then return UnitIsTapped(unit) and not UnitIsTappedByPlayer(unit) end
+    return false
+end
+
+local function GoodQuestUnit(unit)
+    return unit and UnitExists(unit) and targetNames[UnitName(unit) or ""]
+        and not UnitIsDead(unit) and UnitCanAttack("player", unit) and not TapDenied(unit)
+end
+
+local function PickNameplate()
+    if InCombatLockdown() then return end
+    local pick, idle, seenBad
+    if next(targetNames) then
+        -- Kozvetlenul a nameplateN unit tokeneken megyunk vegig (nameplate addonoktol fuggetlen)
+        for i = 1, 40 do
+            local unit = "nameplate" .. i
+            if not UnitExists(unit) then
+                -- lyukak lehetnek a sorszamokban, ezert nem allunk meg
+            elseif GoodQuestUnit(unit) then
+                if UnitIsUnit(unit, "target") then pick = unit break end -- marad a mostani
+                if not UnitAffectingCombat(unit) then idle = idle or unit else pick = pick or unit end
+            elseif unit and UnitExists(unit) and targetNames[UnitName(unit) or ""] then
+                seenBad = true -- latszik quest mob, de halott vagy mas tapolta
+            end
+        end
+    end
+    pick = (pick and UnitIsUnit(pick, "target")) and pick or idle or pick
+    -- Ha a kozelben csak tapolt/halott quest mob van: "busy" -> a macro nem targetel semmit
+    if not pick and seenBad then pick = "busy" end
+    if state.pick ~= pick then
+        state.pick = pick
+        if state.questId and UpdateMacro then UpdateMacro() end
+    end
+end
+
+local pickElapsed = 0
+pickTicker:SetScript("OnUpdate", function(_, dt)
+    pickElapsed = pickElapsed + dt
+    if pickElapsed > 0.2 then pickElapsed = 0; PickNameplate() end
+end)
+
+local function BuildMacroBody(objectives, onlyIndex)
+    local usePing = not (QuestFocusDB and QuestFocusDB.noPing)
+    -- Nameplate-ekkel: /target nameplateN (elo, nem tapolt mob). Ha nincs latszo quest mob
+    -- (vagy harc): /targetexact nev szerint, a hullat eldobjuk, a tapoltat itt nem tudjuk kiszurni.
+    -- Leadasnal baratsagos NPC kell: ott mindig nev szerint
+    local turnIn = objectives and objectives[1] and objectives[1].turnIn
+    -- Leadasnal: ha a leado NPC messze van (>100 yd), de a kozelben van mas quest mobja,
+    -- a macro azokat targeteli; az NPC kozeleben visszavalt az NPC-re
+    if turnIn and onlyIndex == nil and state.extra and #state.extra > 0 then
+        local _, d = FindNearest(objectives[1].sources)
+        if not d or d > 100 then
+            turnIn = false
+            objectives = {}
+        end
+    end
+    local useNP = NameplatesUsable() and not turnIn and not InCombatLockdown()
+    local CLEAR, DEADCLR = "/cleartarget", "/cleartarget [dead]"
+    local pick = useNP and state.pick or nil
+    if pick == "busy" then
+        CLEAR = '/run UIErrorsFrame:AddMessage("QuestFocus: nearby quest mobs are taken",1,.6,.2)'
+    elseif pick then
+        CLEAR = "/target " .. pick
+    end
+    -- Opcionalis tap: spell es/vagy autoattack a celpontra (csak ellenseges, elo celra)
+    local tail = {}
+    local spell = QuestFocusDB and QuestFocusDB.spell
+    if not turnIn and QuestFocusDB and QuestFocusDB.startAttack then
+        tail[#tail + 1] = "/startattack [@target,harm,nodead]"
+    end
+    if not turnIn and QuestFocusDB and QuestFocusDB.useSpell and spell and spell ~= "" then
+        tail[#tail + 1] = "/cast [@target,harm,nodead] " .. spell
+    end
+    -- Pingelni csak uj celpontra: ha a kivalasztott mob mar a targeted (vagy harcban a
+    -- mostani target jo quest mob), a ping kimarad, igy a macro spamelese nem pingel ujra
+    local onTarget
+    if pick and pick ~= "busy" then
+        onTarget = UnitIsUnit(pick, "target")
+    elseif not pick then
+        onTarget = GoodQuestUnit("target")
+    end
+    if usePing and not onTarget then tail[#tail + 1] = PING_LINE end
+    local lines, seen = { CLEAR }, {}
+    local len = #CLEAR + 1
+    for _, t in ipairs(tail) do len = len + #t + 1 end
+    local n = 0
+    wipe(targetNames)
+    local function addName(name)
+        if not name or seen[name] then return end
+        seen[name] = true
+        targetNames[name] = true
+        n = n + 1
+        if not pick then -- nev szerint, ha nincs latszo quest mob nameplate (vagy harc)
+            local line = "/targetexact [noexists] " .. name
+            local cost = #line + 1 + #DEADCLR + 1
+            if len + cost <= MACRO_MAX then
+                lines[#lines + 1] = line
+                lines[#lines + 1] = DEADCLR
+                len = len + cost
+            end
+        end
+    end
+    for i, obj in ipairs(objectives or {}) do
+        if (onlyIndex == nil and not obj.completed) or onlyIndex == i then
+            for _, src in ipairs(obj.sources) do
+                if src.isNpc then addName(src.name) end
+            end
+        end
+    end
+    -- A kozelben levo tobbi quest mobjai is (ha nem egy konkret objective-re szukitettel)
+    if not turnIn and onlyIndex == nil then
+        for _, e in ipairs(state.extra or {}) do
+            for _, name in ipairs(e.names) do addName(name) end
+        end
+    end
+    if n == 0 then
+        return '/run print("QuestFocus: no targetable mob")', 0
+    end
+    for _, t in ipairs(tail) do lines[#lines + 1] = t end
+    return table.concat(lines, "\n"), n
+end
+
+local iconCache = {}
+local function IconId(name)
+    if type(name) == "number" then return name end
+    if type(name) ~= "string" or name == "" then return ICON_FALLBACK end
+    if iconCache[name] then return iconCache[name] end
+    local id
+    if GetFileIDFromPath then
+        local path = name:find("[/\\]") and name or ("Interface\\Icons\\" .. name)
+        local ok, r = pcall(GetFileIDFromPath, path)
+        if ok and type(r) == "number" and r > 0 then id = r end
+    end
+    if not id and tonumber(name) then id = tonumber(name) end
+    iconCache[name] = id or ICON_FALLBACK
+    return iconCache[name]
+end
+
+local function CurrentIcon()
+    if QuestFocusDB and QuestFocusDB.icon then return IconId(QuestFocusDB.icon) end
+    if not state.questId then return IconId(ICON_IDLE) end
+    local objs = state.objectives or {}
+    if objs[1] and objs[1].turnIn then return IconId(ICON_TURNIN) end
+    return IconId(ICON_HUNT)
+end
+
+local function ApplyMacro(body)
+    if InCombatLockdown() then
+        if not state.pendingBody then Print(L["You are in combat, the QFocus macro will update after combat."]) end
+        state.pendingBody = body
+        return
+    end
+    state.pendingBody = nil
+    local idx = GetMacroIndexByName(MACRO_NAME)
+    if idx and idx > 0 then
+        EditMacro(idx, MACRO_NAME, CurrentIcon(), body)
+    else
+        local numAccount = GetNumMacros()
+        if numAccount >= (MAX_ACCOUNT_MACROS or 120) then
+            Print(L["No room for a new account macro, delete one first."])
+            return
+        end
+        CreateMacro(MACRO_NAME, CurrentIcon(), body, nil)
+        Print(L["Created the |cffffff00%s|r macro. Open /macro and drag it to your action bar."], MACRO_NAME)
+    end
+    state.lastBody = body
+    state.lastIcon = CurrentIcon()
+end
+
+UpdateMacro = function()
+    local body, n = BuildMacroBody(state.objectives, state.objIndex)
+    state.macroCount = n
+    if body ~= state.lastBody or state.pendingBody or CurrentIcon() ~= state.lastIcon then ApplyMacro(body) end
+end
+
+---------------------------------------------------------------------------
+-- Nyil
+---------------------------------------------------------------------------
+local arrow = CreateFrame("Button", "QuestFocusArrow", UIParent)
+arrow:SetSize(64, 80)
+arrow:SetPoint("TOP", UIParent, "TOP", 0, -140)
+arrow:SetMovable(true)
+arrow:SetClampedToScreen(true)
+arrow:EnableMouse(true)
+arrow:RegisterForDrag("LeftButton")
+arrow:RegisterForClicks("RightButtonUp")
+arrow:SetScript("OnDragStart", arrow.StartMoving)
+arrow:SetScript("OnDragStop", arrow.StopMovingOrSizing)
+arrow.tex = arrow:CreateTexture(nil, "ARTWORK")
+arrow.tex:SetTexture("Interface\\Minimap\\MinimapArrow")
+arrow.tex:SetSize(48, 48)
+arrow.tex:SetPoint("TOP")
+arrow.text = arrow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+arrow.text:SetPoint("TOP", arrow.tex, "BOTTOM", 0, 4)
+arrow:Hide()
+arrow:SetScript("OnClick", function(self)
+    state.waypoint = nil
+    self:Hide()
+end)
+
+local arrowElapsed = 0
+arrow:SetScript("OnUpdate", function(self, elapsed)
+    arrowElapsed = arrowElapsed + elapsed
+    if arrowElapsed < 0.05 then return end
+    arrowElapsed = 0
+    local w = state.waypoint
+    if not w then self:Hide() return end
+    local pc, px, py = PlayerWorldPos()
+    if not pc or not w.wc or pc ~= w.wc or not w.wx then
+        self.tex:SetRotation(0)
+        self.tex:SetVertexColor(0.6, 0.6, 0.6)
+        self.text:SetText((w.title or "?") .. "\n" .. ZoneName(w.map))
+        return
+    end
+    local dx, dy = w.wx - px, w.wy - py
+    local dist = math.sqrt(dx * dx + dy * dy)
+    if dist < 10 then
+        self.tex:SetRotation(0)
+        self.tex:SetVertexColor(0.2, 1, 0.2)
+        self.text:SetText((w.title or "?") .. L["\n|cff33ff33You have arrived|r"])
+        return
+    end
+    local facing = GetPlayerFacing() or 0
+    local angle = math.atan2(dy, dx) - facing
+    self.tex:SetRotation(angle)
+    local a = math.abs(((angle + math.pi) % (2 * math.pi)) - math.pi) -- 0 = egyenesen elore
+    local t = a / math.pi
+    self.tex:SetVertexColor(t, 1 - t * 0.6, 0.1)
+    self.text:SetFormattedText("%s\n%d yd", w.title or "?", dist)
+end)
+
+local function UseOwnArrow()
+    return not (TomTom and TomTom.AddWaypoint) and not (QuestFocusDB and QuestFocusDB.noArrow)
+end
+
+---------------------------------------------------------------------------
+-- Waypoint
+---------------------------------------------------------------------------
+local function SetWaypoint(p, title)
+    state.waypoint = { map = p.map, x = p.x, y = p.y, title = title, wc = p.wc, wx = p.wx, wy = p.wy }
+
+    if TomTom and TomTom.AddWaypoint then
+        if state.tomtomUid and TomTom.RemoveWaypoint then pcall(TomTom.RemoveWaypoint, TomTom, state.tomtomUid) end
+        local ok, uid = pcall(TomTom.AddWaypoint, TomTom, p.map, p.x / 100, p.y / 100,
+            { title = title, persistent = false, crazy = true, from = "QuestFocus" })
+        if ok then state.tomtomUid = uid end
+    end
+
+    if C_Map.SetUserWaypoint and UiMapPoint and UiMapPoint.CreateFromCoordinates then
+        local canSet = true
+        if C_Map.CanSetUserWaypointOnMap then canSet = C_Map.CanSetUserWaypointOnMap(p.map) end
+        if canSet then
+            if pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(p.map, p.x / 100, p.y / 100)) then
+                state.ownsUserWaypoint = true
+            end
+            if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+                pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
+            end
+        end
+    end
+
+    if UseOwnArrow() then arrow:Show() else arrow:Hide() end
+end
+
+-- Minden altalunk lerakott marker torlese (TomTom, beepitett map pin, sajat nyil)
+local function ClearWaypoint()
+    state.waypoint = nil
+    arrow:Hide()
+    if state.tomtomUid and TomTom and TomTom.RemoveWaypoint then
+        pcall(TomTom.RemoveWaypoint, TomTom, state.tomtomUid)
+    end
+    state.tomtomUid = nil
+    if state.ownsUserWaypoint and C_Map.ClearUserWaypoint then
+        pcall(C_Map.ClearUserWaypoint)
+        if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+            pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, false)
+        end
+    end
+    state.ownsUserWaypoint = nil
+end
+
+arrow:SetScript("OnClick", function() ClearWaypoint() end)
+
+local function MarkObjective(i)
+    local objs = state.objectives or {}
+    local list = {}
+    if i and objs[i] then
+        list[1] = objs[i]
+    else
+        for _, o in ipairs(objs) do if not o.completed then list[#list + 1] = o end end
+        if #list == 0 then list = objs end
+    end
+    local sources = {}
+    for _, o in ipairs(list) do
+        for _, s in ipairs(o.sources) do sources[#sources + 1] = s end
+    end
+    if #sources == 0 then
+        Print(L["No known location for: %s"], state.title or "?")
+        return
+    end
+    local p, dist, inArea = FindSpawnTarget(sources)
+    if not p then
+        Print(L["No coordinates found (it may be inside an instance)."])
+        return
+    end
+    -- Mob objective-nel, ha mar a teruleten vagy, nem kuldunk tovabb (leadasnal mindig jelolunk)
+    local isTurnIn = list[1] and list[1].turnIn
+    if inArea and not isTurnIn then
+        ClearWaypoint()
+        Print(L["You are in the spawn area of |cffffff00%s|r, no marker needed (nearest spawn %d yd)."], p.name or "?", dist or 0)
+        return
+    end
+    SetWaypoint(p, p.name or state.title)
+    Print(L["Marker: |cffffff00%s|r - %s %.1f, %.1f%s"], p.name or "?", ZoneName(p.map), p.x, p.y,
+        dist and (" (%d yd)"):format(dist) or "")
+end
+
+
+-- belso exportok a tobbi core fajlnak
+NS.C.ApplyMacro, NS.C.BuildMacroBody, NS.C.ClearWaypoint, NS.C.CurrentIcon, NS.C.IconId, NS.C.MarkObjective, NS.C.NameplatesUsable, NS.C.PickNameplate = ApplyMacro, BuildMacroBody, ClearWaypoint, CurrentIcon, IconId, MarkObjective, NameplatesUsable, PickNameplate
+NS.C.SetWaypoint, NS.C.TapDenied, NS.C.UpdateMacro, NS.C.UseOwnArrow, NS.C.arrow, NS.C.targetNames = SetWaypoint, TapDenied, UpdateMacro, UseOwnArrow, arrow, targetNames

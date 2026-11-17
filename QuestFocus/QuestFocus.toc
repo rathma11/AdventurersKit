@@ -1,12 +1,36 @@
 ## Interface: 16001
 ## Title: QuestFocus
 ## Notes: Quest target macro (QFocus), markers, tooltips and quest item tools based on Questie data
-## Version: 0.1.0
+## Version: 0.2.0
 ## OptionalDeps: Questie, TomTom, Bagnon
 ## SavedVariables: QuestFocusDB
 
-Locales.lua
-QuestFocus.lua
+# Alap (core)
+Core\Locales.lua
+Core\Init.lua
+Core\Questie.lua
+Core\Map.lua
+Core\Targeting.lua
+UI\Panel.lua
+Core\Selection.lua
+Core\Events.lua
+Core\ZoneFocus.lua
+Core\Debug.lua
+UI\Options.lua
+Core\Slash.lua
+
+# Kiegeszitok (a 2. lepesben kulon addonok lesznek)
 QuestFocusBags.lua
-QuestFocusPlanner.lua
+
+# Tervezo: tempo, ETA, javaslatok, utazas, varos mod
+Planner\Pace.lua
+Planner\Toast.lua
+Planner\Route.lua
+Planner\Popup.lua
+Planner\Travel.lua
+Planner\City.lua
+Planner\Suggestions.lua
+Planner\Events.lua
+Planner\Options.lua
+
 QuestFocusBuffs.lua
