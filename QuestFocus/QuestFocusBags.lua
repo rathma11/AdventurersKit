@@ -272,7 +272,12 @@ end
 
 local function UpdateAllBagFrames()
     for _, B in ipairs({ _G.BagBrother, _G.Bagnon }) do
-        if type(B) == "table" and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+        if type(B) == "table" then
+            if B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+            -- A Bagnon a slotokat a keresesi jelzesre rajzolja ujra (UpdateSearch): ugyanazzal
+            -- a keresessel ujrakuldjuk, igy a kiemeles azonnal latszik, a keresesed nem valtozik
+            if type(B.SendSignal) == "function" then pcall(B.SendSignal, B, "SEARCH_CHANGED", B.search) end
+        end
     end
 end
 
