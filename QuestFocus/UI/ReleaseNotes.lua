@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.6", date = "2026-11-17", items = {
+        "Buff reminder: ticked item buffs (sleeping bag, weapon enchant, your own items) show up even when you have none in your bags; click the icon to choose one, or drag an item onto it.",
+        "Buff reminder: a small X at the end of each row stops watching that buff (tick it again on the Buffs tab).",
+    } },
     { version = "0.4.5", date = "2026-11-17", items = {
         "Tracking reminder fixed: it now checks by name whether one of your tracking spells is really active (it used to think something was on when nothing was).",
     } },

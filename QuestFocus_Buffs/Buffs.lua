@@ -699,15 +699,74 @@ for i = 1, #SLOTS + MAX_CUSTOM do
     b.count:SetPoint("BOTTOMRIGHT", 1, -1)
     b.text = alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     b.text:SetPoint("LEFT", b.arrow, "RIGHT", 4, 0)
-    b.text:SetPoint("RIGHT", alert, "RIGHT", -10, 0)
+    b.text:SetPoint("RIGHT", alert, "RIGHT", -28, 0)
     b.text:SetJustifyH("LEFT")
     b.text:SetWordWrap(false)
+    -- a sor vegen: ezt a tipust ne figyelje tobbet (Options > Buffs: visszapipalhato)
+    b.off = CreateFrame("Button", nil, alert)
+    b.off:SetSize(14, 14)
+    b.off:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+    b.off:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Highlight", "ADD")
+    b.off:Hide()
+    b.off:SetScript("OnClick", function()
+        local s = b.slot
+        if not s then return end
+        if s.custom then
+            RemoveCustomBuff(s.key) -- sajat item / buff: torlodik a listabol (Add buff-fal visszaveheto)
+            NS.Loud(Print, L["%s: removed from the watched buffs."], s.label)
+        else
+            DB()["noBuff_" .. s.key] = true
+            NS.Loud(Print, L["%s: no longer watched. Turn it back on: Options > Buffs."], s.label)
+        end
+        if NS.RebuildBuffBar then NS.RebuildBuffBar() end
+        if NS.RefreshBuffOptions then pcall(NS.RefreshBuffOptions) end
+    end)
+    b.off:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L["Don't watch this"], 1, 1, 1)
+        GameTooltip:AddLine(L["You can tick it again on the Buffs tab of the options."], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    b.off:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- item / spell huzasa az ikonra: ez lesz a beallitott
+    b:SetScript("OnReceiveDrag", function(self)
+        local s = self.slot
+        if not s or InCombatLockdown() then return end
+        local kind, itemId, _, spellID = GetCursorInfo()
+        if s.isClass and kind == "spell" then
+            local name = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)) or (GetSpellInfo and GetSpellInfo(spellID))
+            if name then QuestFocusDB.classPref = QuestFocusDB.classPref or {}; QuestFocusDB.classPref[s.key] = name end
+        elseif not s.isClass and not s.customSpell and kind == "item" then
+            DB().buffItems[s.key] = itemId
+            DB()["noBuff_" .. s.key] = false
+        else
+            return
+        end
+        ClearCursor()
+        if NS.RebuildBuffBar then NS.RebuildBuffBar() end
+    end)
+    -- info sor (nincs mit hasznalni): kattintasra valasztas (kaja: XP kaja lista, mas: Options > Buffs)
+    b:HookScript("PostClick", function(self)
+        if self.itemId or self.spellName or InCombatLockdown() then return end
+        local s = self.slot
+        if not s then return end
+        if GetCursorInfo() then
+            local h = self:GetScript("OnReceiveDrag")
+            if h then h(self) end
+            return
+        end
+        if s.key == "food" and NS.ShowFoodPicker then NS.ShowFoodPicker()
+        elseif NS.OpenOptionsTab then NS.OpenOptionsTab(L["Buffs"]) end
+    end)
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         local s = self.slot or slot
         if self.info then
             GameTooltip:SetText(s.label, 1, 1, 1)
             GameTooltip:AddLine(self.info, 1, 0.82, 0, true)
+            if not s.customSpell then
+                GameTooltip:AddLine(L["Click: choose one · or drag an item here"], 0.5, 0.5, 0.5)
+            end
         elseif self.spellName then
             GameTooltip:SetText(self.spellName, 1, 1, 1)
             GameTooltip:AddLine(L["Click: cast it on yourself"], 0.5, 0.5, 0.5)
@@ -792,6 +851,11 @@ local function UpdateAlert(auras)
             -- sajat buff, amit nem te teszel fel (pl. mas classe): csak szolunk
             need[#need + 1] = { slot = slot, left = nil, info = L["ask someone for it"] }
             key = key .. slot.key .. ":none;"
+        elseif not a and not left and not slot.isClass and not slot.customSpell and slot.key ~= "food"
+            and not NS.BuffSlotOff(slot) and not dismissed[slot.key] then
+            -- bepipalt itemes tipus (alvozsak, fegyver enchant, sajat item), de nincs ilyen a taskaban
+            need[#need + 1] = { slot = slot, left = nil, info = L["none in your bags - click to choose, or drag an item here"] }
+            key = key .. slot.key .. ":none;"
         end
     end
     if #need == 0 then
@@ -815,7 +879,7 @@ local function UpdateAlert(auras)
     -- Szovegek mindig frissulnek, a secure resz csak ha valtozott a lista
     if key ~= lastAlertKey then
         lastAlertKey = key
-        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide(); b.arrow:Hide() end
+        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide(); b.arrow:Hide(); b.off:Hide() end
         if NS.HideBuffFlyout then NS.HideBuffFlyout() end
         for i, n in ipairs(need) do
             local b = alertRows[i]
@@ -830,9 +894,13 @@ local function UpdateAlert(auras)
                 -- csak informacio (pl. nincs XP kaja): nincs kattinthato ikon
                 b.slot, b.itemId, b.spellName, b.alts = n.slot, nil, nil, nil
                 b:SetAttribute("type", nil)
-                b.icon:SetTexture(n.slot.customSpell and n.slot.buffName and SpellIconOf(n.slot.buffName)
-                    or (n.slot.customSpell and "Interface\\Icons\\INV_Misc_QuestionMark")
-                    or "Interface\\Icons\\INV_Misc_Food_15")
+                local s = n.slot
+                b.icon:SetTexture((s.customSpell and s.buffName and SpellIconOf(s.buffName))
+                    or (s.custom and s.itemId and GetItemIcon(s.itemId))
+                    or (s.hand and "Interface\\Icons\\INV_Stone_SharpeningStone_01")
+                    or (s.key == "rest" and "Interface\\Icons\\INV_Misc_Bag_08")
+                    or (s.key == "food" and "Interface\\Icons\\INV_Misc_Food_15")
+                    or "Interface\\Icons\\INV_Misc_QuestionMark")
             end
             b.info = n.info
             b.icon:SetDesaturated(n.info ~= nil)
@@ -840,6 +908,9 @@ local function UpdateAlert(auras)
             b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
             b:Show()
             b.text:Show()
+            b.off:ClearAllPoints()
+            b.off:SetPoint("TOPRIGHT", alert, "TOPRIGHT", -8, -26 - (i - 1) * ROW_H)
+            b.off:Show()
         end
         alert:SetHeight(26 + #need * ROW_H)
         PlaceAlert()
