@@ -927,12 +927,18 @@ local function UpdateAlert(auras)
                 SetupSecure(b, n.slot, n.action)
                 local alts = NS.BuffAlternatives and NS.BuffAlternatives(n.slot)
                 b.alts = alts
-                b.arrow:SetShown(alts ~= nil and #alts >= 2)
+                -- fegyver enchant / XP kaja: a nyil mindig ott van (valasztas); masnal csak ha tobb lehetoseg
+                b.arrow:SetShown(alts ~= nil and (#alts >= 2 or n.slot.hand ~= nil or n.slot.key == "food"))
             else
                 -- csak informacio (pl. nincs XP kaja): nincs kattinthato ikon
                 b.slot, b.itemId, b.spellName, b.alts = n.slot, nil, nil, nil
                 b:SetAttribute("type", nil)
                 local s = n.slot
+                -- fegyver enchant / XP kaja: valaszto nyil itt is (ha nincs mibol, megmondja)
+                if s.hand or s.key == "food" then
+                    b.alts = NS.BuffAlternatives and NS.BuffAlternatives(s) or {}
+                    b.arrow:Show()
+                end
                 b.icon:SetTexture((s.customSpell and s.buffName and SpellIconOf(s.buffName))
                     or (s.custom and s.itemId and GetItemIcon(s.itemId))
                     or (s.hand and "Interface\\Icons\\INV_Stone_SharpeningStone_01")
@@ -1115,12 +1121,18 @@ local function FoodCandidates()
             if id and not seen[id] then
                 seen[id] = true
                 local _, _, _, _, _, classID, subID = GetItemInfoInstant(id)
-                local tip = TooltipText(bag, s):lower()
-                local isXP = tip:find("experience", 1, true) or tip:find("%f[%w]xp%f[%W]")
-                if isXP and classID == 0 then
-                    xp[#xp + 1] = id
-                elseif classID == 0 and subID == 5 then -- Consumable > Food & Drink
-                    other[#other + 1] = id
+                -- csak etel / ital: Consumable > Food & Drink, vagy aminek a leirasa evest ir
+                -- (a sator, alvozsak, tekercs is "experience"-t ir, de az nem kaja)
+                if classID == 0 then
+                    local tip = TooltipText(bag, s):lower()
+                    local isFood = subID == 5 or tip:find("must remain seated while eating", 1, true)
+                        or tip:find("well fed", 1, true)
+                    local isXP = tip:find("experience", 1, true) or tip:find("%f[%w]xp%f[%W]")
+                    if isFood and isXP then
+                        xp[#xp + 1] = id
+                    elseif isFood then
+                        other[#other + 1] = id
+                    end
                 end
             end
         end
@@ -1371,7 +1383,13 @@ NS.ToggleBuffFlyout = function(row, arrow)
         f:SetPoint("LEFT", flyout, "LEFT", 4 + (n - 1) * 26, 0)
         f:Show()
     end
-    if n == 0 then return end
+    if n == 0 then
+        -- nincs mibol valasztani (pl. nincs a fegyverre illo ko / olaj a taskaban)
+        local s = row.slot
+        NS.Loud(Print, s and s.hand and L["Nothing for this weapon in your bags (%s). Buy one, or drag an item onto the icon."]
+            or L["Nothing to choose from in your bags (%s)."], s and s.label or "?")
+        return
+    end
     flyout.row = row
     flyout:SetWidth(8 + n * 26)
     flyout:ClearAllPoints()

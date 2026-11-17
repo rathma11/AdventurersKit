@@ -38,6 +38,10 @@ local function SlashHandler(msg)
         if NS.ShowCityList then NS.ShowCityList() end
     elseif msg == "dungeon" or msg == "dungeons" then
         if NS.ToggleDungeonList then NS.ToggleDungeonList() end
+    elseif msg == "export" then
+        if NS.OpenShareSettings then NS.OpenShareSettings("export") end
+    elseif msg == "import" then
+        if NS.OpenShareSettings then NS.OpenShareSettings("import") end
     elseif msg == "cityreset" then
         if NS.ResetCityIgnore then NS.ResetCityIgnore() end
     elseif msg == "chat" then

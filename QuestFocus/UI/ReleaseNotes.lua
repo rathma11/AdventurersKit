@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.5.2", date = "2026-11-17", items = {
+        "Share settings tab (and /qf export, /qf import): your settings as text to send to others, or load theirs. "
+            .. "Item choices (XP food, sleeping bag, stones / oils, own item buffs) are only taken if the importer has the item; "
+            .. "class settings only for the same class; panel position, ignore list and kill pace are not shared.",
+        "XP food: only real food / drink is listed (camp tents, sleeping bags and scrolls no longer show up).",
+        "Buff reminder: the weapon enchant and XP food rows always have the small arrow to choose another one.",
+    } },
     { version = "0.5.1", date = "2026-11-17", items = {
         "Spacing: the chain icon no longer touches the quest name / 2/5, '(in log)' sits further right, "
             .. "and the panel's top icons no longer touch the close button.",
