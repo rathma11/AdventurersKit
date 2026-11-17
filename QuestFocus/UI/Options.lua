@@ -95,8 +95,8 @@ local function AddOptionsTab(label, order, opts)
         content = CreateFrame("Frame", nil, scroll)
         content:SetSize(DESC_W + 60, 10)
         scroll:SetScrollChild(content)
-        -- tartalom magassaga: a legalso elem alja (megjeleneskor merjuk)
-        holder:SetScript("OnShow", function()
+        -- tartalom magassaga: a legalso elem alja (megjeleneskor, es ha az oldal keri: Remeasure)
+        local function Remeasure()
             C_Timer.After(0, function()
                 local top, low = content:GetTop(), nil
                 if not top then return end
@@ -114,7 +114,9 @@ local function AddOptionsTab(label, order, opts)
                 content:SetWidth(math.max(DESC_W + 60, scroll:GetWidth()))
                 content:SetHeight(low and (top - low + 16) or 10)
             end)
-        end)
+        end
+        content.Remeasure = Remeasure
+        holder:SetScript("OnShow", Remeasure)
     end
 
     local t = CreateFrame("Button", nil, opt)

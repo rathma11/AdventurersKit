@@ -12,10 +12,25 @@ local SLOTS = {
     -- Cozy Sleeping Bag buff: spell 429959, 3 stack kell belole
     { key = "rest",   label = L["Sleeping bag"], names = { L["Sleeping Bag"] }, spellId = 429959, stacks = 3, warn = 10 },
     { key = "food",   label = L["XP food"],      names = {}, warn = 1 },
-    { key = "weapon", label = L["Weapon enchant"],
+    -- fegyver enchant itemmel: hand = 16 main hand, 17 off hand (csak ha ott fegyver van)
+    { key = "weapon", label = L["Main hand enchant"], hand = 16,
+      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
+    { key = "weapon_off", label = L["Off-hand enchant"], hand = 17,
       names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
 }
-local BTN = 30
+-- Rogue: poisonok is (a nev alapjan keressuk a taskaban; kattintasra a fegyverre teszi)
+if select(2, UnitClass("player")) == "ROGUE" then
+    for _, s in ipairs(SLOTS) do
+        if s.hand then
+            for _, p in ipairs({ L["Instant Poison"], L["Deadly Poison"], L["Crippling Poison"],
+                L["Mind-numbing Poison"], L["Wound Poison"] }) do s.names[#s.names + 1] = p end
+            s.label = s.hand == 16 and L["Main hand poison / enchant"] or L["Off-hand poison / enchant"]
+        end
+    end
+end
+-- Ezekbol a tipusokbol egyszerre csak egy lehet (Options > Buffs > Add buff); a tobbi
+-- ("Other item") barmennyi: QuestFocusDB.customBuffs = { { key = "i_<itemId>", itemId } }
+local MAX_CUSTOM = 8
 
 -- Class buffok: 'spells' = a buff nevei (barmelyik eleg, a "Greater ..." is), 'cast' = amit
 -- feltehetunk magunkra. 'permanent': nem jar le (aura / aspect), csak a hianya szamit.
@@ -59,6 +74,9 @@ local CLASS_BUFFS = {
         { key = "c_trueshot", label = L["Trueshot Aura"], permanent = true, spells = { "Trueshot Aura" } },
     },
     SHAMAN = {
+        -- fegyver imbue spellel: a main hand enchant idejet nezi (GetWeaponEnchantInfo)
+        { key = "c_imbue", label = L["Weapon imbue"], warn = 1, hand = 16,
+          spells = { "Windfury Weapon", "Flametongue Weapon", "Frostbrand Weapon", "Rockbiter Weapon" } },
         { key = "c_shield", label = L["Shield"], warn = 1, spells = { "Lightning Shield", "Water Shield", "Earth Shield" } },
     },
 }
@@ -90,10 +108,67 @@ local function DB()
     return QuestFocusDB
 end
 
--- Figyelmeztetesi kuszob percben, buffonkent (alap: slot.warn)
+-- Figyelmeztetesi kuszob percben, buffonkent (alap: slot.warn). 0 = csak ha hianyzik.
 local function Minutes(slot)
     local t = QuestFocusDB.buffWarn
     return (t and tonumber(t[slot.key])) or slot.warn or 10
+end
+
+-- Sajat item tipusok ("Other item"): barmilyen item, ami buffot ad (elixir, scroll...).
+-- A buffot az elso hasznalatkor tanulja meg (vagy az item spell neve alapjan talalja).
+local function CustomSlotIndex(key)
+    for i, s in ipairs(SLOTS) do if s.key == key then return i end end
+end
+-- Sajat buff (spell ID / nev alapjan): a buffot nevrol / ID-rol ismerjuk fel; ha a spellt
+-- te tudod castolni, az emlekezteto gombja fel is teszi, kulonben csak szol, hogy hianyzik.
+local function EnsureCustomBuffs()
+    local list = QuestFocusDB.customBuffs or {}
+    for _, e in ipairs(list) do
+        local i = CustomSlotIndex(e.key)
+        if e.itemId then
+            local name = GetItemInfo(e.itemId)
+            if not i then
+                SLOTS[#SLOTS + 1] = { key = e.key, itemId = e.itemId, custom = true, names = {}, warn = 0,
+                    label = name or ("item " .. e.itemId) }
+            elseif name then
+                SLOTS[i].label = name
+            end
+            DB().buffItems[e.key] = e.itemId
+        elseif not i then
+            SLOTS[#SLOTS + 1] = { key = e.key, custom = true, customSpell = true, names = {}, warn = 0,
+                buffSpellId = e.spellId, buffName = e.name, label = e.name or ("spell " .. tostring(e.spellId)) }
+        end
+    end
+end
+NS.EnsureCustomBuffs = EnsureCustomBuffs
+local function AddCustomSpellBuff(spellId, name, minutes)
+    QuestFocusDB.customBuffs = QuestFocusDB.customBuffs or {}
+    local key = "s_" .. tostring(spellId or name)
+    if CustomSlotIndex(key) or #QuestFocusDB.customBuffs >= MAX_CUSTOM then return false end
+    table.insert(QuestFocusDB.customBuffs, { key = key, spellId = spellId, name = name })
+    QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
+    QuestFocusDB.buffWarn[key] = minutes or 0
+    EnsureCustomBuffs()
+    return true
+end
+local function AddCustomBuff(itemId, minutes)
+    QuestFocusDB.customBuffs = QuestFocusDB.customBuffs or {}
+    local key = "i_" .. itemId
+    if CustomSlotIndex(key) then return false end
+    if #QuestFocusDB.customBuffs >= MAX_CUSTOM then return false end
+    table.insert(QuestFocusDB.customBuffs, { key = key, itemId = itemId })
+    QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
+    QuestFocusDB.buffWarn[key] = minutes or 0
+    EnsureCustomBuffs()
+    return true
+end
+local function RemoveCustomBuff(key)
+    for i, e in ipairs(QuestFocusDB.customBuffs or {}) do
+        if e.key == key then table.remove(QuestFocusDB.customBuffs, i) break end
+    end
+    local i = CustomSlotIndex(key)
+    if i then table.remove(SLOTS, i) end
+    DB().buffItems[key] = nil
 end
 
 ---------------------------------------------------------------------------
@@ -201,6 +276,30 @@ local function Remaining(slot, itemId, auras)
         -- nem buff, hanem a minimap kovetes: lent (NS.TrackingRemaining)
         return NS.TrackingRemaining and NS.TrackingRemaining(slot)
     end
+    if slot.customSpell then
+        local a = (slot.buffSpellId and auraById[slot.buffSpellId]) or (slot.buffName and auras[slot.buffName])
+        if not a then return end
+        if a.expires == 0 then return math.huge end
+        return a.expires - GetTime()
+    end
+    if slot.hand then
+        -- fegyver enchant / poison / shaman imbue: a fegyveren levo ideiglenes enchant
+        if slot.hand == 17 then
+            -- off hand: csak ha ott fegyver van (pajzs / off-hand item / ures: nem szolunk)
+            local id = GetInventoryItemID("player", 17)
+            local classID = id and select(6, GetItemInfoInstant(id))
+            if classID ~= 2 then return math.huge end
+        end
+        local ok, hasMain, mainMs, _, _, hasOff, offMs = pcall(GetWeaponEnchantInfo)
+        if not ok then return end
+        local has, ms = hasMain, mainMs
+        if slot.hand == 17 then has, ms = hasOff, offMs end
+        if has then
+            local okN, sec = pcall(function() return (ms or 0) / 1000 end)
+            if okN then return sec end
+        end
+        return
+    end
     if slot.isClass then
         for _, name in ipairs(slot.spells) do
             local a = auras[name]
@@ -222,14 +321,6 @@ local function Remaining(slot, itemId, auras)
             return a.expires - GetTime(), stacks
         end
         return nil, 0
-    end
-    if slot.key == "weapon" then
-        local ok, has, ms = pcall(GetWeaponEnchantInfo)
-        if ok and has then
-            local okN, sec = pcall(function() return (ms or 0) / 1000 end)
-            if okN then return sec end
-        end
-        return
     end
     local names = {}
     local learned = itemId and DB().buffLearn[itemId]
@@ -336,6 +427,13 @@ end
 -- Mivel lehet "megjavitani" a slotot: { kind = "item", id } vagy { kind = "spell", name }
 local function Action(slot)
     if DB()["noBuff_" .. slot.key] then return end
+    if slot.customSpell then
+        -- csak ha te tudod castolni (kulonben az emlekezteto csak szol, gomb nelkul)
+        local known = (slot.buffSpellId and IsPlayerSpell and IsPlayerSpell(slot.buffSpellId))
+            or (slot.buffName and SpellKnown(slot.buffName))
+        if known and slot.buffName then return { kind = "spell", name = slot.buffName } end
+        return
+    end
     if slot.isClass then
         local name = SlotSpell(slot)
         if name then return { kind = "spell", name = name } end
@@ -371,8 +469,8 @@ local function SetupSecure(b, slot, a)
         b:SetAttribute("type", "macro")
         b:SetAttribute("spell", nil)
         b:SetAttribute("unit", nil)
-        b:SetAttribute("macrotext", slot.key == "weapon"
-            and ("/use item:%d\n/use 16"):format(a.id) or ("/use item:%d"):format(a.id))
+        b:SetAttribute("macrotext", slot.hand
+            and ("/use item:%d\n/use %d"):format(a.id, slot.hand) or ("/use item:%d"):format(a.id))
     end
 end
 
@@ -429,14 +527,8 @@ NS.ResetBuffLearn = function()
 end
 
 ---------------------------------------------------------------------------
--- Gombok
+-- Segedek az emlekezteto kisablakhoz (a regi "buff gombsor a panel alatt" kikerult)
 ---------------------------------------------------------------------------
-local bar = CreateFrame("Frame", "QuestFocusBuffBar", UIParent)
-bar:SetSize(3 * (BTN + 6), BTN + 14)
-bar:Hide()
-
-local buttons = {}
-
 -- Stack kovetelmeny (alvozsak: 3 stack kell)
 local function ShortStacks(slot, stacks)
     return slot.stacks and (stacks or 0) < slot.stacks
@@ -456,117 +548,21 @@ local function FmtLeft(sec, slot)
     return "|cffd0d0d0" .. txt .. "|r"
 end
 
-for i, slot in ipairs(SLOTS) do
-    local b = CreateFrame("Button", "QuestFocusBuff" .. i, bar, "SecureActionButtonTemplate")
-    b:SetSize(BTN, BTN)
-    b:RegisterForClicks("AnyUp", "AnyDown")
-    b.slot = slot
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetAllPoints()
-    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    b.border = b:CreateTexture(nil, "OVERLAY")
-    b.border:SetPoint("TOPLEFT", -2, 2)
-    b.border:SetPoint("BOTTOMRIGHT", 2, -2)
-    b.border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-    b.border:SetBlendMode("ADD")
-    b.border:SetTexCoord(0.2, 0.8, 0.2, 0.8)
-    b.border:Hide()
-    b.warn = b:CreateTexture(nil, "OVERLAY")
-    b.warn:SetAllPoints()
-    b.warn:SetColorTexture(1, 0.1, 0.1, 0.35)
-    b.warn:Hide()
-    b.time = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.time:SetPoint("TOP", b, "BOTTOM", 0, -1)
-    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    b.count:SetPoint("BOTTOMRIGHT", -1, 1)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.15)
-    b:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-        if self.itemId then GameTooltip:SetItemByID(self.itemId) else GameTooltip:SetText(slot.label, 1, 1, 1) end
-        GameTooltip:AddLine(" ")
-        local left, stacks = Remaining(slot, self.itemId, HelpfulAuras())
-        GameTooltip:AddLine(slot.label .. ": " .. FmtLeft(left, slot) .. StackText(slot, stacks), 1, 0.82, 0)
-        if slot.stacks then
-            GameTooltip:AddLine((L["Needs %d stacks of the buff (spell %d)."]):format(slot.stacks, slot.spellId), 0.7, 0.7, 0.7)
-        end
-        GameTooltip:AddLine(slot.key == "weapon" and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    b:HookScript("PreClick", function(self)
-        if self.itemId and slot.key ~= "weapon" then StartLearning(self.itemId) end
-    end)
-    buttons[i] = b
-end
-
--- Secure gombot NEM horgonyzunk a panelhez (attol a panel is vedett lenne, es harcban
--- a meretezese/mozgatasa blokkolva lenne): a panel kepernyo-pozicioja alapjan tesszuk le.
-local lastGeo
-local function Anchor()
-    if InCombatLockdown() then return end
-    local p = NS.panel
-    local r, b = NS.PanelEdge("right"), NS.PanelEdge("bottom")
-    local geo = p:IsShown() and r and b and (math.floor(r) .. ":" .. math.floor(b)) or "none"
-    if geo == lastGeo and bar:GetNumPoints() > 0 then return end
-    lastGeo = geo
-    bar:ClearAllPoints()
-    if geo ~= "none" then
-        bar:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", r - 4, b - 2)
-    else
-        bar:SetPoint("RIGHT", UIParent, "RIGHT", -264, -20)
-    end
-end
-
 -- Modul ki/be (Options > Buffs > Module on): kikapcsolva betoltve marad, de semmit nem csinal
 local function On() return not NS.ModuleOn or NS.ModuleOn("QuestFocus_Buffs") end
 
--- Secure attributumok + lathatosag: csak harcon kivul
+-- Valtozas utan (item / lista / modul): az emlekezteto azonnal ujraepul (lent allitjuk be)
+local refreshAlert
 local function Rebuild()
-    if InCombatLockdown() then bar.dirty = true return end
-    bar.dirty = nil
-    -- A gombsor alapbol ki van kapcsolva (a buff idok ugyis latszanak a buff kereten)
-    if not QuestFocusDB.showBuffBar or not On() then bar:Hide() return end
-    local x, auras = 0, HelpfulAuras()
-    for _, b in ipairs(buttons) do
-        local slot = b.slot
-        local id = not DB()["noBuff_" .. slot.key] and FindItem(slot) or nil
-        local count = id and GetItemCount(id) or 0
-        b.itemId = id
-        local active = Remaining(slot, id, auras)
-        if slot.isClass then
-            b:Hide() -- a gombsorban csak az itemek; class buff a kisablakban
-        elseif (id and count > 0) or active then
-            b.icon:SetTexture(id and GetItemIcon(id) or "Interface\\Icons\\INV_Misc_QuestionMark")
-            b.count:SetText(count > 1 and count or "")
-            if id and count > 0 then
-                b:SetAttribute("type", "macro")
-                b:SetAttribute("macrotext", slot.key == "weapon"
-                    and ("/use item:%d\n/use 16"):format(id) or ("/use item:%d"):format(id))
-            else
-                b:SetAttribute("type", nil)
-            end
-            b:ClearAllPoints()
-            b:SetPoint("TOPRIGHT", bar, "TOPRIGHT", -x, 0)
-            b:Show()
-            x = x + BTN + 6
-        else
-            b:Hide()
-        end
-    end
-    if x == 0 then bar:Hide() return end
-    bar:SetWidth(x)
-    lastGeo = nil
-    Anchor()
-    bar:Show()
+    if QuestFocusDB then EnsureCustomBuffs() end -- item nevek, ha kozben betoltodtek
+    if refreshAlert then refreshAlert() end
 end
 NS.RebuildBuffBar = Rebuild
 
 -- Idok + figyelmeztetes (harcban is mehet, nem secure)
 local warned = {}
 
--- Egyszer szolunk (kepernyo + chat), amikor egy buff a kuszob ala esik. A gombsortol fuggetlen.
+-- Egyszer szolunk (chat), amikor egy buff a kuszob ala esik. 0 perc: soha (csak a hiany szamit).
 local function CheckWarnings(auras)
     if QuestFocusDB.noBuffWarn or not On() then return end
     for _, slot in ipairs(SLOTS) do
@@ -586,35 +582,6 @@ local function CheckWarnings(auras)
         end
     end
 end
-
--- Gombsor idok + pulzalas (csak ha be van kapcsolva es latszik)
-local function Tick()
-    if not bar:IsShown() then return end
-    local auras = HelpfulAuras()
-    local pulse = 0.25 + 0.25 * math.sin(GetTime() * 5)
-    for _, b in ipairs(buttons) do
-        if b:IsShown() then
-            local slot = b.slot
-            local limit = Minutes(slot) * 60
-            local left, stacks = Remaining(slot, b.itemId, auras)
-            b.time:SetText(FmtLeft(left, slot) .. StackText(slot, stacks))
-            local low = (not left) or (left ~= math.huge and left < limit) or ShortStacks(slot, stacks)
-            local canFix = b.itemId and GetItemCount(b.itemId) > 0
-            b.warn:SetShown(low and canFix)
-            b.warn:SetAlpha(pulse + 0.2)
-            b.icon:SetDesaturated(not left)
-        end
-    end
-end
-
-local elapsed = 0
-bar:SetScript("OnUpdate", function(_, dt)
-    elapsed = elapsed + dt
-    if elapsed < 0.25 then return end
-    elapsed = 0
-    Tick()
-    Anchor() -- a panel mozgott / atmeretezodott (csak harcon kivul tesz barmit)
-end)
 
 ---------------------------------------------------------------------------
 -- Buff figyelmezteto kisablak (harcon kivul): ikon gombbal, amivel fel is rakhato
@@ -654,7 +621,9 @@ local dismissed = {}   -- slot.key -> true: bezarta, amig a buff fel nem kerul u
 NS.buffDismissed = dismissed
 local alertRows = {}
 local ROW_H = 26
-for i, slot in ipairs(SLOTS) do
+-- sorok: a beepitett tipusok + MAX_CUSTOM sajat item (a slot futas kozben valtozik: b.slot)
+for i = 1, #SLOTS + MAX_CUSTOM do
+    local slot = SLOTS[i]
     local b = CreateFrame("Button", "QuestFocusBuffAlertBtn" .. i, alert, "SecureActionButtonTemplate")
     b:SetSize(22, 22)
     b:RegisterForClicks("AnyUp", "AnyDown")
@@ -698,14 +667,15 @@ for i, slot in ipairs(SLOTS) do
             GameTooltip:AddLine(L["Click: cast it on yourself"], 0.5, 0.5, 0.5)
         else
             if self.itemId then GameTooltip:SetItemByID(self.itemId) end
-            GameTooltip:AddLine(s.key == "weapon" and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(s.hand == 17 and L["Click: apply to off-hand weapon"]
+                or s.hand and L["Click: apply to main hand weapon"] or L["Click: use"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:HookScript("PreClick", function(self)
         local s = self.slot or slot
-        if self.itemId and s.key ~= "weapon" and not s.isClass then StartLearning(self.itemId) end
+        if self.itemId and not s.hand and not s.isClass then StartLearning(self.itemId) end
     end)
     b:Hide()
     alertRows[i] = b
@@ -772,6 +742,10 @@ local function UpdateAlert(auras)
             -- nincs XP kaja a taskaban: csak szolunk, gomb nelkul
             need[#need + 1] = { slot = slot, left = nil, info = L["no XP food in your bags - buy some at a vendor, or cook one if you can"] }
             key = key .. "food:none;"
+        elseif not a and slot.customSpell and not left and not dismissed[slot.key] then
+            -- sajat buff, amit nem te teszel fel (pl. mas classe): csak szolunk
+            need[#need + 1] = { slot = slot, left = nil, info = L["ask someone for it"] }
+            key = key .. slot.key .. ":none;"
         end
     end
     if #need == 0 then
@@ -810,7 +784,9 @@ local function UpdateAlert(auras)
                 -- csak informacio (pl. nincs XP kaja): nincs kattinthato ikon
                 b.slot, b.itemId, b.spellName, b.alts = n.slot, nil, nil, nil
                 b:SetAttribute("type", nil)
-                b.icon:SetTexture("Interface\\Icons\\INV_Misc_Food_15")
+                b.icon:SetTexture(n.slot.customSpell and n.slot.buffName and SpellIconOf(n.slot.buffName)
+                    or (n.slot.customSpell and "Interface\\Icons\\INV_Misc_QuestionMark")
+                    or "Interface\\Icons\\INV_Misc_Food_15")
             end
             b.info = n.info
             b.icon:SetDesaturated(n.info ~= nil)
@@ -864,6 +840,10 @@ local function UpdateAlert(auras)
     end
 end
 NS.BuffAlertFrame = alert
+refreshAlert = function()
+    lastAlertKey = nil
+    if not InCombatLockdown() then UpdateAlert(HelpfulAuras()) end
+end
 
 local alertElapsed = 0
 local alertTicker = CreateFrame("Frame")
@@ -910,11 +890,12 @@ ev:SetScript("OnEvent", function(_, event, unit)
     elseif event == "UNIT_INVENTORY_CHANGED" then
         if unit == "player" then Soon() end
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if bar.dirty then Rebuild() end
+        Rebuild()
     elseif event == "BAG_UPDATE_DELAYED" then
         if NS.ClearFoodCache then NS.ClearFoodCache() end
         Soon()
     elseif event == "PLAYER_LOGIN" then
+        NS.EnsureCustomBuffs()
         C_Timer.After(3, Rebuild)
         -- XP kaja valaszto: ha nincs beallitva (a panel betoltese utan)
         C_Timer.After(12, function() if NS.MaybePromptFood then NS.MaybePromptFood() end end)
@@ -1236,86 +1217,236 @@ end)
 
 fl:Header(L["Reminder"])
 fl:Check(L["Reminder popup out of combat"],
-    L["When a buff is missing or about to run out, a small popup above the panel shows the item; click its icon to apply it. "]
+    L["When a watched buff is missing or about to run out, a small popup above the panel shows the item; click its icon to apply it. "]
     .. L["The X hides it until that buff is applied again."],
     function() return not QuestFocusDB.noBuffAlert end,
     function(v) QuestFocusDB.noBuffAlert = not v; wipe(dismissed); lastAlertKey = nil end)
 fl:Check(L["Warn before a buff expires"],
-    L["One chat message when a buff has less time left than its minutes below (needs chat messages on, General tab)."],
+    L["One chat message when a buff has less time left than its minutes in the list (needs chat messages on, General tab)."],
     function() return not QuestFocusDB.noBuffWarn end,
     function(v) QuestFocusDB.noBuffWarn = not v end)
 fl:Check(L["Ask for XP food at login"],
-    L["If no XP food is set but you have food in your bags, a picker opens once after login."],
+    L["If XP food is watched but none is set and you have food in your bags, a picker opens once after login."],
     function() return not QuestFocusDB.noFoodPrompt end,
     function(v) QuestFocusDB.noFoodPrompt = not v end)
 
-fl:Header(L["Buffs to watch"])
-fl:Text(L["Items: drag one from your bags onto a slot. Right click: automatic / none. "]
-    .. L["Sleeping bag and weapon enchant are found by name if no item is set; XP food must be dragged in once. "]
-    .. L["The buff an item gives is learned the first time you use it from the button. "]
-    .. L["The number box: warn this many minutes before the buff runs out (Enter to save). "]
-    .. L["Class buffs: by default the one you last had on is cast; drag a spell from your spellbook (P) onto the slot to choose."], 2)
+---------------------------------------------------------------------------
+-- Figyelt buffok listaja: sorok [ikon] nev / item  [perc] min  [X]
+---------------------------------------------------------------------------
+fl:Header(L["Watched buffs"])
+fl:Text(L["Tick what you want watched. Icon: click to choose (food, stone / oil / poison, spell), or drag an item / spell onto it; "]
+    .. L["right click: automatic. Minutes: remind this long before it runs out, 0 = only when it's missing. "]
+    .. L["Other buffs (elixirs, scrolls...): Add item below."], 2)
 
-local slotUI = {}
-for i, slot in ipairs(SLOTS) do
-    local s = CreateFrame("Button", nil, page)
-    s:SetSize(34, 34)
-    fl:Place(s, 4, i == 1 and 12 or 8)
-    s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    s.bg = s:CreateTexture(nil, "BACKGROUND")
-    s.bg:SetAllPoints()
-    s.bg:SetColorTexture(0, 0, 0, 0.5)
-    s.icon = s:CreateTexture(nil, "ARTWORK")
-    s.icon:SetPoint("TOPLEFT", 2, -2)
-    s.icon:SetPoint("BOTTOMRIGHT", -2, 2)
-    -- Figyelmeztetes kuszob ehhez a buffhoz (perc)
-    s.min = CreateFrame("EditBox", nil, page, "InputBoxTemplate")
-    s.min:SetSize(34, 20)
-    s.min:SetAutoFocus(false)
-    s.min:SetNumeric(true)
-    s.min:SetPoint("LEFT", s, "RIGHT", 14, 0)
-    s.minLabel = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    s.minLabel:SetPoint("LEFT", s.min, "RIGHT", 4, 0)
-    s.minLabel:SetText(L["min"])
-    s.min:SetScript("OnEnterPressed", function(self)
-        local v = tonumber(self:GetText())
-        if v and v >= 0 then
-            QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
-            QuestFocusDB.buffWarn[slot.key] = v
+local function Watched(slot)
+    if slot.custom then return true end
+    return not DB()["noBuff_" .. slot.key]
+end
+
+local function AfterChange()
+    wipe(warned)
+    wipe(dismissed)
+    lastAlertKey = nil
+    Rebuild()
+end
+
+-- Valaszto (nem secure): az ikonra kattintva a lehetosegek; kattintasra az lesz a beallitott
+local chooser = CreateFrame("Frame", nil, NS.opt, BackdropTemplateMixin and "BackdropTemplate" or nil)
+chooser:SetFrameStrata("DIALOG")
+chooser:EnableMouse(true)
+chooser:Hide()
+if chooser.SetBackdrop then
+    chooser:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    chooser:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
+    chooser:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
+end
+chooser.btns = {}
+local RefreshList -- lent
+local function OpenChooser(anchor, slot)
+    if chooser:IsShown() and chooser.slot == slot then chooser:Hide() return end
+    local alts = NS.BuffAlternatives(slot)
+    if #alts == 0 then
+        NS.Loud(Print, slot.isClass and L["No known spell for %s."] or L["Nothing for %s in your bags. Drag an item onto the icon."], slot.label)
+        return
+    end
+    chooser.slot = slot
+    for _, b in ipairs(chooser.btns) do b:Hide() end
+    for i, a in ipairs(alts) do
+        local b = chooser.btns[i]
+        if not b then
+            b = CreateFrame("Button", nil, chooser)
+            b:SetSize(26, 26)
+            b.icon = b:CreateTexture(nil, "ARTWORK")
+            b.icon:SetAllPoints()
+            b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+            b:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                if self.act.kind == "spell" then GameTooltip:SetText(self.act.name, 1, 1, 1)
+                else GameTooltip:SetItemByID(self.act.id) end
+                GameTooltip:AddLine(L["Click: use this one"], 0.5, 0.5, 0.5)
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            b:SetScript("OnClick", function(self)
+                local s, act = chooser.slot, self.act
+                if act.kind == "spell" then
+                    QuestFocusDB.classPref = QuestFocusDB.classPref or {}
+                    QuestFocusDB.classPref[s.key] = act.name
+                else
+                    DB().buffItems[s.key] = act.id
+                end
+                chooser:Hide()
+                AfterChange()
+                RefreshList()
+            end)
+            chooser.btns[i] = b
         end
-        wipe(warned)
-        wipe(dismissed)
-        lastAlertKey = nil
-        self:SetText(Minutes(slot))
+        b.act = a
+        b.icon:SetTexture(ActionIcon(a))
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", 6 + ((i - 1) % 8) * 28, -6 - math.floor((i - 1) / 8) * 28)
+        b:Show()
+    end
+    local cols = math.min(#alts, 8)
+    chooser:SetSize(12 + cols * 28, 12 + math.ceil(#alts / 8) * 28)
+    chooser:ClearAllPoints()
+    chooser:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 6, 4)
+    chooser:Show()
+end
+page:HookScript("OnHide", function() chooser:Hide() end)
+
+local listFrame = CreateFrame("Frame", nil, page)
+listFrame:SetSize(430, 10)
+fl:Place(listFrame, 4, 10)
+local ROW = 38
+local rows = {}
+
+local function SlotIconAndName(slot)
+    local db = DB()
+    if slot.customSpell then
+        local tex = slot.buffName and SpellIconOf(slot.buffName)
+        if (not tex or tex:find("QuestionMark")) and slot.buffSpellId and GetSpellTexture then
+            tex = GetSpellTexture(slot.buffSpellId) or tex
+        end
+        local castable = Action(slot) ~= nil
+        return tex or "Interface\\Icons\\INV_Misc_QuestionMark",
+            (slot.buffSpellId and ("spell " .. slot.buffSpellId .. "  ") or "")
+            .. "|cff808080(" .. (castable and L["you can cast it"] or L["reminder only"]) .. ")|r"
+    end
+    if slot.isClass then
+        local pref = db.classPref and db.classPref[slot.key]
+        local name = SlotSpell(slot)
+        return name and SpellIconOf(name) or "Interface\\Icons\\INV_Misc_QuestionMark",
+            (name or L["not known"]) .. "  |cff808080(" .. (pref and L["set"] or L["automatic"]) .. ")|r"
+    end
+    local set = db.buffItems[slot.key]
+    local id = FindItem(slot)
+    if slot.key == "food" and not id and NS.FoodCandidates then id = NS.FoodCandidates()[1] end
+    local name = id and GetItemInfo(id)
+    return id and GetItemIcon(id) or "Interface\\PaperDoll\\UI-Backpack-EmptySlot",
+        (name or (slot.key == "food" and L["no XP food set"] or "-"))
+        .. ((set and not slot.custom) and ("  |cff808080(" .. L["set"] .. ")|r") or "")
+end
+
+local function GetRow(i)
+    local r = rows[i]
+    if r then return r end
+    r = CreateFrame("Frame", nil, listFrame)
+    r:SetSize(430, ROW - 4)
+    -- pipa: kered / nem kered (beepitett tipusok); sajat itemnel helyette X a sor vegen
+    r.check = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
+    r.check:SetSize(24, 24)
+    r.check:SetPoint("LEFT", 0, 0)
+    r.check:SetScript("OnClick", function(self)
+        local s = r.slot
+        if not s or s.custom then return end
+        DB()["noBuff_" .. s.key] = (not self:GetChecked()) or nil
+        chooser:Hide()
+        AfterChange()
+        RefreshList()
+    end)
+    r.check:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Watch this buff"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    r.check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r.icon = CreateFrame("Button", nil, r)
+    r.icon:SetSize(30, 30)
+    r.icon:SetPoint("LEFT", 28, 0)
+    r.icon:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    r.icon.bg = r.icon:CreateTexture(nil, "BACKGROUND")
+    r.icon.bg:SetAllPoints()
+    r.icon.bg:SetColorTexture(0, 0, 0, 0.5)
+    r.icon.tex = r.icon:CreateTexture(nil, "ARTWORK")
+    r.icon.tex:SetPoint("TOPLEFT", 2, -2)
+    r.icon.tex:SetPoint("BOTTOMRIGHT", -2, 2)
+    r.icon:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    r.label = r:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    r.label:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 8, -1)
+    r.sub = r:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    r.sub:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -3)
+    r.sub:SetWidth(250)
+    r.sub:SetJustifyH("LEFT")
+    r.sub:SetWordWrap(false)
+    r.close = CreateFrame("Button", nil, r, "UIPanelCloseButton")
+    r.close:SetSize(22, 22)
+    r.close:SetPoint("RIGHT", 0, 0)
+    r.minLabel = r:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    r.minLabel:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
+    r.minLabel:SetText(L["min"])
+    r.min = CreateFrame("EditBox", nil, r, "InputBoxTemplate")
+    r.min:SetSize(30, 20)
+    r.min:SetAutoFocus(false)
+    r.min:SetNumeric(true)
+    r.min:SetPoint("RIGHT", r.minLabel, "LEFT", -4, 0)
+    r.onlyMissing = r:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    r.onlyMissing:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
+    r.onlyMissing:SetText(L["when missing"])
+    r.min:SetScript("OnEnterPressed", function(self)
+        local v = tonumber(self:GetText())
+        if v and v >= 0 and r.slot then
+            QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
+            QuestFocusDB.buffWarn[r.slot.key] = v
+            AfterChange()
+        end
+        self:SetText(r.slot and Minutes(r.slot) or "")
         self:ClearFocus()
     end)
-    s.min:SetScript("OnEscapePressed", function(self) self:SetText(Minutes(slot)); self:ClearFocus() end)
-    s.text = page:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    s.text:SetPoint("LEFT", s.minLabel, "RIGHT", 12, 0)
-    s.refresh = function()
-        s.min:SetText(Minutes(slot))
-        local db = DB()
-        local off = db["noBuff_" .. slot.key]
-        if slot.isClass then
-            local pref = db.classPref and db.classPref[slot.key]
-            local name = not off and SlotSpell(slot)
-            s.icon:SetTexture(name and SpellIconOf(name) or "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-            local mode = off and L["off"] or (pref and L["set"] or L["automatic"])
-            s.text:SetText(("%s: |cffffff00%s|r  |cff808080(%s)|r"):format(slot.label,
-                name or (off and "-" or L["not known"]), mode))
-            return
-        end
-        local set = db.buffItems[slot.key]
-        local id = not off and FindItem(slot)
-        s.icon:SetTexture(id and GetItemIcon(id) or "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-        local name = id and GetItemInfo(id)
-        local mode = off and L["off"] or (set and L["set"] or L["automatic"])
-        s.text:SetText(("%s: |cffffff00%s|r  |cff808080(%s)|r"):format(slot.label, name or "-", mode))
-    end
+    r.min:SetScript("OnEscapePressed", function(self) self:SetText(r.slot and Minutes(r.slot) or ""); self:ClearFocus() end)
+    r.min:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Remind this many minutes before it runs out"], 1, 1, 1)
+        GameTooltip:AddLine(L["0 = only when the buff is missing. Enter to save."], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    r.min:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r.close:SetScript("OnClick", function()
+        local s = r.slot
+        if not s or not s.custom then return end
+        RemoveCustomBuff(s.key)
+        chooser:Hide()
+        AfterChange()
+        RefreshList()
+    end)
+    r.close:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Remove this item"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    r.close:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- ikon: kattintas = valaszto, jobb klikk = automatikus, huzas = item / spell beallitasa
     local function FromCursor()
+        local s = r.slot
         local kind, itemId, _, spellID = GetCursorInfo()
-        if slot.isClass then
-            -- class slotra spellt huzhatsz a spellbookbol (P): azt teszi fel
+        if not s then return end
+        if s.isClass then
             if kind ~= "spell" then return end
             local ok, name = pcall(function()
                 if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(spellID) end
@@ -1324,59 +1455,340 @@ for i, slot in ipairs(SLOTS) do
             ClearCursor()
             if ok and name then
                 QuestFocusDB.classPref = QuestFocusDB.classPref or {}
-                QuestFocusDB.classPref[slot.key] = name
-                DB()["noBuff_" .. slot.key] = nil
-                lastAlertKey = nil
+                QuestFocusDB.classPref[s.key] = name
             end
-            s.refresh()
+        elseif not s.custom then
+            if kind ~= "item" then return end
+            ClearCursor()
+            DB().buffItems[s.key] = itemId
+        else
             return
         end
-        if kind ~= "item" then return end
-        ClearCursor()
-        DB().buffItems[slot.key] = itemId
-        DB()["noBuff_" .. slot.key] = nil
-        s.refresh()
-        Rebuild()
+        AfterChange()
+        RefreshList()
+        return true
     end
-    s:SetScript("OnReceiveDrag", FromCursor)
-    s:SetScript("OnClick", function(_, button)
+    r.icon:SetScript("OnReceiveDrag", FromCursor)
+    r.icon:SetScript("OnClick", function(self, button)
+        local s = r.slot
+        if not s then return end
         if button == "RightButton" then
-            local db = DB()
-            -- jobb klikk: beallitott -> automatikus -> kikapcsolva -> automatikus
-            lastAlertKey = nil
-            if slot.isClass and db.classPref and db.classPref[slot.key] then
-                db.classPref[slot.key] = nil
-            elseif db.buffItems[slot.key] then
-                db.buffItems[slot.key] = nil
-            else
-                db["noBuff_" .. slot.key] = not db["noBuff_" .. slot.key] or nil
-            end
-            s.refresh()
-            Rebuild()
-        else
-            FromCursor()
+            if s.isClass and QuestFocusDB.classPref then QuestFocusDB.classPref[s.key] = nil
+            elseif not s.custom then DB().buffItems[s.key] = nil end
+            AfterChange()
+            RefreshList()
+            return
         end
+        if GetCursorInfo() and FromCursor() then return end
+        if s.custom then return end
+        if s.key == "food" then ShowFoodPicker() return end
+        OpenChooser(self, s)
     end)
-    slotUI[i] = s
-    fl:OnRefresh(s.refresh)
+    r.icon:SetScript("OnEnter", function(self)
+        local s = r.slot
+        if not s then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(s.label, 1, 1, 1)
+        if s.stacks then
+            GameTooltip:AddLine((L["Needs %d stacks of the buff (spell %d)."]):format(s.stacks, s.spellId), 0.7, 0.7, 0.7)
+        end
+        if s.custom then
+            GameTooltip:AddLine(L["The buff is learned the first time you use the item from the reminder."], 0.7, 0.7, 0.7, true)
+        else
+            GameTooltip:AddLine(s.key == "food" and L["Click: choose food from your bags"]
+                or L["Click: choose · Drag: set · Right click: automatic"], 0.5, 0.5, 0.5)
+        end
+        GameTooltip:Show()
+    end)
+    r.icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rows[i] = r
+    return r
 end
 
-fl:Button(L["Choose XP food from bags"], 200,
-    L["Lists the food in your bags (XP food first) to pick the one the reminder should use."], ShowFoodPicker, 4)
+RefreshList = function()
+    for _, r in ipairs(rows) do r:Hide(); r.slot = nil end
+    local n = 0
+    -- beepitett tipusok (pipaval), utana a sajat itemek (X-szel)
+    local customHeaderAt
+    for pass = 1, 2 do
+        for _, slot in ipairs(SLOTS) do
+            if (pass == 1) == (not slot.custom) then
+                n = n + 1
+                if pass == 2 and not customHeaderAt then customHeaderAt = n end
+                local r = GetRow(n)
+                r.slot = slot
+                local on = Watched(slot)
+                local tex, sub = SlotIconAndName(slot)
+                r.icon.tex:SetTexture(tex)
+                r.icon.tex:SetDesaturated(not on)
+                r.label:SetText(slot.label)
+                r.label:SetTextColor(on and 1 or 0.5, on and 1 or 0.5, on and 1 or 0.5)
+                r.sub:SetText(sub)
+                r.check:SetShown(not slot.custom)
+                r.check:SetChecked(on)
+                r.close:SetShown(slot.custom and true or false)
+                local perm = slot.permanent
+                r.min:SetShown(on and not perm)
+                r.minLabel:SetShown(on and not perm)
+                r.onlyMissing:SetShown(on and perm and true or false)
+                -- ha nincs X, a perc mezo a sor vegere csuszik
+                r.minLabel:ClearAllPoints()
+                r.onlyMissing:ClearAllPoints()
+                if slot.custom then
+                    r.minLabel:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
+                    r.onlyMissing:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
+                else
+                    r.minLabel:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+                    r.onlyMissing:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+                end
+                if on and not perm and not r.min:HasFocus() then r.min:SetText(Minutes(slot)) end
+                r:ClearAllPoints()
+                r:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 0, -(n - 1) * ROW - (customHeaderAt and 18 or 0))
+                r:Show()
+            end
+        end
+    end
+    if not listFrame.customHeader then
+        listFrame.customHeader = listFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        listFrame.customHeader:SetText(L["Other items"])
+    end
+    listFrame.customHeader:ClearAllPoints()
+    if customHeaderAt then
+        listFrame.customHeader:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 2, -(customHeaderAt - 1) * ROW - 2)
+    end
+    listFrame.customHeader:SetShown(customHeaderAt ~= nil)
+    listFrame:SetHeight(math.max(n * ROW + (customHeaderAt and 18 or 0), 20))
+    if page.Remeasure then page.Remeasure() end
+end
+NS.RefreshBuffOptions = RefreshList
+fl:OnRefresh(RefreshList)
+
+---------------------------------------------------------------------------
+-- Add item: egyeb, specialis buffok (elixir, scroll...): ide huzott item + perc
+---------------------------------------------------------------------------
+local add = CreateFrame("Frame", nil, NS.opt, BackdropTemplateMixin and "BackdropTemplate" or nil)
+add:SetFrameStrata("DIALOG")
+add:EnableMouse(true)
+add:SetSize(300, 290)
+add:Hide()
+if add.SetBackdrop then
+    add:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    add:SetBackdropColor(0.04, 0.04, 0.06, 0.98)
+    add:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
+end
+add.title = add:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+add.title:SetPoint("TOPLEFT", 12, -10)
+add.title:SetText(L["Add buff"])
+
+local itemSlot = CreateFrame("Button", nil, add)
+itemSlot:SetSize(30, 30)
+itemSlot:SetPoint("TOPLEFT", 14, -32)
+itemSlot.bg = itemSlot:CreateTexture(nil, "BACKGROUND")
+itemSlot.bg:SetAllPoints()
+itemSlot.bg:SetColorTexture(0, 0, 0, 0.6)
+itemSlot.tex = itemSlot:CreateTexture(nil, "ARTWORK")
+itemSlot.tex:SetPoint("TOPLEFT", 2, -2)
+itemSlot.tex:SetPoint("BOTTOMRIGHT", -2, 2)
+itemSlot:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+local itemText = add:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+itemText:SetPoint("LEFT", itemSlot, "RIGHT", 8, 0)
+itemText:SetWidth(230)
+itemText:SetJustifyH("LEFT")
+
+-- ...vagy egy buff: spell ID vagy nev, a most rajtad levo buffok kozul kattintva is
+local buffLabel = add:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+buffLabel:SetPoint("TOPLEFT", itemSlot, "BOTTOMLEFT", 0, -12)
+buffLabel:SetText(L["...or a buff: spell ID or name (search)"])
+local buffBox = CreateFrame("EditBox", nil, add, "InputBoxTemplate")
+buffBox:SetSize(150, 18)
+buffBox:SetAutoFocus(false)
+buffBox:SetPoint("TOPLEFT", buffLabel, "BOTTOMLEFT", 6, -4)
+local buffMatch = add:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+buffMatch:SetPoint("LEFT", buffBox, "RIGHT", 8, 0)
+buffMatch:SetWidth(110)
+buffMatch:SetJustifyH("LEFT")
+buffMatch:SetWordWrap(false)
+local auraHint = add:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+auraHint:SetPoint("TOPLEFT", buffBox, "BOTTOMLEFT", -6, -6)
+auraHint:SetText(L["Buffs on you now (click one):"])
+local auraBtns = {}
+
+local function SpellNameOf(id)
+    if not id then return end
+    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
+    return GetSpellInfo and (GetSpellInfo(id)) or nil
+end
+local function SpellTexOf(id, name)
+    local t = id and GetSpellTexture and GetSpellTexture(id)
+    return t or (name and SpellIconOf(name)) or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+local okBtn -- lent
+local function UpdateOk() if okBtn then okBtn:SetEnabled(add.itemId ~= nil or add.buffName ~= nil) end end
+
+local function RefreshAuraButtons(filter)
+    for _, b in ipairs(auraBtns) do b:Hide() end
+    local list = {}
+    for name, a in pairs(HelpfulAuras()) do
+        if not filter or filter == "" or tonumber(filter) or name:lower():find(filter:lower(), 1, true) then
+            list[#list + 1] = { name = name, id = a.spellId }
+        end
+    end
+    table.sort(list, function(x, y) return x.name < y.name end)
+    for i = 1, math.min(#list, 20) do
+        local b = auraBtns[i]
+        if not b then
+            b = CreateFrame("Button", nil, add)
+            b:SetSize(22, 22)
+            b.tex = b:CreateTexture(nil, "ARTWORK")
+            b.tex:SetAllPoints()
+            b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+            b:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:SetText(self.aura.name, 1, 1, 1)
+                if self.aura.id then GameTooltip:AddLine("spell " .. self.aura.id, 0.6, 0.6, 0.6) end
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            b:SetScript("OnClick", function(self)
+                add.pickingAura = true
+                buffBox:SetText(self.aura.name)
+                add.pickingAura = nil
+                add.buffName, add.buffId = self.aura.name, self.aura.id
+                buffMatch:SetText("|cff33ff99" .. self.aura.name .. "|r")
+                add.itemId = nil
+                itemSlot.tex:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+                UpdateOk()
+            end)
+            auraBtns[i] = b
+        end
+        b.aura = list[i]
+        b.tex:SetTexture(SpellTexOf(list[i].id, list[i].name))
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", auraHint, "BOTTOMLEFT", ((i - 1) % 10) * 24, -4 - math.floor((i - 1) / 10) * 24)
+        b:Show()
+    end
+end
+
+buffBox:SetScript("OnTextChanged", function(self)
+    if add.pickingAura then return end
+    local text = self:GetText():match("^%s*(.-)%s*$")
+    add.buffName, add.buffId = nil, nil
+    if text ~= "" then
+        local id = tonumber(text)
+        if id then
+            add.buffId, add.buffName = id, SpellNameOf(id)
+        else
+            add.buffName = text
+            -- pontos nev a rajtad levo buffok kozul (helyes kis/nagybetu + spell ID)
+            for name, a in pairs(HelpfulAuras()) do
+                if name:lower() == text:lower() then add.buffName, add.buffId = name, a.spellId end
+            end
+        end
+        if add.buffName then add.itemId = nil end
+    end
+    buffMatch:SetText(add.buffName and ("|cff33ff99" .. add.buffName .. "|r")
+        or (text ~= "" and ("|cffff4444" .. L["unknown spell ID"] .. "|r") or ""))
+    RefreshAuraButtons(text)
+    UpdateOk()
+end)
+buffBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+buffBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+local minLabel = add:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+minLabel:SetPoint("TOPLEFT", auraHint, "BOTTOMLEFT", 0, -60)
+minLabel:SetText(L["Remind before it runs out:"])
+local minBox = CreateFrame("EditBox", nil, add, "InputBoxTemplate")
+minBox:SetSize(30, 18)
+minBox:SetAutoFocus(false)
+minBox:SetNumeric(true)
+minBox:SetPoint("LEFT", minLabel, "RIGHT", 8, 0)
+local minSuffix = add:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+minSuffix:SetPoint("LEFT", minBox, "RIGHT", 4, 0)
+minSuffix:SetText(L["min (0 = only when missing)"])
+okBtn = CreateFrame("Button", nil, add, "UIPanelButtonTemplate")
+okBtn:SetSize(90, 22)
+okBtn:SetPoint("BOTTOMLEFT", 12, 12)
+okBtn:SetText(L["Add"])
+local cancelBtn = CreateFrame("Button", nil, add, "UIPanelButtonTemplate")
+cancelBtn:SetSize(90, 22)
+cancelBtn:SetText(CANCEL or "Cancel")
+cancelBtn:SetPoint("LEFT", okBtn, "RIGHT", 8, 0)
+cancelBtn:SetScript("OnClick", function() add:Hide() end)
+page:HookScript("OnHide", function() add:Hide() end)
+
+local function SetAddItem(id)
+    add.itemId = id
+    itemSlot.tex:SetTexture(id and GetItemIcon(id) or "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+    itemText:SetText(id and (GetItemInfo(id) or ("item " .. id))
+        or L["Drag an item here from your bags (flask, elixir, scroll, juju...)."])
+    if id then
+        add.buffName, add.buffId = nil, nil
+        add.pickingAura = true
+        buffBox:SetText("")
+        add.pickingAura = nil
+        buffMatch:SetText("")
+    end
+    UpdateOk()
+end
+local function ItemFromCursor()
+    local kind, itemId = GetCursorInfo()
+    if kind ~= "item" then return end
+    ClearCursor()
+    SetAddItem(itemId)
+end
+itemSlot:SetScript("OnReceiveDrag", ItemFromCursor)
+itemSlot:SetScript("OnClick", ItemFromCursor)
+
+local function OpenAdd(anchor)
+    if add:IsShown() then add:Hide() return end
+    add.buffName, add.buffId = nil, nil
+    add.pickingAura = true
+    buffBox:SetText("")
+    add.pickingAura = nil
+    buffMatch:SetText("")
+    SetAddItem(nil)
+    RefreshAuraButtons(nil)
+    minBox:SetText(0)
+    add:ClearAllPoints()
+    add:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)
+    add:Show()
+end
+
+okBtn:SetScript("OnClick", function()
+    local minutes = tonumber(minBox:GetText()) or 0
+    local ok
+    if add.itemId then
+        ok = AddCustomBuff(add.itemId, minutes)
+    elseif add.buffName then
+        ok = AddCustomSpellBuff(add.buffId, add.buffName, minutes)
+    else
+        return
+    end
+    if not ok then
+        NS.Loud(Print, L["Already watched, or too many items (max %d)."], MAX_CUSTOM)
+        return
+    end
+    add:Hide()
+    AfterChange()
+    RefreshList()
+end)
+
+fl:Button(L["Add buff"], 140,
+    L["Anything else: an item (flask, elixir, scroll, juju - its buff is learned the first time you use it from the reminder) "]
+    .. L["or any buff by spell ID / name, or picked from the buffs on you now. If you can cast it, the reminder casts it; otherwise it only tells you it's missing."],
+    function(self) OpenAdd(self) end, 4)
+
+fl:Header(L["Other"])
 fl:Button(L["Forget learned buffs"], 200,
-    L["Forget which buff each item gives; learned again the next time you use it from the button. Same as /qf buffreset."],
+    L["Forget which buff each item gives; learned again the next time you use it from the reminder. Same as /qf buffreset."],
     function() if NS.ResetBuffLearn then NS.ResetBuffLearn() end end, 4)
-
-fl:Header(L["Buttons"])
-fl:Check(L["Buff buttons under the panel"],
-    L["Sleeping bag, XP food and weapon enchant buttons with the time left; click to use the item. "]
-    .. L["Off by default: the buff frame already shows the timers, and the reminder popup works without these."],
-    function() return QuestFocusDB.showBuffBar end,
-    function(v) QuestFocusDB.showBuffBar = v; Rebuild() end)
 fl:Text(L["Tracking (Find Minerals / Find Herbs) can be switched with a key: Options > Keybindings > AddOns > QuestFocus - Buffs."], 2)
-
-NS.RefreshBuffOptions = function()
-    for _, s in ipairs(slotUI) do s.refresh() end
-end
 
 page:HookScript("OnShow", function() fl:Refresh() end)

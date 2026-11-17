@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: QuestFocus
 ## Notes: Quest target macro (QFocus), markers, tooltips and quest item tools based on Questie data
-## Version: 0.3.6
+## Version: 0.3.7
 ## OptionalDeps: Questie, TomTom, Bagnon
 ## SavedVariables: QuestFocusDB
 

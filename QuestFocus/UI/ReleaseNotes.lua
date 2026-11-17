@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.3.7", date = "2026-11-17", items = {
+        "Buff buttons under the panel removed.",
+        "Buffs tab: every type with a tick (watch / don't watch), its item or spell (click the icon to choose), and minutes; 0 = remind only when it's missing.",
+        "New types: off-hand enchant (only with an off-hand weapon), rogue poisons on both hands, shaman weapon imbue (Windfury / Flametongue / Frostbrand / Rockbiter).",
+        "Add buff: any item (flask, elixir, scroll, juju) or any buff by spell ID / name, or picked from the buffs on you; castable ones are cast from the reminder, others only remind.",
+    } },
     { version = "0.3.6", date = "2026-11-17", items = {
         "Pickup quest length: '?' / 'length unknown' instead of a misleading guess for battleground quests (e.g. Arathi Basin) and items whose source is unknown.",
     } },
