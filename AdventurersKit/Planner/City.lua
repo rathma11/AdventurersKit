@@ -134,14 +134,14 @@ local function MakeBtn(text, w)
     if b:GetFontString() then b:GetFontString():SetFontObject("GameFontNormalSmall") end
     return b
 end
-city.ignoreBtn = MakeBtn(L["Ignore this place"], 150)
+city.ignoreBtn = MakeBtn(L["Don't open here again"], 170)
 city.disableBtn = MakeBtn(L["Disable city list everywhere"], 190)
 city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
     local i, e = IgnoredHere()
     if i then
         table.remove(QuestFocusDB.cityIgnore, i)
         NS.Print(L["City list: |cffffff00%s|r is no longer ignored."], e.name or "?")
-        city.ignoreBtn:SetText(L["Ignore this place"])
+        city.ignoreBtn:SetText(L["Don't open here again"])
         return
     end
     local pc, px, py = NS.PlayerWorldPos()
@@ -153,8 +153,15 @@ city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
     city:Hide()
 end) end)
 city.ignoreBtn:SetScript("OnEnter", function(self)
-    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Ignore this place"])
-    NS.TT.Note(tt, L["Don't open the list automatically here (within ~500 yd), not even next time you come back."])
+    local ignored = IgnoredHere()
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", ignored and L["Open here again"] or L["Don't open here again"])
+    if ignored then
+        NS.TT.Note(tt, (L["The list opens by itself in %s again."]):format(PlaceName()))
+    else
+        NS.TT.Note(tt, (L["This list won't pop up by itself in %s (within ~500 yd) any more, not even next time. "
+            .. "Other cities and inns are not affected. /qf city opens it anyway; Options > Quest pickup lists and clears these places."])
+            :format("|cffffff00" .. PlaceName() .. "|r"))
+    end
     NS.TT.Finish(tt)
 end)
 city.ignoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -416,7 +423,7 @@ local function RefreshCityList()
     if QuestFocusDB.noCityMode or not NS.QuestieAvailable() then city:Hide() return end
     local ignored = IgnoredHere()
     if ignored and not city.forced then city:Hide() return end
-    city.ignoreBtn:SetText(ignored and L["Stop ignoring here"] or L["Ignore this place"])
+    city.ignoreBtn:SetText(ignored and L["Open here again"] or L["Don't open here again"])
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
     local ok, list = pcall(BuildPickups, pc, px, py, CITY_MAX)

@@ -73,7 +73,7 @@ pk:OnRefresh(function()
     local list = QuestFocusDB.cityIgnore or {}
     local names = {}
     for _, e in ipairs(list) do names[#names + 1] = e.name or "?" end
-    ignBtn.desc:SetText((L["Places where the list doesn't open by itself (button on the list: Ignore this place). Now: %s"])
+    ignBtn.desc:SetText((L["Places where the list doesn't open by itself (button on the list: Don't open here again). Now: %s"])
         :format(#names > 0 and ("|cffffff00" .. table.concat(names, ", ") .. "|r") or L["none"]))
     ignBtn:SetEnabled(#names > 0)
 end)
