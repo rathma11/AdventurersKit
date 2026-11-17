@@ -1197,10 +1197,6 @@ local pClose = CreateFrame("Button", nil, picker, "UIPanelCloseButton")
 pClose:SetSize(24, 24)
 pClose:SetPoint("TOPRIGHT", -4, -4)
 pClose:SetScript("OnClick", function() picker:Hide() end)
-local pNever = CreateFrame("Button", nil, picker, "UIPanelButtonTemplate")
-pNever:SetSize(110, 20)
-pNever:SetText(L["Don't ask again"])
-pNever:SetScript("OnClick", function() QuestFocusDB.noFoodPrompt = true; picker:Hide() end)
 picker.empty = picker:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 picker.empty:SetText(L["No food found in your bags."])
 
@@ -1271,9 +1267,7 @@ local function ShowFoodPicker()
         picker.empty:SetPoint("TOPLEFT", 14, y)
         y = y - 40
     end
-    pNever:ClearAllPoints()
-    pNever:SetPoint("TOPRIGHT", picker, "TOPRIGHT", -14, y - 6)
-    picker:SetHeight(-y + 40)
+    picker:SetHeight(-y + 14)
     picker:Show()
 end
 NS.ShowFoodPicker = ShowFoodPicker
