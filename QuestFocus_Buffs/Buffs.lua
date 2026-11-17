@@ -651,6 +651,9 @@ for i = 1, #SLOTS + MAX_CUSTOM do
         GameTooltip:Show()
     end)
     b.arrow:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- hany darab van meg a taskaban (item alapu buffoknal)
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    b.count:SetPoint("BOTTOMRIGHT", 1, -1)
     b.text = alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     b.text:SetPoint("LEFT", b.arrow, "RIGHT", 4, 0)
     b.text:SetPoint("RIGHT", alert, "RIGHT", -10, 0)
@@ -828,6 +831,8 @@ local function UpdateAlert(auras)
         end
     end
     for i, n in ipairs(need) do
+        local cnt = n.action and n.action.kind == "item" and GetItemCount(n.action.id) or nil
+        alertRows[i].count:SetText(cnt and cnt > 0 and cnt or "")
         if n.info then
             alertRows[i].text:SetText(("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(
                 n.slot.label, L["missing"], n.info))
@@ -835,7 +840,9 @@ local function UpdateAlert(auras)
             local name = ActionName(n.action, n.slot)
             local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
                 .. StackText(n.slot, n.stacks)
-            alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r"):format(n.slot.label, state, name))
+            -- itemnel: mennyi van meg (1 = az utolso, sarga)
+            local have = cnt and ((cnt <= 1 and " |cffffd100x%d|r" or " |cffd0d0d0x%d|r"):format(cnt)) or ""
+            alertRows[i].text:SetText(("|cffffd100%s|r  %s  |cff808080%s|r%s"):format(n.slot.label, state, name, have))
         end
     end
 end
