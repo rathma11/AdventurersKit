@@ -15,9 +15,9 @@ local SLOTS = {
     { key = "food",   label = L["XP food"],      names = {}, warn = 1 },
     -- fegyver enchant itemmel: hand = 16 main hand, 17 off hand (csak ha ott fegyver van)
     { key = "weapon", label = L["Main hand enchant"], hand = 16,
-      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
+      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"], L["Scroll of Imbue"] }, warn = 1 },
     { key = "weapon_off", label = L["Off-hand enchant"], hand = 17,
-      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
+      names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"], L["Scroll of Imbue"] }, warn = 1 },
 }
 -- Rogue: poisonok is (a nev alapjan keressuk a taskaban; kattintasra a fegyverre teszi)
 if select(2, UnitClass("player")) == "ROGUE" then
@@ -223,6 +223,11 @@ local function ItemFitsWeapon(itemId, hand)
     if not name then return true end -- meg nincs betoltve: ne dobjuk el
     if name:find(L["Sharpening Stone"], 1, true) then return kind == "edged" or kind == "fist" end
     if name:find(L["Weightstone"], 1, true) then return kind == "blunt" or kind == "fist" end
+    -- Scroll of Imbue (mage): csak botra (staff, subclass 10)
+    if name:find(L["Scroll of Imbue"], 1, true) then
+        local _, _, _, _, _, _, subID = GetItemInfoInstant(GetInventoryItemID("player", hand))
+        return subID == 10
+    end
     return true
 end
 NS.ItemFitsWeapon = ItemFitsWeapon

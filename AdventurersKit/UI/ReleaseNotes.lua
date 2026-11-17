@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.8", date = "2026-11-17", items = {
+        "Weapon enchant rows: mage Scroll of Imbue (e.g. Lesser Flame) counts as a weapon enchant, offered only when a staff is equipped.",
+    } },
     { version = "0.6.7", date = "2026-11-17", items = {
         "City list title row: Trainer (nearest trainer of your class) and AH (nearest auctioneer) next to Bank; "
             .. "hover shows the nearest one and its distance, click puts a marker on it.",
