@@ -65,31 +65,6 @@ local function Bags()
     if B and B.Frames then return B end
 end
 
--- Bagnon kereso: a megadott szoveget beirja (a talalat kiemelodik, a tobbi elhalvanyul).
--- Ugyanarra masodszor: torli a keresest. A Bagnon/BagBrother nevter jelzeseit hasznalja.
-NS.BagnonSearch = function(text)
-    local done = false
-    for _, A in ipairs({ _G.BagBrother, _G.Bagnon }) do
-        if type(A) == "table" and type(A.SendSignal) == "function" then
-            local clear = A.canSearch and A.search == text
-            pcall(function()
-                if clear then
-                    A.canSearch, A.search = nil, nil
-                    A:SendSignal("SEARCH_TOGGLED", nil)
-                    A:SendSignal("SEARCH_CHANGED", nil)
-                else
-                    A.canSearch, A.search = true, text
-                    -- nem a frame ID-t kuldjuk, igy a keresomezo nem kapja meg a billentyuzetet
-                    A:SendSignal("SEARCH_TOGGLED", "questfocus")
-                    A:SendSignal("SEARCH_CHANGED", text)
-                end
-            end)
-            done = true
-        end
-    end
-    return done
-end
-
 ---------------------------------------------------------------------------
 -- Adatgyujtes
 ---------------------------------------------------------------------------
@@ -224,33 +199,97 @@ local function StatusKey(status)
     return table.concat(t, ",")
 end
 
-local function HookBagnonItems()
-    local B = Bags()
-    if not (B and B.Item and B.Item.UpdateBorder) or B.qfItemHooked then return end
+-- Kiemelt item (a listaban rakattintottal): erosen pulzalo arany keret, a tobbi elhalvanyul
+local bagFocus -- itemID vagy nil
+
+local function ApplyFocus(self, B)
+    local id = self.info and self.info.itemID
+    if bagFocus then
+        if id == bagFocus then
+            if not self.qfFocus then
+                local t = self:CreateTexture(nil, "OVERLAY", nil, 7)
+                t:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+                t:SetBlendMode("ADD")
+                t:SetAllPoints()
+                local ag = t:CreateAnimationGroup()
+                ag:SetLooping("BOUNCE")
+                local a = ag:CreateAnimation("Alpha")
+                a:SetFromAlpha(1)
+                a:SetToAlpha(0.25)
+                a:SetDuration(0.5)
+                self.qfFocus, self.qfFocusAnim = t, ag
+            end
+            self.qfFocus:SetVertexColor(1, 0.85, 0.1)
+            self.qfFocus:Show()
+            self.qfFocusAnim:Play()
+            if self.IconBorder then self.IconBorder:SetVertexColor(1, 0.85, 0.1); self.IconBorder:Show() end
+            if self.IconGlow then self.IconGlow:SetVertexColor(1, 0.85, 0.1, 1); self.IconGlow:Show() end
+            self:SetAlpha(1)
+        else
+            if self.qfFocus then self.qfFocus:Hide(); self.qfFocusAnim:Stop() end
+            self:SetAlpha(0.3)
+        end
+        self.qfDimmed = true
+    elseif self.qfDimmed then
+        self.qfDimmed = nil
+        if self.qfFocus then self.qfFocus:Hide(); self.qfFocusAnim:Stop() end
+        self:SetAlpha(1)
+    end
+end
+
+local function HookOne(B)
+    if not (type(B) == "table" and B.Item and B.Item.UpdateBorder) or B.qfItemHooked then return end
     B.qfItemHooked = true
     hooksecurefunc(B.Item, "UpdateBorder", function(self)
-        if QuestFocusDB.noBagGlow then return end
-        local id = self.info and self.info.itemID
-        local kind = id and self.searched and scan.status[id]
-        if not kind then return end
-        local c = COLORS[kind]
-        if self.IconBorder then
-            self.IconBorder:SetVertexColor(c[1], c[2], c[3])
-            self.IconBorder:Show()
+        if not QuestFocusDB.noBagGlow then
+            local id = self.info and self.info.itemID
+            local kind = id and self.searched and scan.status[id]
+            if kind then
+                local c = COLORS[kind]
+                if self.IconBorder then
+                    self.IconBorder:SetVertexColor(c[1], c[2], c[3])
+                    self.IconBorder:Show()
+                end
+                if self.IconGlow then
+                    self.IconGlow:SetVertexColor(c[1], c[2], c[3], (B.sets and B.sets.glowAlpha) or 0.5)
+                    self.IconGlow:Show()
+                end
+            end
         end
-        if self.IconGlow then
-            self.IconGlow:SetVertexColor(c[1], c[2], c[3], (B.sets and B.sets.glowAlpha) or 0.5)
-            self.IconGlow:Show()
-        end
+        ApplyFocus(self, B)
     end)
+    -- a Bagnon sajat keresese is allit atlatszosagot: utana a mienk ervenyes
+    if type(B.Item.UpdateSearch) == "function" then
+        hooksecurefunc(B.Item, "UpdateSearch", function(self) ApplyFocus(self, B) end)
+    end
+end
+
+-- A Bagnon a BagBrother kodjat a sajat nevtereben is betolti: mindkettot hookoljuk
+local function HookBagnonItems()
+    HookOne(_G.BagBrother)
+    HookOne(_G.Bagnon)
+end
+
+local function UpdateAllBagFrames()
+    for _, B in ipairs({ _G.BagBrother, _G.Bagnon }) do
+        if type(B) == "table" and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+    end
+end
+
+-- Kattintas a listaban: ki/be kapcsolja az item kiemeleset a taskaban
+NS.BagFocus = function(itemId)
+    if not itemId and not bagFocus then return false end
+    HookBagnonItems()
+    if itemId then bagFocus = (bagFocus ~= itemId) and itemId or nil else bagFocus = nil end
+    UpdateAllBagFrames()
+    return bagFocus ~= nil
 end
 
 local function MaybeRefreshBagnon()
     local key = StatusKey(scan.status)
     if key == lastStatusKey then return end
     lastStatusKey = key
-    local B = Bags()
-    if B and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+    UpdateAllBagFrames()
 end
 
 ---------------------------------------------------------------------------
@@ -271,6 +310,8 @@ list:Hide()
 list.title = list:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 list.title:SetPoint("TOPLEFT", 10, -8)
 list.rows = {}
+-- taska bezarasakor a kiemeles is megszunik
+list:HookScript("OnHide", function() if NS.BagFocus then NS.BagFocus(nil) end end)
 local anchorFrame
 local RefreshBagList -- lent
 
@@ -345,18 +386,15 @@ local function GetRow(i)
         if e.kind == "leftover" then
             GameTooltip:AddLine(e.noValue and L["Unsellable: /qf junk can destroy it"] or L["Can be sold to a vendor"], 0.6, 0.6, 0.6)
         end
-        GameTooltip:AddLine(L["Click: highlight it in the bag (Bagnon search); again: clear"], 0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Click: highlight it in the bag; click again: clear"], 0.5, 0.5, 0.5)
         if e.needs then GameTooltip:AddLine(L["...and select the quest (QFocus marker + macro)"], 0.5, 0.5, 0.5) end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     r:SetScript("OnClick", function(self)
         local e = self.entry
-        -- Kiemeles a taskaban: a Bagnon keresojebe beirjuk az item nevet
-        if e and NS.BagnonSearch then
-            local name = GetItemInfo(e.id)
-            if name then NS.BagnonSearch(name) end
-        end
+        -- Kiemeles a taskaban (pulzalo keret, a tobbi elhalvanyul); ujra kattintva ki
+        if e and e.id and NS.BagFocus then NS.BagFocus(e.id) end
         local n = e and e.needs and e.needs[1]
         if n then
             local title, done = NS.FindQuestInLog(n.qid)
