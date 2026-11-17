@@ -7,6 +7,7 @@ local L = NS.L
 local NOTES = {
     { version = "0.4.2", date = "2026-11-17", items = {
         "Usable quest item buttons: only items the quest gives you to use (or quest-type objective items), not collected consumables like drinks or food.",
+        "Options: when a module is off, the rest of its tab is greyed out and can't be clicked.",
     } },
     { version = "0.4.1", date = "2026-11-17", items = {
         "Bag highlight fixed: clicking an item in the quest item list highlights it in the open bag (Bagnon or Blizzard bags) and dims the rest; click again to clear.",

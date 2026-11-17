@@ -103,7 +103,7 @@ local function AddOptionsTab(label, order, opts)
                 local function scan(...)
                     for i = 1, select("#", ...) do
                         local r = select(i, ...)
-                        if r:IsShown() and r:GetBottom() then
+                        if r:IsShown() and not r.qfNoMeasure and r:GetBottom() then
                             local b = r:GetBottom()
                             if not low or b < low then low = b end
                         end
@@ -292,15 +292,37 @@ local function ModulePage(addon, onToggle)
     if not def then return end
     local page = AddOptionsTab(def.label, def.order)
     local fl = OptFlow(page)
-    fl:Check(L["Module on"],
+    local cb
+    -- Kikapcsolt modul: a tobbi beallitas szurke es nem kattinthato (gorgetni lehet)
+    local blocker = CreateFrame("Frame", nil, page)
+    blocker.qfNoMeasure = true -- az oldal aljaig er: a magassag meresebol kimarad
+    blocker:EnableMouse(true)
+    blocker:Hide()
+    local function ApplyGrey()
+        local on = ModuleOn(addon)
+        local a = on and 1 or 0.35
+        for _, c in ipairs({ page:GetChildren() }) do
+            if c ~= cb and c ~= blocker then c:SetAlpha(a) end
+        end
+        for _, r in ipairs({ page:GetRegions() }) do
+            if r ~= cb.desc then r:SetAlpha(a) end
+        end
+        blocker:SetFrameLevel(page:GetFrameLevel() + 60)
+        blocker:SetShown(not on)
+    end
+    cb = fl:Check(L["Module on"],
         def.desc .. " " .. L["Off: the module stays loaded but does nothing (its settings below are kept)."],
         function() return ModuleOn(addon) end,
         function(v)
             QuestFocusDB.modules = QuestFocusDB.modules or {}
             QuestFocusDB.modules[addon] = v and true or false
             if onToggle then pcall(onToggle, v) end
+            ApplyGrey()
         end)
-    page:HookScript("OnShow", function() fl:Refresh() end)
+    blocker:SetPoint("TOPLEFT", cb.desc, "BOTTOMLEFT", -40, -4)
+    blocker:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
+    -- a modul sajat elemei kesobb jonnek letre: megjeleneskor (es frissiteskor) szurkitunk
+    page:HookScript("OnShow", function() fl:Refresh(); ApplyGrey() end)
     return page, fl
 end
 NS.ModulePage = ModulePage
