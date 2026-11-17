@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Adventurer's Kit - Buffs
 ## Notes: Adventurer's Kit module: buff reminder (sleeping bag, XP food, weapon enchant, class buffs, tracking)
-## Version: 0.5.0
+## Version: 0.5.1
 ## Dependencies: QuestFocus
 
 Buffs.lua

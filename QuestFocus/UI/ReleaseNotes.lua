@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.5.1", date = "2026-11-17", items = {
+        "Spacing: the chain icon no longer touches the quest name / 2/5, '(in log)' sits further right, "
+            .. "and the panel's top icons no longer touch the close button.",
+    } },
     { version = "0.5.0", date = "2026-11-17", items = {
         "Start dungeon: skull button on the panel (and /qf dungeon) lists the dungeons for your level with their quests. "
             .. "With the Dungeon Journal addon it uses its data (Forever's own dungeons too) and opens the quest there; "

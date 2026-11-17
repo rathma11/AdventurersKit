@@ -17,7 +17,8 @@ NS.HasDungeonJournal = function() return FDJ() ~= nil end
 
 -- Lanc ikon: a Journal sajatja, ha fent van (kulonben csak a lila 2/5 szoveg)
 NS.ChainMarkup = function()
-    if FDJ() then return "|TInterface\\AddOns\\ForeverDungeonJournal\\Media\\QuestChain:12:12|t" end
+    -- utana egy szokoz: ne erjen ossze a 2/5 szoveggel
+    if FDJ() then return "|TInterface\\AddOns\\ForeverDungeonJournal\\Media\\QuestChain:12:12|t " end
     return ""
 end
 
@@ -299,8 +300,8 @@ local function Refresh()
             local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
             local tag = ""
             local info = NS.QuestExtraInfo and NS.GetQuestieQuest(q.qid) and NS.QuestExtraInfo(q.qid)
-            if info and info.chainPos then tag = (" %s|cffb48cff%d/%d|r"):format(chain, info.chainPos, info.chainLen) end
-            if q.inLog then tag = tag .. " |cff60ff60" .. L["in log"] .. "|r" end
+            if info and info.chainPos then tag = ("   %s|cffb48cff%d/%d|r"):format(chain, info.chainPos, info.chainLen) end
+            if q.inLog then tag = tag .. "     |cff60ff60(" .. L["in log"] .. ")|r" end
             r.text:SetText(("    %s[%s] %s|r%s"):format(hex, tostring(q.level or "?"), q.name or "?", tag))
             r.right:SetText(q.requires and (L["from level %d"]):format(q.requires) or "")
             r:ClearAllPoints()

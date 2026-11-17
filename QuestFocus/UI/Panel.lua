@@ -168,8 +168,9 @@ local optBtn = ToolButton("Interface\\Icons\\INV_Misc_Gear_01", L["Options"],
     L["Opens the Adventurer's Kit options. Same as /qf options."],
     function() if NS.C.OpenOptions then NS.C.OpenOptions() end end)
 panel.dungeonBtn, panel.optBtn = dungeonBtn, optBtn
-dungeonBtn:SetPoint("RIGHT", close, "LEFT", -2, 0)
-optBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -4, 0)
+-- az X gomb kepe kitolt a keretebol: tobb hely kell, kulonben osszeernek
+dungeonBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
+optBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -7, 0)
 
 local function Divider(y)
     local t = panel:CreateTexture(nil, "ARTWORK")

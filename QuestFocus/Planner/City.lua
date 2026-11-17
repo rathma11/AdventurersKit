@@ -283,7 +283,7 @@ local function RefreshCityList()
             r.bg:Hide()
             r.dBtn:Hide()
         end
-        if info.chainPos then tags = tags .. (" %s|cffb48cff%d/%d|r"):format(NS.ChainMarkup(), info.chainPos, info.chainLen) end
+        if info.chainPos then tags = tags .. ("   %s|cffb48cff%d/%d|r"):format(NS.ChainMarkup(), info.chainPos, info.chainLen) end
         if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
         r.text:SetText(("%s[%s]|r %s%s%s|r%s  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
             NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", tags, FormatTime(EstimateQuestTime(d.quest))))
