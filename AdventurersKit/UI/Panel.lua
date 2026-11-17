@@ -128,15 +128,15 @@ clearBtn:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Down")
 clearBtn:Hide()
 clearBtn:SetScript("OnClick", function()
     -- dungeon prep modban: a prep mod vege (Planner\Prep.lua)
-    if NS.PrepActive and NS.PrepActive() then NS.StopPrep() return end
+    if NS.PrepActive and NS.PrepActive() then NS.StopPrep(false, true) return end
     if NS.C.ClearQuest then NS.C.ClearQuest() end
     NS.Loud(Print, L["Focus cleared (the quest stays in your log)."])
 end)
 clearBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
     if NS.PrepActive and NS.PrepActive() then
-        GameTooltip:SetText(L["Leave dungeon prep"], 1, 1, 1)
-        GameTooltip:AddLine(L["Ends the dungeon prep mode: the marker and the macro are cleared. Same as /qf dungeon off."], 0.8, 0.8, 0.8, true)
+        GameTooltip:SetText(L["Abort dungeon prep"], 1, 1, 1)
+        GameTooltip:AddLine(L["Leaves the dungeon prep mode and goes back to the quest (and objective) you had focused before, if it is still in your log. Same as /qf dungeon off."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
         return
     end
@@ -221,8 +221,8 @@ end
 local dungeonBtn = ToolButton("Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", L["Dungeons"],
     function()
         return NS.HasDungeonJournal and NS.HasDungeonJournal()
-            and L["Dungeons for your level and their quests; click one to open it in Dungeon Journal. Same as /qf dungeon."]
-            or L["Dungeons for your level and their quests (click: marker on the quest giver). Same as /qf dungeon."]
+            and L["Dungeons for your level and their quests; click one to prep it (its quests on this panel, then the entrance). Shift+click: Dungeon Journal. Same as /qf dungeon."]
+            or L["Dungeons for your level and their quests; click one to prep it (its quests on this panel, then the entrance). Shift+click: marker on the quest giver. Same as /qf dungeon."]
     end,
     function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
 local optBtn = ToolButton("Interface\\Icons\\INV_Misc_Gear_01", L["Options"],

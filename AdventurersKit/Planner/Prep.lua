@@ -418,6 +418,13 @@ end
 
 NS.StartPrep = function(name, restoring)
     if not name then return end
+    -- az elozo allapot (fokuszalt quest + objective) a megszakitashoz (StopPrep restore)
+    if not restoring and not prep.dungeon then
+        local st = NS.state
+        local prev = st.questId and { qid = st.questId, title = st.title, obj = st.objIndex } or nil
+        local c0 = CharDB()
+        if c0 and QuestFocusDB then c0.prepPrev = prev end
+    end
     if NS.C.ClearQuest and NS.state.questId then NS.C.ClearQuest() end
     prep.dungeon, prep.sel, prep.markedKey, prep.dirty = name, nil, nil, true
     local c = CharDB()
@@ -439,9 +446,12 @@ NS.StartPrep = function(name, restoring)
     end
 end
 
-NS.StopPrep = function(quiet)
+NS.StopPrep = function(quiet, restore)
     if not prep.dungeon then return end
     local old = prep.dungeon
+    local c1 = CharDB()
+    local prev = c1 and rawget(c1, "prepPrev")
+    if c1 and QuestFocusDB then c1.prepPrev = nil end
     prep.dungeon, prep.rows, prep.sel, prep.markedKey, prep.info = nil, {}, nil, nil, nil
     local c = CharDB()
     if c and QuestFocusDB then c.prepDungeon = nil end
@@ -451,6 +461,16 @@ NS.StopPrep = function(quiet)
     if NS.C.ApplyMacro then NS.C.ApplyMacro('/run print("QFocus: no quest selected")') end
     if NS.Panel_Update then NS.Panel_Update() end
     if not quiet then NS.Loud(NS.Print, L["Dungeon prep ended (%s)."], old) end
+    -- megszakitas: vissza az elozo questre (ha meg a logban van), kulonben javaslatok
+    if restore and prev and prev.qid then
+        local title, done = NS.FindQuestInLog(prev.qid)
+        if title then
+            NS.SelectQuest(prev.qid, title, done, true)
+            if prev.obj and NS.state.questId == prev.qid and NS.state.objectives and NS.state.objectives[prev.obj] then
+                NS.SelectObjective(prev.obj)
+            end
+        end
+    end
 end
 
 -- /qf dungeon <nev> | off
@@ -458,7 +478,7 @@ NS.PrepCommand = function(arg)
     arg = (arg or ""):match("^%s*(.-)%s*$")
     local low = arg:lower()
     if low == "off" or low == "stop" or low == "clear" or low == "end" then
-        if prep.dungeon then NS.StopPrep() else NS.Print(L["Dungeon prep is not on."]) end
+        if prep.dungeon then NS.StopPrep(false, true) else NS.Print(L["Dungeon prep is not on."]) end
         return
     end
     local name, hits, all = Resolve(arg)

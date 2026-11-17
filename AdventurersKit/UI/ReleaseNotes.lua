@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.66", date = "2026-11-17", items = {
+        "Dungeon list: a plain click on a dungeon or one of its quests now starts dungeon prep for that dungeon (the "
+            .. "panel shows its quests to pick up, then the entrance). Shift+click does what a click did before (Dungeon "
+            .. "Journal page, or without it a marker on the quest giver).",
+        "Aborting dungeon prep (the small red circle next to the title, or /qf dungeon off) takes you back to the quest "
+            .. "and objective you had focused before you started, with its marker and macro. If that quest is no longer "
+            .. "in your log, you get the normal suggestion view.",
+    } },
     { version = "0.6.65", date = "2026-11-17", items = {
         "Dungeon prep mode: pick a dungeon and the panel turns into a checklist for it. It lists the dungeon's quests "
             .. "you can still pick up (quest giver, zone, distance; nearest first), the ones already in your log "

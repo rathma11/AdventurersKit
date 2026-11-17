@@ -256,7 +256,7 @@ local function Row(i)
     r.prep:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(L["Prep this dungeon"], 0.4, 1, 0.4)
-        GameTooltip:AddLine(L["The quest panel lists this dungeon's quests you can still pick up (nearest first, with the marker on the quest giver), then the entrance. Same as /qf dungeon <name>; right-click a dungeon row works too."], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["The quest panel lists this dungeon's quests you can still pick up (nearest first, with the marker on the quest giver), then the entrance. Same as /qf dungeon <name>, or a click on the row."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     r.prep:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -265,7 +265,9 @@ local function Row(i)
     r:SetScript("OnClick", function(self, button)
         local d = self.data
         if not d then return end
-        if button == "RightButton" then
+        -- kattintas (dungeon vagy quest sor): dungeon prep mod erre a dungeonra; Shift+klikk: a
+        -- regi mod (Dungeon Journal oldal, Journal nelkul marker a quest adora)
+        if not IsShiftKeyDown() then
             if self.dungeon and NS.StartPrep then NS.StartPrep(self.dungeon) end
             dj:Hide()
             return
@@ -290,9 +292,11 @@ local function Row(i)
             GameTooltip:SetText(self.dungeon or "?", 1, 0.6, 0.45)
             GameTooltip:AddLine((L["Level %d-%d"]):format(d.lo, d.hi), 0.8, 0.8, 0.8)
         end
-        GameTooltip:AddLine(FDJ() and L["Click: open in Dungeon Journal"] or (d.qid and L["Click: marker on the quest giver"] or " "),
-            0.5, 0.5, 0.5)
-        GameTooltip:AddLine(L["Right click: prep this dungeon (quests to pick up, then the entrance)"], 0.4, 1, 0.4)
+        GameTooltip:AddLine(L["Click: prep this dungeon (its quests on the panel, then the entrance)"], 0.4, 1, 0.4)
+        if FDJ() or d.qid then
+            GameTooltip:AddLine(FDJ() and L["Shift+click: open in Dungeon Journal"] or L["Shift+click: marker on the quest giver"],
+                0.5, 0.5, 0.5)
+        end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -366,9 +370,9 @@ local function Refresh()
     scroll:SetPoint("BOTTOMRIGHT", dj, "TOPLEFT", DJ_W - (needBar and 34 or 12), -38 - visH)
     if scroll.ScrollBar then scroll.ScrollBar:SetShown(needBar) end
     if not needBar then scroll:SetVerticalScroll(0) end
-    dj.foot:SetText((f and L["Click: opens the quest in Dungeon Journal. Wheel: scroll. Drag to move."]
-        or L["Click: marker on the quest giver. Wheel: scroll. Drag to move. (Dungeon Journal addon: more dungeons and details.)"])
-        .. "\n" .. L["Prep / right click: collect a dungeon's quests, then an arrow to its entrance (/qf dungeon <name>)."])
+    dj.foot:SetText(L["Click a dungeon or quest: dungeon prep (its quests on the panel, then an arrow to the entrance; /qf dungeon <name>)."]
+        .. "\n" .. (f and L["Shift+click: opens the quest in Dungeon Journal. Wheel: scroll. Drag to move."]
+        or L["Shift+click: marker on the quest giver. Wheel: scroll. Drag to move. (Dungeon Journal addon: more dungeons and details.)"]))
     dj.foot:ClearAllPoints()
     dj.foot:SetPoint("TOPLEFT", dj, "TOPLEFT", 14, -38 - visH - 6)
     dj:SetHeight(38 + visH + 14 + (dj.foot:GetStringHeight() or 12) + 8)
