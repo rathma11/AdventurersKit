@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.40", date = "2026-11-17", items = {
+        "Pace / time left in a group: the kill pace is learned separately per group size (your party's kills count, "
+            .. "and quest items drop for each of you). Until there's enough data in a group, it uses your solo pace "
+            .. "divided by the group size; the PACE box shows the group size, e.g. '~19s / kill (3)'.",
+    } },
     { version = "0.6.39", date = "2026-11-17", items = {
         "Ping question window redone in the panel's style: header, question, two answer buttons, a divider, "
             .. "and a three-way 'next time I join a group' switch (Ask / Always ping / Never ping).",

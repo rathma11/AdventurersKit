@@ -17,6 +17,14 @@ local PICKUP_LEN = 3
 -- Kill tempo
 ---------------------------------------------------------------------------
 local lastKill, killSeen = nil, {}
+local lastSize
+-- Csapat letszama (egyedul 1; raidben max 5-tel szamolunk, ott ugysem questelnek igy)
+local function GroupSize()
+    if not (IsInGroup and IsInGroup()) then return 1 end
+    local n = GetNumGroupMembers and GetNumGroupMembers() or 1
+    return math.max(1, math.min(5, n))
+end
+NS.GroupSize = GroupSize
 local mobKills = {} -- mob nev -> kill idopontok (a kereses ideje is benne van a kozokben)
 
 local function RecordKill(guid, name)
@@ -29,19 +37,39 @@ local function RecordKill(guid, name)
         t[#t + 1] = now
         while #t > 15 do table.remove(t, 1) end
     end
-    if lastKill then
+    -- Csapatmeret szerint kulon tempo: csapatban a tobbiek killjei is jonnek (az XP uzenet
+    -- a csapat killjeire is jon, es a quest itemek mindenkinek kulon esnek), igy gyorsabb.
+    local size = GroupSize and GroupSize() or 1
+    if lastKill and lastSize == size then
         local dt = now - lastKill
         if dt > 1 and dt < MAX_GAP then
             local db = QuestFocusDB
-            db.killPace = db.killPace and (db.killPace * 0.75 + dt * 0.25) or dt
-            db.killSamples = (db.killSamples or 0) + 1
+            if size <= 1 then
+                db.killPace = db.killPace and (db.killPace * 0.75 + dt * 0.25) or dt
+                db.killSamples = (db.killSamples or 0) + 1
+            else
+                db.killPaceGroup = db.killPaceGroup or {}
+                local g = db.killPaceGroup[size] or {}
+                g.pace = g.pace and (g.pace * 0.75 + dt * 0.25) or dt
+                g.n = (g.n or 0) + 1
+                db.killPaceGroup[size] = g
+            end
         end
     end
-    lastKill = now
+    lastKill, lastSize = now, size
 end
 
+-- Kill tempo a mostani csapatmerethez. Ha csapatban meg nincs eleg meres: az egyeni tempo
+-- osztva a letszammal (becsles). Visszaad: mp/kill, becsles-e
 local function KillPace()
     local db = QuestFocusDB or {}
+    local size = GroupSize()
+    if size > 1 then
+        local g = db.killPaceGroup and db.killPaceGroup[size]
+        if g and g.pace and (g.n or 0) >= 3 then return g.pace, false end
+        local solo = (db.killPace and (db.killSamples or 0) >= 3) and db.killPace or DEFAULT_KILL_TIME
+        return solo / size, true
+    end
     if db.killPace and (db.killSamples or 0) >= 3 then return db.killPace, false end
     return DEFAULT_KILL_TIME, true
 end
@@ -185,8 +213,13 @@ NS.PaceText = function(objectives)
         end
     end
     local pace, guess = KillPace()
+    local size = GroupSize()
+    if guess and size > 1 then
+        -- csapatban, meg nincs eleg meres: az egyeni tempo / letszam (becsles)
+        return "~" .. FmtSec(pace) .. " / " .. L["kill"] .. (" (%d)"):format(size)
+    end
     if guess then return "|cff808080" .. L["no data"] .. "|r" end
-    return FmtSec(pace) .. " / " .. L["kill"]
+    return FmtSec(pace) .. " / " .. L["kill"] .. (size > 1 and (" (%d)"):format(size) or "")
 end
 
 local function FormatTime(sec)
