@@ -28,7 +28,7 @@ While you focus a quest, the addon also looks at the other quests in your log. U
 ### Panel
 - Header with the quest name, then three stat boxes: **Progress** (all objective counters together), **Time left** and **Pace** (average time per kill, searching included), plus a progress bar.
 - Each objective shows its own estimated time left. Hover it for the details.
-- **Resize:** drag the grip in the bottom right corner to make the whole panel bigger or smaller (60-160%). Right click the grip to reset. The size is saved.
+- **Resize:** drag the grip in the bottom right corner to change the panel width and height. In "What next?" mode a taller panel shows more route and pickup rows. Right click the grip to reset. The font size is a separate setting on the Panel tab (8-20).
 - **Progress popup:** for a few seconds after an objective counter goes up, a small popup above the panel shows the new count and the time left.
 
 ### Time left estimate
@@ -79,7 +79,7 @@ Each button shows the time left on its buff. When the buff is missing, or about 
 
 By default it casts the one you last had on (e.g. Blessing of Might). To choose, drag a spell from your spellbook onto its slot on the Buffs tab. Auras and aspects only count when they are missing. Timed buffs warn 1 min before they run out (you can change this).
 
-**Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. It sits as a band on top of the panel and moves with it. The X hides it until your next fight; after that fight it comes back if still needed. It disappears when combat starts, because the game does not allow it to stay up (attached to the panel) in combat. It uses the same spot as the progress popup: if a progress popup is showing (e.g. right after combat), the reminder waits until it fades.
+**Reminder popup.** Out of combat, when a buff is missing or about to run out, a small popup appears above the panel with one row per buff: the item icon, the time left and the item name. Click the icon to apply it; weapon enchants go on the main hand. It sits as a band on top of the panel and moves with it. When there is more than one choice, a small arrow next to the icon opens a flyout (like the inventory slot flyouts). It holds the XP foods in your bags, the auras / blessings you know, or your sharpening stones / oils. Clicking one uses or casts it right away and makes it the default. The X hides it until your next fight; after that fight it comes back if still needed. It disappears when combat starts, because the game does not allow it to stay up (attached to the panel) in combat. It uses the same spot as the progress popup: if a progress popup is showing (e.g. right after combat), the reminder waits until it fades.
 
 ## Commands
 | Command | What it does |

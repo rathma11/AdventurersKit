@@ -607,8 +607,25 @@ for i, slot in ipairs(SLOTS) do
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.2)
+    -- Oldalra nyil: alternativak (XP kajak, aurak/blessingek, kovek/olajok) - mint az
+    -- inventory slot flyout-ja. Csak akkor latszik, ha tobb lehetoseg van.
+    b.arrow = CreateFrame("Button", nil, alert)
+    b.arrow:SetSize(12, 22)
+    b.arrow:SetPoint("LEFT", b, "RIGHT", 2, 0)
+    b.arrow:SetNormalTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    b.arrow:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+    b.arrow:Hide()
+    b.arrow:SetScript("OnClick", function(self)
+        if NS.ToggleBuffFlyout then NS.ToggleBuffFlyout(b, self) end
+    end)
+    b.arrow:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L["Choose another one"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    b.arrow:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b.text = alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.text:SetPoint("LEFT", b, "RIGHT", 8, 0)
+    b.text:SetPoint("LEFT", b.arrow, "RIGHT", 4, 0)
     b.text:SetPoint("RIGHT", alert, "RIGHT", -10, 0)
     b.text:SetJustifyH("LEFT")
     b.text:SetWordWrap(false)
@@ -707,12 +724,16 @@ local function UpdateAlert(auras)
     -- Szovegek mindig frissulnek, a secure resz csak ha valtozott a lista
     if key ~= lastAlertKey then
         lastAlertKey = key
-        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide() end
+        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide(); b.arrow:Hide() end
+        if NS.HideBuffFlyout then NS.HideBuffFlyout() end
         for i, n in ipairs(need) do
             local b = alertRows[i]
             b.slot, b.itemId, b.spellName = n.slot, n.action.id, n.action.name
             b.icon:SetTexture(ActionIcon(n.action))
             SetupSecure(b, n.slot, n.action)
+            local alts = NS.BuffAlternatives and NS.BuffAlternatives(n.slot)
+            b.alts = alts
+            b.arrow:SetShown(alts ~= nil and #alts >= 2)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
             b:Show()
@@ -939,6 +960,117 @@ local function ShowFoodPicker()
     picker:Show()
 end
 NS.ShowFoodPicker = ShowFoodPicker
+
+---------------------------------------------------------------------------
+-- Flyout (oldalra nyilo ikonsor) a buff emlekezteto soraihoz: alternativak
+---------------------------------------------------------------------------
+-- Egy slot lehetosegei: { kind = "item", id } / { kind = "spell", name }
+NS.BuffAlternatives = function(slot)
+    local out, seen = {}, {}
+    if slot.isClass then
+        for _, c in ipairs(slot.cast or slot.spells) do
+            if SpellKnown(c) and not seen[c] then seen[c] = true; out[#out + 1] = { kind = "spell", name = c } end
+        end
+    elseif slot.key == "food" then
+        local xp, other = FoodCandidates()
+        for _, id in ipairs(#xp > 0 and xp or other) do out[#out + 1] = { kind = "item", id = id } end
+    elseif #slot.names > 0 then
+        for bag = 0, 4 do
+            for s = 1, (GetSlots(bag) or 0) do
+                local iid = GetItemID(bag, s)
+                local name = iid and not seen[iid] and GetItemInfo(iid)
+                if name then
+                    for _, pat in ipairs(slot.names) do
+                        if name:find(pat, 1, true) then seen[iid] = true; out[#out + 1] = { kind = "item", id = iid } break end
+                    end
+                end
+            end
+        end
+    end
+    return out
+end
+
+local flyout = CreateFrame("Frame", "QuestFocusBuffFlyout", alert, BackdropTemplateMixin and "BackdropTemplate" or nil)
+flyout:SetFrameStrata("DIALOG")
+flyout:SetHeight(32)
+flyout:Hide()
+if flyout.SetBackdrop then
+    flyout:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    flyout:SetBackdropColor(0, 0, 0, 0.9)
+    flyout:SetBackdropBorderColor(0.95, 0.78, 0.40, 0.9)
+end
+local flyBtns = {}
+local function FlyBtn(i)
+    local f = flyBtns[i]
+    if f then return f end
+    f = CreateFrame("Button", "QuestFocusBuffFlyoutBtn" .. i, flyout, "SecureActionButtonTemplate")
+    f:SetSize(24, 24)
+    f:RegisterForClicks("AnyUp", "AnyDown")
+    f.icon = f:CreateTexture(nil, "ARTWORK")
+    f.icon:SetAllPoints()
+    f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local hl = f:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.25)
+    f:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        if self.act.kind == "spell" then GameTooltip:SetText(self.act.name, 1, 1, 1)
+        else GameTooltip:SetItemByID(self.act.id) end
+        GameTooltip:AddLine(L["Click: use it and make it the default"], 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- Kattintas elott: ez lesz az alapertelmezett; utana a flyout bezarul
+    f:HookScript("PreClick", function(self)
+        local s, a = self.slot, self.act
+        if s.isClass then
+            QuestFocusDB.classPref = QuestFocusDB.classPref or {}
+            QuestFocusDB.classPref[s.key] = a.name
+        else
+            DB().buffItems[s.key] = a.id
+            DB()["noBuff_" .. s.key] = nil
+            if s.key == "food" then StartLearning(a.id) end
+        end
+    end)
+    f:HookScript("PostClick", function()
+        if not InCombatLockdown() then flyout:Hide() end
+        lastAlertKey = nil -- a sor az uj valasztassal epul ujra
+    end)
+    flyBtns[i] = f
+    return f
+end
+
+NS.HideBuffFlyout = function() if not InCombatLockdown() then flyout:Hide() end end
+
+NS.ToggleBuffFlyout = function(row, arrow)
+    if InCombatLockdown() then return end
+    if flyout:IsShown() and flyout.row == row then flyout:Hide() return end
+    local alts = row.alts or {}
+    for _, f in ipairs(flyBtns) do f:Hide() end
+    local n = 0
+    for _, a in ipairs(alts) do
+        if n >= 10 then break end
+        n = n + 1
+        local f = FlyBtn(n)
+        f.slot, f.act = row.slot, a
+        f.icon:SetTexture(ActionIcon(a))
+        SetupSecure(f, row.slot, a)
+        f:ClearAllPoints()
+        f:SetPoint("LEFT", flyout, "LEFT", 4 + (n - 1) * 26, 0)
+        f:Show()
+    end
+    if n == 0 then return end
+    flyout.row = row
+    flyout:SetWidth(8 + n * 26)
+    flyout:ClearAllPoints()
+    flyout:SetPoint("LEFT", arrow, "RIGHT", 2, 0)
+    flyout:Show()
+end
 
 -- Bejelentkezes utan egyszer felajanljuk, ha nincs XP kaja beallitva, de van etel a taskaban
 local function MaybePromptFood()
