@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.1", date = "2026-11-17", items = {
+        "Less CPU: quest changes come from specific events (accepted, turned in, removed, objective progress) "
+            .. "instead of every quest log update (that one is only a fallback if the client never sends the others).",
+    } },
     { version = "0.6.0", date = "2026-11-17", items = {
         "Folders renamed to AdventurersKit, AdventurersKit_Bags, AdventurersKit_Buffs (the CPU / addon lists now say Adventurer's Kit). "
             .. "A small code-free 'QuestFocus' folder carries your old settings over; delete it after one login.",

@@ -936,7 +936,12 @@ end
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("BAG_UPDATE_DELAYED")
-ev:RegisterEvent("QUEST_LOG_UPDATE")
+-- quest valtozas: a core szuri (felvetel / leadas / haladas), nem minden QUEST_LOG_UPDATE
+if NS.OnQuestChange then
+    NS.OnQuestChange(function() local h = ev:GetScript("OnEvent"); if h then h(ev, "QUEST_CHANGED") end end)
+else
+    ev:RegisterEvent("QUEST_LOG_UPDATE")
+end
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("UPDATE_BINDINGS")
 local pending

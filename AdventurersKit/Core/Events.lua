@@ -51,10 +51,34 @@ local function ScheduleRefresh()
     end)
 end
 
+---------------------------------------------------------------------------
+-- Quest valtozas: a QUEST_LOG_UPDATE nagyon gyakran jon (sokszor valtozas nelkul), ezert a
+-- konkret esemenyeket figyeljuk: felvetel, leadas, eltavolitas, haladas (UNIT_QUEST_LOG_CHANGED).
+-- A QUEST_LOG_UPDATE csak tartalek, amig a kliens egyszer sem kuldott konkret esemenyt.
+-- NS.OnQuestChange(fn): a modulok (Planner, Bags) erre iratkoznak fel.
+---------------------------------------------------------------------------
+local questCallbacks = {}
+NS.OnQuestChange = function(fn) questCallbacks[#questCallbacks + 1] = fn end
+local specificSeen = false
+local qev = CreateFrame("Frame")
+for _, e in ipairs({ "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "UNIT_QUEST_LOG_CHANGED", "QUEST_LOG_UPDATE" }) do
+    pcall(qev.RegisterEvent, qev, e) -- ha egy esemeny nincs ezen a kliensen, kihagyjuk
+end
+qev:SetScript("OnEvent", function(_, event, arg1)
+    if event == "UNIT_QUEST_LOG_CHANGED" and arg1 ~= "player" then return end
+    if event == "QUEST_LOG_UPDATE" then
+        if specificSeen then return end
+    else
+        specificSeen = true
+    end
+    NS.questLogGen = (NS.questLogGen or 0) + 1 -- a tickerek ebbol latjak, hogy ujra kell szamolni
+    ScheduleRefresh()
+    for _, fn in ipairs(questCallbacks) do pcall(fn, event) end
+end)
+
 QF:RegisterEvent("ADDON_LOADED")
 QF:RegisterEvent("PLAYER_LOGIN")
 QF:RegisterEvent("PLAYER_REGEN_ENABLED")
-QF:RegisterEvent("QUEST_LOG_UPDATE")
 QF:RegisterEvent("CVAR_UPDATE")
 QF:RegisterEvent("PLAYER_REGEN_DISABLED")
 QF:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -111,9 +135,6 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_REGEN_ENABLED" then
         if state.pendingBody then ApplyMacro(state.pendingBody) end
         PickNameplate()
-    elseif event == "QUEST_LOG_UPDATE" then
-        NS.questLogGen = (NS.questLogGen or 0) + 1 -- a tickerek ebbol latjak, hogy ujra kell szamolni
-        ScheduleRefresh()
     end
 end)
 
