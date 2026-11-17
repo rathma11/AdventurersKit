@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.23", date = "2026-11-17", items = {
+        "Travel: WoW Forever's own boat / zeppelin / airship list with exact dock positions from the game tables: "
+            .. "Stormwind Harbor - Auberdine, the Menethil -> Southshore -> Auberdine loop (one way), Menethil - Theramore, "
+            .. "Auberdine - Rut'theran, Feathermoon, Booty Bay - Ratchet, Steamwheedle Port - Powderfuse Port (Riverglades), "
+            .. "the Zephras Isle airships (Dalaran for the Alliance, Skywatcher Plateau for the Horde) and the Horde zeppelins.",
+    } },
     { version = "0.6.22", date = "2026-11-17", items = {
         "City list also opens in villages: within ~250 yd of an innkeeper counts as a town (not only resting in the inn); "
             .. "it closes when you walk away, and never pops up on a flight path.",

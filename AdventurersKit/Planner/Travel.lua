@@ -77,25 +77,69 @@ end
 local function Dist(ax, ay, bx, by) return math.sqrt((ax - bx) ^ 2 + (ay - by) ^ 2) end
 
 ---------------------------------------------------------------------------
--- Hajok, zeppelinek, villamos. Ket allomas (uiMap, x %, y %, nev) es a menetido masodpercben
--- (atlagos varakozas + ut). Az allomasok vilagkoordinatait futas kozben szamoljuk (egyszer).
+-- Hajok, zeppelinek, leghajok, villamos (WoW Forever, build 1.60.1).
+-- Kikotok vilag-yardban, kontinensenkent (0 Eastern Kingdoms, 1 Kalimdor, 2991 Zephras Isle):
+-- a jatek sajat tablajabol (az OpenMap addon Places.lua adata), ugyanabban a rendszerben, amit
+-- a C_Map.GetWorldPosFromMapPos ad. ido = atlagos varakozas + ut (masodperc, becsles az
+-- ut hosszabol: 90 + yard / 25). oneway: csak A -> B (korjarat).
 -- faction: csak annak a frakcionak (nil = mindenki). Bovitheto: QuestFocusDB.customTransports
--- ugyanilyen formaban (pl. a Forever sajat hajojaihoz).
+-- (ugyanilyen formaban, vagy a = { uiMap, x %, y %, nev } terkep koordinatakkal).
 ---------------------------------------------------------------------------
+local function T(len) return math.floor(90 + len / 25) end
+local W = {
+    stormwind = { 0, -8654.5, 1344.4, "Stormwind Harbor" },
+    menethilT = { 0, -3905.2, -585.8, "Menethil Harbor" },
+    menethilL = { 0, -3709.5, -575.1, "Menethil Harbor" },
+    southshore = { 0, -1102.6, -554.7, "Southshore" },
+    theramore = { 1, -4016.4, -4740.6, "Theramore" },
+    auberdineL = { 1, 6406.2, 823.1, "Auberdine" },
+    auberdineS = { 1, 6548.3, 942.2, "Auberdine" },
+    auberdineR = { 1, 6594.4, 759.8, "Auberdine" },
+    ruttheran = { 1, 8532.0, 1023.7, "Rut'theran Village" },
+    feathermoon = { 1, -4197.3, 3286.6, "Feathermoon Stronghold" },
+    feralas = { 1, -4347.8, 2444.4, "Forgotten Coast" },
+    bootybay = { 0, -14277.7, 582.9, "Booty Bay" },
+    ratchet = { 1, -1005.6, -3841.6, "Ratchet" },
+    steamwheedle = { 1, -6932.6, -4950.8, "Steamwheedle Port" },
+    powderfuse = { 0, -8232.3, -5800.8, "Powderfuse Port" },
+    dalaran = { 0, 544.8, 424.2, "Dalaran" },
+    skywatcher = { 1, -802.0, 366.5, "Skywatcher Plateau" },
+    valanaarA = { 2991, 1848.3, 569.1, "Valanaar" },
+    valanaarH = { 2991, 1952.5, 1019.1, "Valanaar" },
+    orgUC = { 1, 1318.1, -4658.0, "Orgrimmar" },
+    orgGG = { 1, 1360.9, -4631.3, "Orgrimmar" },
+    ucOrg = { 0, 2062.4, 293.0, "Undercity" },
+    ucGG = { 0, 2062.6, 235.3, "Undercity" },
+    ggOrg = { 0, -12464.0, 231.6, "Grom'gol" },
+    ggUC = { 0, -12406.9, 211.8, "Grom'gol" },
+}
 local TRANSPORTS = {
-    { kind = "boat", a = { 1437, 4.6, 57.1, "Menethil Harbor" }, b = { 1445, 71.6, 56.4, "Theramore" }, time = 180, faction = "Alliance" },
-    { kind = "boat", a = { 1437, 4.4, 62.6, "Menethil Harbor" }, b = { 1439, 32.4, 43.8, "Auberdine" }, time = 180, faction = "Alliance" },
-    { kind = "boat", a = { 1439, 33.2, 40.2, "Auberdine" }, b = { 1438, 54.9, 96.8, "Rut'theran Village" }, time = 120, faction = "Alliance" },
-    { kind = "boat", a = { 1434, 25.9, 73.1, "Booty Bay" }, b = { 1413, 63.7, 38.6, "Ratchet" }, time = 180 },
-    { kind = "zeppelin", a = { 1411, 50.8, 13.7, "Orgrimmar" }, b = { 1420, 60.7, 58.8, "Undercity" }, time = 180, faction = "Horde" },
-    { kind = "zeppelin", a = { 1411, 50.6, 12.6, "Orgrimmar" }, b = { 1434, 31.5, 29.1, "Grom'gol" }, time = 180, faction = "Horde" },
-    { kind = "zeppelin", a = { 1420, 61.9, 59.0, "Undercity" }, b = { 1434, 31.6, 29.2, "Grom'gol" }, time = 180, faction = "Horde" },
+    { kind = "boat", a = W.stormwind, b = W.auberdineS, time = T(1572), faction = "Alliance" },
+    { kind = "boat", a = W.menethilT, b = W.theramore, time = T(2441), faction = "Alliance" },
+    -- korjarat, egy iranyban: Menethil -> Southshore -> Auberdine -> Menethil
+    { kind = "boat", a = W.menethilL, b = W.southshore, time = T(3336), faction = "Alliance", oneway = true },
+    { kind = "boat", a = W.southshore, b = W.auberdineL, time = T(1964), faction = "Alliance", oneway = true },
+    { kind = "boat", a = W.auberdineL, b = W.menethilL, time = T(2154), faction = "Alliance", oneway = true },
+    { kind = "boat", a = W.auberdineR, b = W.ruttheran, time = T(2219), faction = "Alliance" },
+    { kind = "boat", a = W.feathermoon, b = W.feralas, time = 60 + T(899) - 90, faction = "Alliance" },
+    { kind = "boat", a = W.bootybay, b = W.ratchet, time = T(2787) },
+    { kind = "boat", a = W.steamwheedle, b = W.powderfuse, time = T(1561) },
+    { kind = "airship", a = W.dalaran, b = W.valanaarA, time = T(2690), faction = "Alliance" },
+    { kind = "airship", a = W.skywatcher, b = W.valanaarH, time = T(2214), faction = "Horde" },
+    { kind = "zeppelin", a = W.orgUC, b = W.ucOrg, time = T(3297), faction = "Horde" },
+    { kind = "zeppelin", a = W.orgGG, b = W.ggOrg, time = T(2422), faction = "Horde" },
+    { kind = "zeppelin", a = W.ucGG, b = W.ggUC, time = T(3000), faction = "Horde" },
+    -- Deeprun Tram (instance, nincs a tablaban): a ket bejarat terkep koordinataval
     { kind = "tram", a = { 1453, 69.2, 31.0, "Stormwind" }, b = { 1455, 76.6, 51.2, "Ironforge" }, time = 90 },
 }
-local KIND_NAME = { boat = L["Boat"], zeppelin = L["Zeppelin"], tram = L["Tram"] }
+local KIND_NAME = { boat = L["Boat"], zeppelin = L["Zeppelin"], airship = L["Airship"], tram = L["Tram"] }
 
 local stationCache = {} -- "uiMap:x:y" -> { wc, wx, wy } vagy false
 local function Station(s)
+    -- vilagkoordinata (kontinens 0 / 1 / 2991 ...): kozvetlenul
+    if s[1] == 0 or s[1] == 1 or s[1] == 2991 or math.abs(s[2]) > 100 or math.abs(s[3]) > 100 then
+        return { wc = s[1], wx = s[2], wy = s[3], name = s[4] }
+    end
     local key = s[1] .. ":" .. s[2] .. ":" .. s[3]
     local c = stationCache[key]
     if c == nil then
@@ -113,7 +157,9 @@ local function Transports()
         for _, t in ipairs(type(list) == "table" and list or {}) do
             if not t.faction or t.faction == fac then
                 local a, b = Station(t.a), Station(t.b)
-                if a and b then out[#out + 1] = { a = a, b = b, time = tonumber(t.time) or 180, kind = t.kind } end
+                if a and b then
+                    out[#out + 1] = { a = a, b = b, time = tonumber(t.time) or 180, kind = t.kind, oneway = t.oneway }
+                end
             end
         end
     end
@@ -149,7 +195,7 @@ local function TransportRoute(from, to, speed, useHearth)
         local step = { kind = tr.kind, from = tr.a.name, to = tr.b.name }
         local back = { kind = tr.kind, from = tr.b.name, to = tr.a.name }
         edge(ia, ib, tr.time, step)
-        edge(ib, ia, tr.time, back)
+        if not tr.oneway then edge(ib, ia, tr.time, back) end
     end
     -- gyalog: minden ket pont kozott ugyanazon a kontinensen
     for i = 1, #nodes do
