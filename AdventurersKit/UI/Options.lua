@@ -10,7 +10,7 @@ local ApplyMacro, BuildMacroBody, IconId = C.ApplyMacro, C.BuildMacroBody, C.Ico
 -- Beallitasok (Options > AddOns > QuestFocus)
 -- Bal oldalon fuggoleges fulek feature-onkent (sorrend: order), jobb oldalon a
 -- gorgetheto oldal. Minden kapcsolo alatt rovid, szurke leiras.
--- Oldal sorrend:  10 General · 20 Macro & marker · 30 Route & progress · 40 Quest pickup
+-- Oldal sorrend:  10 General · 20 Macro & marker · 30 Route & progress · 40 Quest pickup · 45 City list
 --                 50 Zone focus · 60 Bags (modul) · 70 Buffs (modul) · 90 Debug
 ---------------------------------------------------------------------------
 local function RebuildMacro()

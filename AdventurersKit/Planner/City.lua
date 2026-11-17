@@ -159,7 +159,7 @@ city.ignoreBtn:SetScript("OnEnter", function(self)
         NS.TT.Note(tt, (L["The list opens by itself in %s again."]):format(PlaceName()))
     else
         NS.TT.Note(tt, (L["This list won't pop up by itself in %s (within ~500 yd) any more, not even next time. "
-            .. "Other cities and inns are not affected. /qf city opens it anyway; Options > Quest pickup lists and clears these places."])
+            .. "Other cities and inns are not affected. /qf city opens it anyway; Options > City list lists and clears these places."])
             :format("|cffffff00" .. PlaceName() .. "|r"))
     end
     NS.TT.Finish(tt)
@@ -168,12 +168,12 @@ city.ignoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 city.disableBtn:SetScript("OnClick", function()
     QuestFocusDB.noCityMode = true
     city:Hide()
-    NS.PrintAlways(L["City list disabled everywhere (all cities and inns). Turn it back on: Options > Quest pickup > City mode."])
+    NS.PrintAlways(L["City list disabled everywhere (all cities and inns). Turn it back on: Options > City list."])
     NS.Panel_Update()
 end)
 city.disableBtn:SetScript("OnEnter", function(self)
     local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Disable city list everywhere"])
-    NS.TT.Note(tt, L["Turns off the city list in every city and inn, not just here. Turn it back on: Options > Quest pickup > City mode."])
+    NS.TT.Note(tt, L["Turns off the city list in every city and inn, not just here. Turn it back on: Options > City list."])
     NS.TT.Finish(tt)
 end)
 city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -255,7 +255,7 @@ end
 -- Teendok a varosban (a questek folott): javitas, hunter ammo, XP kaja. Kattintasra marker
 -- a legkozelebbi javitora / ammo arusra / kaja arusra. Plusz Bank gomb a fejlecben.
 ---------------------------------------------------------------------------
--- Kuszobok (Options > Quest pickup > City to-do); 0 = az a sor ki van kapcsolva
+-- Kuszobok (Options > City list > City to-do); 0 = az a sor ki van kapcsolva
 local LIMIT_DEFAULTS = { bagPct = 70, bagFree = 10, repair = 60, ammo = 400 }
 local LIMIT_KEYS = { bagPct = "cityBagPct", bagFree = "cityBagFree", repair = "cityRepairPct", ammo = "cityAmmo" }
 NS.CityLimit = function(which)

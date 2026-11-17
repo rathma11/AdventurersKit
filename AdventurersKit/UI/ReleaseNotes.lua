@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.11", date = "2026-11-17", items = {
+        "Options: Quest pickup split in two tabs. Quest pickup = the nearby popup out in the world and the quest level range; "
+            .. "City list = the list in cities / inns, skipped places, to-do thresholds. Each starts with a short intro and its on / off switch.",
+        "City list tab: skipped places are listed one per line with a Remove button (Remove all when there are several).",
+    } },
     { version = "0.6.10", date = "2026-11-17", items = {
         "City list: 'Ignore this place' is now 'Don't open here again' (and 'Open here again'); the tooltip names the place "
             .. "and says other cities are not affected.",
