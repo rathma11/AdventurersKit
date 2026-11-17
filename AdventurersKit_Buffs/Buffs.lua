@@ -409,26 +409,39 @@ end
 -- csak harcon kivul). Az alvozsak rested buffja (429959) nem szamit.
 local auraTip = CreateFrame("GameTooltip", "QuestFocusAuraTip", nil, "GameTooltipTemplate")
 local xpAuraCache = {}
-local function IsXPAura(a)
-    if not a or not a.spellId or a.spellId == 429959 then return false end
-    local cached = xpAuraCache[a.spellId]
-    if cached ~= nil then return cached end
-    if InCombatLockdown() or not a.index then return false end
+local xpAuraText = {} -- debug: mit olvastunk ki (spellId -> szoveg)
+local function AuraText(a)
     local text = ""
-    local ok = pcall(function()
+    -- 1) a buff tooltipje
+    pcall(function()
         auraTip:SetOwner(WorldFrame, "ANCHOR_NONE")
         auraTip:ClearLines()
         auraTip:SetUnitBuff("player", a.index)
         for i = 1, auraTip:NumLines() do
             local fs = _G["QuestFocusAuraTipTextLeft" .. i]
             local t = fs and fs:GetText()
-            if t then text = text .. "\n" .. t end
+            if type(t) == "string" then text = text .. "\n" .. t end
         end
         auraTip:Hide()
     end)
-    if not ok then return false end
+    -- 2) a spell leirasa (a buff tooltip nem mindig irja ki az XP reszt)
+    pcall(function()
+        local d = (C_Spell and C_Spell.GetSpellDescription and C_Spell.GetSpellDescription(a.spellId))
+            or (GetSpellDescription and GetSpellDescription(a.spellId))
+        if type(d) == "string" then text = text .. "\n" .. d end
+    end)
+    return text
+end
+local function IsXPAura(a)
+    if not a or not a.spellId or a.spellId == 429959 then return false end
+    local cached = xpAuraCache[a.spellId]
+    if cached ~= nil then return cached end
+    if InCombatLockdown() or not a.index then return false end
+    local text = AuraText(a)
     local lower = text:lower()
+    -- pl. Well Fed: "experience gained from kills increased by 5%"
     local isXP = lower:find("experience", 1, true) ~= nil or lower:find("%f[%w]xp%f[%W]") ~= nil
+    xpAuraText[a.spellId] = text:gsub("\n", " / ")
     -- ha a leiras meg nem toltott be (csak a nev sor jott), a "nem XP"-t nem jegyezzuk meg
     local _, lines = text:gsub("\n", "")
     if isXP or lines >= 2 then xpAuraCache[a.spellId] = isXP end
@@ -730,6 +743,15 @@ NS.BuffDebugLines = function()
             slot.stacks and (" stacks " .. tostring(stacks or 0) .. "/" .. slot.stacks) or "",
             NS.BuffSlotOff(slot) and " |cff808080(off)|r" or "",
             NS.buffDismissed and NS.buffDismissed[slot.key] and " |cff808080(closed with X)|r" or "")
+    end
+    -- XP kaja keresese: minden 60 mp-nel hosszabb buff, XP-e, es mit olvastunk ki belole
+    for name, a in pairs(auras) do
+        if a.duration > 60 then
+            local xp = IsXPAura(a)
+            out[#out + 1] = ("  aura %s (%s) %ds mine=%s xp=%s: %s"):format(name, tostring(a.spellId),
+                math.floor(a.duration), tostring(a.mine), tostring(xp),
+                (a.spellId and xpAuraText[a.spellId] or "-"):sub(1, 160))
+        end
     end
     return out
 end

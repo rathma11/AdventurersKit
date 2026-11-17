@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.49", date = "2026-11-17", items = {
+        "XP food row: a Well Fed buff with bonus kill XP (e.g. +5% from Longjaw Mud Snapper) counts. The buff's spell "
+            .. "description is checked too, not just its tooltip. /qf debug lists your long buffs and whether each one is an XP buff.",
+    } },
     { version = "0.6.48", date = "2026-11-17", items = {
         "XP food row: an active food buff (e.g. Well Fed from Longjaw Mud Snapper) counts again. The food buff's caster "
             .. "is no longer checked, and a buff description that hasn't loaded yet is retried instead of being remembered as 'no XP'.",
