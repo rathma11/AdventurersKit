@@ -411,17 +411,44 @@ local function ActiveTracking()
     return nil, tex
 end
 
+-- Aktiv-e valamelyik tracking spellunk (nev szerint). nil = nincs (szolunk), math.huge = van.
+-- Elsonek a minimap tracking listat nezzuk (aktiv jelzo): a GetTrackingTexture ezen a
+-- kliensen akkor is adhat egy alap ikont, ha semmi sincs bekapcsolva.
 NS.TrackingRemaining = function(slot)
-    local name, tex = ActiveTracking()
-    if not (name or tex) then return end
-    for _, s in ipairs(slot.spells) do
-        if s == name or (tex and SpellKnown(s) and SpellIconOf(s) == tex) then
-            QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
-            QuestFocusDB.classSeen[slot.key] = s
-            return math.huge
+    local want = {}
+    for _, s in ipairs(slot.spells) do want[s] = true end
+    local function seen(s)
+        QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
+        QuestFocusDB.classSeen[slot.key] = s
+        return math.huge
+    end
+    if C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo then
+        local ok, n = pcall(C_Minimap.GetNumTrackingTypes)
+        if ok and n and n > 0 then
+            for i = 1, n do
+                local ok2, a, b, c = pcall(C_Minimap.GetTrackingInfo, i)
+                if ok2 then
+                    local name, active
+                    if type(a) == "table" then name, active = a.name, a.active else name, active = a, c end
+                    if active and name and want[name] then return seen(name) end
+                end
+            end
+            return nil -- a lista mukodik, es egyik tracking spellunk sem aktiv
         end
     end
-    return math.huge -- valami mas kovetes aktiv (pl. masik addonbol): nem szolunk
+    -- regi API: az aktiv kovetes ikonja; csak akkor "van", ha egy ismert spellunk ikonja
+    if GetTrackingTexture then
+        local ok, tex = pcall(GetTrackingTexture)
+        if ok and tex then
+            for _, s in ipairs(slot.spells) do
+                if SpellKnown(s) and SpellIconOf(s) == tex then return seen(s) end
+            end
+        end
+    end
+    -- buffkent is lehet (classic hunter track aura)
+    local auras = HelpfulAuras()
+    for _, s in ipairs(slot.spells) do if auras[s] then return seen(s) end end
+    return nil
 end
 
 -- Melyik spellt tegyuk fel: beallitott > legutobb rajtad latott > az elso ismert
