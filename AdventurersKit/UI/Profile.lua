@@ -13,7 +13,7 @@ local PREFIX = "AK1:"
 -- Exportalt kulcsok (a tobbi allapot / karakterhez kotott, nem visszuk at)
 local PLAIN = {
     "quietChat", "showErrors", "hideMinimap", "fontSize", "panelW", "panelH", "panelScale",
-    "macroIcons", "startAttack", "noPing", "pingMode", "noArrow", "nearbyRadius", "noNearbyQuests",
+    "macroIcons", "startAttack", "noPing", "pingMode", "noArrow", "noEscortIcon", "nearbyRadius", "noNearbyQuests",
     "noSuggest", "noToast", "noQuestPopup", "noCityMode", "pickupAbove", "pickupBelow",
     "zoneFocus", "noZonePrompt", "zoneAutoFollow", "modules",
     "noBagGlow", "noBagList", "noUseButton",

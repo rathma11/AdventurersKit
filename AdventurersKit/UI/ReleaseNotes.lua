@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.50", date = "2026-11-17", items = {
+        "Escort quests: the panel shows who you escort, their health (warning with a sound below 35%) and where to. "
+            .. "The QFocus macro targets whatever is attacking the escort, otherwise the escort itself. The marker goes "
+            .. "to the escort's end point. If the escort fails, the marker and the macro point to the quest giver to restart.",
+        "A star raid icon goes on the escorted NPC when you target or mouse over it (solo, in a party, or as raid "
+            .. "leader / assist). An icon already on it is left alone. Option: Macro & marker tab.",
+    } },
     { version = "0.6.49", date = "2026-11-17", items = {
         "XP food row: a Well Fed buff with bonus kill XP (e.g. +5% from Longjaw Mud Snapper) counts. The buff's spell "
             .. "description is checked too, not just its tooltip. /qf debug lists your long buffs and whether each one is an XP buff.",

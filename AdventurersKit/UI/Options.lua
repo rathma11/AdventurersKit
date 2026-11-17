@@ -755,6 +755,10 @@ mac:Check(L["Own arrow"],
         QuestFocusDB.noArrow = not v
         if not v then arrow:Hide() elseif state.waypoint and UseOwnArrow() then arrow:Show() end
     end)
+mac:Check(L["Star raid icon on the escorted NPC"],
+    L["On an escort quest, puts a star raid icon on the NPC you escort when you target or mouse over it. Works solo and in a party; in a raid only as leader or assist. An icon that is already there is left alone."],
+    function() return not QuestFocusDB.noEscortIcon end,
+    function(v) QuestFocusDB.noEscortIcon = (not v) or nil end)
 pageMac:HookScript("OnShow", function() mac:Refresh() end)
 
 ---------------------------------------------------------------------------

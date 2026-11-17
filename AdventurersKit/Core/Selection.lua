@@ -13,6 +13,11 @@ local function Refresh(keepObjective)
     if not state.questId then return end
     local quest = GetQuestieQuest(state.questId)
     state.objectives = quest and CollectTargets(quest, state.isComplete) or {}
+    -- escort quest: escort sor, vege pont marker, kudarcnal ujrakezdes (Core\Escort.lua)
+    if NS.Escort then
+        local ok, r = pcall(NS.Escort.Decorate, state.objectives)
+        if ok and r then state.objectives = r end
+    end
     if not keepObjective then state.objIndex = nil end
     if state.objIndex and not state.objectives[state.objIndex] then state.objIndex = nil end
     UpdateMacro()
@@ -103,6 +108,7 @@ end)
 local function ClearQuest()
     state.questId, state.title, state.objectives, state.objIndex = nil, nil, nil, nil
     state.extra = nil
+    state.escort, state.escortQid, state.escortFailed = nil, nil, nil
     ClearWaypoint()
     QuestFocusDB.lastQuest = nil
     Panel_Update() -- kijeloles nelkul javaslatokat mutat

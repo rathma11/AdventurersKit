@@ -408,6 +408,10 @@ local function FooterText()
     local dist = MarkerDistance()
     local distTxt = dist and ("|cff99ccff%d yd|r"):format(dist) or nil
     local objs = state.objectives or {}
+    if state.escort and not state.isComplete and NS.Escort then
+        local t = NS.Escort.FooterText()
+        if t then return t .. (distTxt and (" - " .. distTxt) or "") end
+    end
     if objs[1] and objs[1].turnIn then
         -- A leado NPC neve mar ott van az objective sorban: itt csak hogy mit csinal a macro
         local _, d = FindNearest(objs[1].sources)
@@ -448,6 +452,11 @@ panel:HookScript("OnUpdate", function(_, dt)
     if footerElapsed < 0.5 then return end
     footerElapsed = 0
     if state.objectives and #state.objectives > 0 then panel.footer:SetText(FooterText()) end
+    -- escort sor (eletero) eloben
+    if panel.escortRow and panel.escortRow:IsShown() and NS.Escort then
+        local t = NS.Escort.RowText()
+        if t then panel.escortRow.text:SetText(t) end
+    end
 end)
 
 local function PanelSelectObjective(i) return NS.SelectObjective(i) end -- Core\Selection.lua
@@ -503,6 +512,7 @@ local ICON_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t "
 local ICON_TODO = "|TInterface\\COMMON\\Indicator-Gray:12:12|t "
 local ICON_SEL = "|TInterface\\COMMON\\Indicator-Green:12:12|t "
 local ICON_TI = "|TInterface\\GossipFrame\\ActiveQuestIcon:12:12|t "
+local ICON_ESC = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:12:12|t "
 
 -- Statisztika dobozok + haladas csik
 local function UpdateStats()
@@ -636,6 +646,7 @@ local function Panel_Update()
         for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
         panel.extraHeader:Hide()
         if panel.hsRow then panel.hsRow:Hide() end
+        if panel.escortRow then panel.escortRow:Hide() end
         panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName("idle"))
         if NS.ShowSuggestions and NS.ShowSuggestions() then panel:Show() else panel:Hide() end
         return
@@ -661,7 +672,7 @@ local function Panel_Update()
         line.index = i
         line.useQid, line.useObj, line.useQuestItem = state.questId, o, (i == firstOpen)
         line:SetSize(PW() - 24, RowH())
-        local icon = o.completed and ICON_DONE or (o.turnIn and ICON_TI)
+        local icon = o.completed and ICON_DONE or (o.turnIn and ICON_TI) or (o.escort and ICON_ESC)
             or (state.objIndex == i and ICON_SEL) or ICON_TODO
         local color = o.completed and "|cff808080" or (o.turnIn and "|cffffff00")
             or (state.objIndex == i and "|cff33ff99") or "|cffffffff"
@@ -674,6 +685,43 @@ local function Panel_Update()
         y = y - RowH() - 1
     end
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
+    -- Escort quest: kit kisersz, hova, eletero (Core\Escort.lua)
+    local escTxt = state.escort and not state.isComplete and NS.Escort and NS.Escort.RowText()
+    if escTxt then
+        local r = panel.escortRow
+        if not r then
+            r = CreateFrame("Button", nil, panel)
+            r:SetSize(PANEL_W - 24, 16)
+            r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
+            r.text:SetAllPoints()
+            r.text:SetJustifyH("LEFT")
+            r.text:SetWordWrap(false)
+            local hl = r:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.08)
+            r:SetScript("OnClick", function()
+                if NS.ShowObjectiveOnMap then NS.ShowObjectiveOnMap(nil) end
+            end)
+            r:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:SetText(state.title or "?", 1, 0.86, 0.5)
+                if NS.Escort then NS.Escort.RowTooltip(GameTooltip) end
+                GameTooltip:AddLine(L["Click: show the end point on the map"], 0.45, 0.45, 0.45)
+                GameTooltip:Show()
+            end)
+            r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            panel.escortRow = r
+        end
+        r:SetSize(PW() - 24, RowH())
+        r.text:SetText(escTxt)
+        y = y - 2
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        r:Show()
+        y = y - RowH() - 1
+    elseif panel.escortRow then
+        panel.escortRow:Hide()
+    end
     -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
     local extras = (state.objIndex == nil) and state.extra or nil
     local nExtra = 0

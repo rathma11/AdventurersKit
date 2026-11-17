@@ -71,6 +71,14 @@ pickTicker:SetScript("OnUpdate", function(_, dt)
 end)
 
 local function BuildMacroBody(objectives, onlyIndex)
+    -- Escort quest: az escortalt NPC tamadoja / maga az NPC / kudarcnal a quest ado (Core\Escort.lua)
+    if NS.Escort and state.escort then
+        local ok, body = pcall(NS.Escort.MacroBody, objectives, onlyIndex)
+        if ok and body then
+            wipe(targetNames)
+            return body, 1
+        end
+    end
     local usePing = NS.UsePing()
     -- Nameplate-ekkel: /target nameplateN (elo, nem tapolt mob). Ha nincs latszo quest mob
     -- (vagy harc): /targetexact nev szerint, a hullat eldobjuk, a tapoltat itt nem tudjuk kiszurni.
