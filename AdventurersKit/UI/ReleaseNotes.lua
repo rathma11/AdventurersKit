@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.32", date = "2026-11-17", items = {
+        "Buff reminder Tracking row: if you know Find Minerals / Find Herbs / Find Fish, only these count and the reminder "
+            .. "casts one of them (other tracking like Track Beasts doesn't silence it). Switch on the Buffs tab (Other).",
+    } },
     { version = "0.6.31", date = "2026-11-17", items = {
         "Marker hopping: when you reach a marked spawn point and the mob / object isn't there (no living nameplate with "
             .. "that name after ~4 s), the point counts as checked for 5 minutes and the arrow moves on to the nearest "

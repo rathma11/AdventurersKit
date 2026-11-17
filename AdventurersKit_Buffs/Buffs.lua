@@ -548,9 +548,21 @@ end
 -- Aktiv-e valamelyik tracking spellunk (nev szerint). nil = nincs (szolunk), math.huge = van.
 -- Elsonek a minimap tracking listat nezzuk (aktiv jelzo): a GetTrackingTexture ezen a
 -- kliensen akkor is adhat egy alap ikont, ha semmi sincs bekapcsolva.
+-- Gyujto kovetes (Mining / Herbalism / Fishing): ha ismered valamelyiket, alapbol csak ezek
+-- szamitanak (pl. a hunter Track Beasts nem), es ezt teszi fel a reminder.
+-- Kikapcsolhato: QuestFocusDB.trackAnyKind = true (Options > Buffs).
+local GATHER_TRACK = { "Find Minerals", "Find Herbs", "Find Fish" }
+local function GatherTracking()
+    if QuestFocusDB.trackAnyKind then return end
+    local list = {}
+    for _, s in ipairs(GATHER_TRACK) do if SpellKnown(s) then list[#list + 1] = s end end
+    if #list > 0 then return list end
+end
+NS.GatherTracking = GatherTracking
+
 NS.TrackingRemaining = function(slot)
     local want = {}
-    for _, s in ipairs(slot.spells) do want[s] = true end
+    for _, s in ipairs(GatherTracking() or slot.spells) do want[s] = true end
     local function seen(s)
         QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
         QuestFocusDB.classSeen[slot.key] = s
@@ -574,20 +586,22 @@ NS.TrackingRemaining = function(slot)
     if GetTrackingTexture then
         local ok, tex = pcall(GetTrackingTexture)
         if ok and tex then
-            for _, s in ipairs(slot.spells) do
+            for s in pairs(want) do
                 if SpellKnown(s) and SpellIconOf(s) == tex then return seen(s) end
             end
         end
     end
     -- buffkent is lehet (classic hunter track aura)
     local auras = HelpfulAuras()
-    for _, s in ipairs(slot.spells) do if auras[s] then return seen(s) end end
+    for s in pairs(want) do if auras[s] then return seen(s) end end
     return nil
 end
 
 -- Melyik spellt tegyuk fel: beallitott > legutobb rajtad latott > az elso ismert
 local function SlotSpell(slot)
     local castable = slot.cast or slot.spells
+    -- kovetes: ha van gyujto szakmad, csak Find Minerals / Herbs / Fish kozul
+    if slot.tracking then castable = GatherTracking() or castable end
     local function ok(name)
         if not name or not SpellKnown(name) then return false end
         for _, c in ipairs(castable) do if c == name then return true end end
@@ -2348,5 +2362,10 @@ fl:Button(L["Forget learned buffs"], 200,
     L["Forget which buff each item gives; learned again the next time you use it from the reminder. Same as /qf buffreset."],
     function() if NS.ResetBuffLearn then NS.ResetBuffLearn() end end, 4)
 fl:Text(L["Tracking (Find Minerals / Find Herbs) can be switched with a key: Options > Keybindings > AddOns > Adventurer's Kit - Buffs."], 2)
+fl:Check(L["Tracking: with a gathering profession, only Find Minerals / Herbs / Fish count"],
+    L["If you know Find Minerals, Find Herbs or Find Fish, the Tracking row wants one of these (other tracking like "]
+    .. L["Track Beasts doesn't count) and casts it. Off: any tracking is fine."],
+    function() return not QuestFocusDB.trackAnyKind end,
+    function(v) QuestFocusDB.trackAnyKind = not v; lastAlertKey = nil end)
 
 page:HookScript("OnShow", function() fl:Refresh() end)
