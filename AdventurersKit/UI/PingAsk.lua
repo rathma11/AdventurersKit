@@ -75,8 +75,9 @@ sub:SetJustifyH("LEFT")
 sub:SetText(L["You joined a group: they see the QFocus macro's pings. Solo it always pings."])
 
 -- lapos gomb (mint a city listen): sotet hatter, vekony arany keret, hoverre vilagosabb
-local function Flat(text, w, h)
-    local b = CreateFrame("Button", nil, f)
+-- (parent: masik ablakhoz is, pl. a dungeon quest megosztas: NS.FlatButton)
+local function Flat(text, w, h, parent)
+    local b = CreateFrame("Button", nil, parent or f)
     b:SetSize(w, h or 22)
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints()
@@ -97,6 +98,7 @@ local function Flat(text, w, h)
     b.text:SetText(text)
     return b
 end
+NS.FlatButton = function(parent, text, w, h) return Flat(text, w, h, parent) end
 
 -- 1) valasz erre a csapatra
 local yes = Flat(L["Ping in this group"], 136, 24)

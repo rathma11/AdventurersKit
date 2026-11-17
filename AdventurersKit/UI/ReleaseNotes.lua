@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.68", date = "2026-11-17", items = {
+        "Inside the dungeon, quests that start outside and you didn't pick up are no longer in the list: one dim "
+            .. "\"Missed outside: N\" line at the end, with their names in its tooltip.",
+        "Dungeon prep in a group: when you zone into the dungeon, a small window (same look as the ping question) "
+            .. "asks whether to share your dungeon quests with the party. Tick the ones you want and press Share; they "
+            .. "are shared one by one. Only out of combat (otherwise right after the fight), once per entry, and only "
+            .. "if at least one of them can be shared. Off switch: Options > Route & progress > Dungeon prep.",
+    } },
     { version = "0.6.67", date = "2026-11-17", items = {
         "Dungeon prep continues inside the dungeon: when you zone into the prepped dungeon, the panel lists all its "
             .. "quests in your log in boss order (built-in boss order for the classic and Forever dungeons; otherwise "

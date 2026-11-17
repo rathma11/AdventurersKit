@@ -183,7 +183,7 @@ local function Build()
     local QP = NS.Module("QuestiePlayer")
     local inLog = QP and type(QP.currentQuestlog) == "table" and QP.currentQuestlog or {}
     local level = UnitLevel("player") or 1
-    local cand = {}
+    local cand, missed = {}, {}
     for qid in pairs(known) do cand[qid] = true end
     for qid in pairs(avail) do cand[qid] = true end
     for qid in pairs(cand) do
@@ -229,6 +229,9 @@ local function Build()
                 groups[#groups + 1] = { kind = "pick", qid = qid, name = (d and d.name) or q.name, level = q.level,
                     hint = hint, giver = giverSrc and giverSrc.name, key = key or 0, order = 0, note = d and d.note }
                 active = true
+            elseif d and not inside and (avail[qid] or (q and not item)) then
+                -- kint kellett volna felvenni: itt mar nem teendo, csak egy halvany sor a vegen
+                missed[#missed + 1] = { name = d.name or q.name, level = q.level or d.level, giver = d.note }
             end
         end
     end
@@ -242,6 +245,7 @@ local function Build()
         rows[#rows + 1] = g
         if g.kind == "q" then for _, o in ipairs(g.objs) do rows[#rows + 1] = o end end
     end
+    if #missed > 0 then rows[#rows + 1] = { kind = "missed", list = missed } end
     ins.rows = rows
     ins.active = active
     if active then ins.hadWork = true end
@@ -395,6 +399,13 @@ local function Line(i)
             GameTooltip:AddLine(L["Pick up inside the dungeon"], 1, 1, 0.4)
             if d.hint then GameTooltip:AddLine(d.hint, 0.8, 0.8, 0.8, true) end
             if d.note and d.note ~= d.hint then GameTooltip:AddLine(d.note, 0.7, 0.7, 0.7, true) end
+        elseif d.kind == "missed" then
+            GameTooltip:SetText(L["Missed outside"], 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(L["These start outside the dungeon; pick them up next time."], 0.6, 0.6, 0.6, true)
+            for _, x in ipairs(d.list) do
+                GameTooltip:AddLine(("[%s] %s"):format(tostring(x.level or "?"), x.name or "?")
+                    .. (x.giver and ("  |cff888888" .. x.giver .. "|r") or ""), 0.9, 0.9, 0.9, true)
+            end
         else
             local TT = NS.TT
             if TT and TT.Objective then
@@ -410,6 +421,15 @@ local function Line(i)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     lines[i] = r
     return r
+end
+
+-- A dungeon questjei a logban (a megosztas ablaknak: Planner\PrepShare.lua)
+NS.PrepInsideQuests = function()
+    local out = {}
+    for _, r in ipairs(ins.rows) do
+        if r.kind == "q" then out[#out + 1] = { qid = r.qid, title = r.title, level = r.level } end
+    end
+    return out
 end
 
 NS.HidePrepInside = function()
@@ -455,6 +475,8 @@ NS.ShowPrepInside = function()
         elseif d.kind == "pick" then
             txt = (d == nx and ICON_NEXT or ICON_PICK) .. ("|cffffff00! [%s] %s|r"):format(tostring(d.level or "?"), d.name or "?")
                 .. (d.hint and ("  |cff999999" .. d.hint .. "|r") or "")
+        elseif d.kind == "missed" then
+            txt = "|cff666666" .. (L["Missed outside: %d"]):format(#d.list) .. "|r"
         else
             local o = d.o
             local icon = o.completed and ICON_DONE or (d == nx and ICON_NEXT) or (o.turnIn and ICON_TI) or ICON_TODO
@@ -534,11 +556,14 @@ local function Enter()
     NS.Loud(NS.Print, L["In %s: %d quest rows. %s"], NS.PrepActive() or "?", #ins.rows,
         ins.hasArrow and "" or L["No map position inside the instance: no arrow, follow the Next hint."])
     Update()
+    -- csapatban: megosszuk-e a dungeon questjeit (Planner\PrepShare.lua), belepesenkent egyszer
+    if ins.on and NS.PrepShareAsk then NS.PrepShareAsk() end
 end
 
 -- Kilepes az instance-bol: ha minden kesz, vege (elozo allapot); kulonben vissza a prep listahoz
 local function Leave()
     ins.on = false
+    if NS.PrepShareHide then NS.PrepShareHide() end
     NS.HidePrepInside()
     if ins.hadWork and not ins.active then
         NS.StopPrep(true, true)

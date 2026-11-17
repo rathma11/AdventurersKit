@@ -42,6 +42,12 @@ rt:Button(L["Reset kill pace"], 160,
         wipe(mobKills)
         NS.Print(L["Kill pace reset."])
     end, 2)
+rt:Header(L["Dungeon prep"])
+rt:Check(L["Ask to share dungeon quests on entering"],
+    L["In dungeon prep, when you zone into the dungeon in a group, a small window asks whether to share your "]
+    .. L["dungeon quests with the party (tick the ones you want). Only out of combat, once per entry."],
+    function() return not QuestFocusDB.noShareAsk end,
+    function(v) QuestFocusDB.noShareAsk = not v end)
 pageRoute:HookScript("OnShow", function() rt:Refresh() end)
 
 ---------------------------------------------------------------------------
