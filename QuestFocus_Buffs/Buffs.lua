@@ -576,8 +576,7 @@ local function CheckWarnings(auras)
             if not warned[key] and canFix then
                 warned[key] = true
                 local msg = (L["%s expires in %d min"]):format(slot.label, math.max(1, math.ceil(left / 60)))
-                if UIErrorsFrame then UIErrorsFrame:AddMessage("QuestFocus: " .. msg, 1, 0.6, 0.2) end
-                Print(msg)
+                Print(msg) -- csak chat; a kepernyo kozepen nem villogunk (ott az emlekezteto sav)
             end
         elseif left and left >= limit then
             warned[key] = nil
@@ -816,7 +815,25 @@ local function UpdateAlert(auras)
         alert.onPanel = NS.panel:IsShown()
         if not alert:IsShown() then
             alert:Show()
-            if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then PlaySound(SOUNDKIT.RAID_WARNING) end
+            -- Hang helyett egy rovid arany felvillanas a saven (csak egy textura animal,
+            -- maga az ablak nem, mert secure gombok vannak benne)
+            if not alert.flash then
+                local f = alert:CreateTexture(nil, "OVERLAY")
+                f:SetPoint("TOPLEFT", 4, -4)
+                f:SetPoint("BOTTOMRIGHT", -4, 4)
+                f:SetColorTexture(1, 0.82, 0.3, 1)
+                f:SetBlendMode("ADD")
+                f:SetAlpha(0)
+                local ag = f:CreateAnimationGroup()
+                local a1 = ag:CreateAnimation("Alpha")
+                a1:SetFromAlpha(0); a1:SetToAlpha(0.35); a1:SetDuration(0.15); a1:SetOrder(1)
+                local a2 = ag:CreateAnimation("Alpha")
+                a2:SetFromAlpha(0.35); a2:SetToAlpha(0); a2:SetDuration(0.7); a2:SetOrder(2)
+                ag:SetScript("OnFinished", function() f:SetAlpha(0) end)
+                alert.flash, alert.flashAnim = f, ag
+            end
+            alert.flashAnim:Stop()
+            alert.flashAnim:Play()
         end
     end
     for i, n in ipairs(need) do
