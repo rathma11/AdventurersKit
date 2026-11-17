@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.43", date = "2026-11-17", items = {
+        "Buff reminder out in the world: the Bags row only comes up when free slots really run low (under the "
+            .. "'fewer free slots than' limit, default 10, or full) - a percentage alone isn't worth a long walk. "
+            .. "It shows how far the nearest vendor is; a vendor close by is still reported by 'Vendor nearby'.",
+    } },
     { version = "0.6.42", date = "2026-11-17", items = {
         "Paladin blessing row: another paladin's blessing counts only if it's the same one you would cast "
             .. "(it can't be on you twice); a different one (e.g. Might on you, you cast Kings) still asks for yours. "

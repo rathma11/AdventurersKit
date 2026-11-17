@@ -1086,6 +1086,7 @@ local function NearVendors()
         if NS.NearestTownsfolk then
             local ok, p, d = pcall(NS.NearestTownsfolk, "Sell")
             if ok and p and d and d <= VENDOR_R * 2 then vendCache.sellP = p end
+            if ok and p then vendCache.anyP, vendCache.anyD = p, d end -- a tele taska sorhoz: barmilyen messze
             ok, p, d = pcall(NS.NearestTownsfolk, "Repair")
             if ok and p and d and d <= VENDOR_R * 2 then vendCache.repP = p end
         end
@@ -1099,6 +1100,7 @@ local function NearVendors()
     end
     local d = live(vendCache.sellP)
     if d then out.sell, out.sellD = vendCache.sellP, d end
+    out.anyP, out.anyD = vendCache.anyP, vendCache.anyD
     d = live(vendCache.repP)
     if d then out.rep, out.repD = vendCache.repP, d end
     return out
@@ -1115,9 +1117,15 @@ local function OutsideWarnings()
     if NS.CityBagSlots then free, total = NS.CityBagSlots() end
     local pctLimit, freeLimit = NS.CityLimit("bagPct"), NS.CityLimit("bagFree")
     local used = total > 0 and math.floor((total - free) / total * 100 + 0.5) or 0
-    if total > 0 and ((pctLimit > 0 and used >= pctLimit) or (freeLimit > 0 and free < freeLimit)) then
+    -- Kint csak akkor szolunk, ha tenyleg fogy a hely (kevesebb szabad hely, mint a kuszob, vagy
+    -- tele): a szazalek magaban meg nem ok egy hosszu utra. Ha arus van a kozelben, a
+    -- "Vendor nearby" sor ugyis szol (mar felig tele taskanal).
+    local urgent = free == 0 or (freeLimit > 0 and free < freeLimit)
+        or (pctLimit > 0 and used >= pctLimit and freeLimit <= 0)
+    if total > 0 and urgent then
+        local far = v.anyD and (" - " .. (L["nearest vendor %d yd"]):format(math.floor(v.anyD + 0.5))) or ""
         out[#out + 1] = { slot = WARN_BAGS, status = free == 0 and L["full"] or L["filling up"],
-            info = (L["%d%% used, %d free - sell or bank"]):format(used, free) }
+            info = (L["%d%% used, %d free"]):format(used, free) .. far }
     else
         dismissed.w_bags = nil
     end
