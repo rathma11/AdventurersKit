@@ -214,23 +214,103 @@ local function HandHasWeapon(hand)
 end
 NS.HandHasWeapon = HandHasWeapon
 
--- Rafer-e ez az item a fegyverre (nev alapjan): Sharpening Stone = eles, Weightstone = tompa,
--- olaj / poison / ismeretlen = barmelyik kozelharci fegyver
+-- Ideiglenes fegyver enchant item felismerese a tooltip "Use:" sorabol (kovek, olajok, poisonok,
+-- Scroll of Imbue ...), es hogy milyen fegyverre jo. Eredmeny itemenkent cache-elve:
+--   false = nem fegyver enchant; "any" / "edged" / "blunt" / { [subID] = true } = erre a fegyverre jo.
+-- Ha a tooltip meg nincs betoltve, nil (nem cache-elunk, kesobb ujra).
+local TYPE_WORDS = { -- "Imbue a dagger" / "applied to a sword" ... -> fegyver subclass(ok)
+    dagger = { [15] = true }, staff = { [10] = true }, sword = { [7] = true, [8] = true },
+    axe = { [0] = true, [1] = true }, mace = { [4] = true, [5] = true }, polearm = { [6] = true },
+    ["fist weapon"] = { [13] = true },
+}
+local scanTip
+local function TooltipUseText(itemId)
+    local lines = {}
+    if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+        local ok, data = pcall(C_TooltipInfo.GetItemByID, itemId)
+        if ok and data and data.lines then
+            for _, l in ipairs(data.lines) do if l.leftText then lines[#lines + 1] = l.leftText end end
+        end
+    end
+    if #lines == 0 then
+        if not scanTip then
+            scanTip = CreateFrame("GameTooltip", "AdventurersKitScanTip", nil, "GameTooltipTemplate")
+        end
+        scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+        scanTip:ClearLines()
+        pcall(scanTip.SetHyperlink, scanTip, "item:" .. itemId)
+        for i = 1, scanTip:NumLines() do
+            local fs = _G["AdventurersKitScanTipTextLeft" .. i]
+            local t = fs and fs:GetText()
+            if t then lines[#lines + 1] = t end
+        end
+        scanTip:Hide()
+    end
+    if #lines == 0 then return nil end
+    for _, t in ipairs(lines) do
+        local u = t:match("^" .. (ITEM_SPELL_TRIGGER_ONUSE or "Use:") .. "%s*(.+)")
+        if u then return u:lower() end
+    end
+    return ""
+end
+local enchantInfo = {}
+local function WeaponEnchantOf(itemId)
+    local c = enchantInfo[itemId]
+    if c ~= nil then return c end
+    local _, _, _, _, _, classID = GetItemInfoInstant(itemId)
+    if classID == 2 or classID == 4 then enchantInfo[itemId] = false return false end -- fegyver / pancel
+    local u = TooltipUseText(itemId)
+    if not u then return nil end
+    local res = false
+    local timed = u:find("minute") or u:find("hour") or u:find("charges")
+    if timed and not u:find("permanent") then
+        local word = u:match("imbue an? ([%a ]-) with") or u:match("imbue an? (%a+)")
+            or u:match("applied to an? ([%a ]-) it") or u:match("apply to an? ([%a ]-)[%.,]")
+        if word then
+            for w, set in pairs(TYPE_WORDS) do
+                if word:find(w, 1, true) then res = set break end
+            end
+        end
+        if not res and u:find("weapon") then
+            res = (u:find("sharp") and "edged") or (u:find("blunt") and "blunt") or "any"
+        elseif not res and u:find("imbue") then
+            res = "any"
+        end
+    end
+    enchantInfo[itemId] = res
+    return res
+end
+NS.WeaponEnchantOf = WeaponEnchantOf
+
+-- Rafer-e ez az item a fegyverre: tooltip alapjan (eles / tompa / adott fegyvertipus),
+-- nev alapjan tartalek (Sharpening Stone = eles, Weightstone = tompa), kulonben barmelyik.
 local function ItemFitsWeapon(itemId, hand)
     local kind = WeaponKind(hand)
     if not kind or kind == "ranged" then return false end
+    local info = WeaponEnchantOf(itemId)
+    if type(info) == "table" then
+        local _, _, _, _, _, _, subID = GetItemInfoInstant(GetInventoryItemID("player", hand))
+        return info[subID] == true
+    elseif info == "edged" then return kind == "edged" or kind == "fist"
+    elseif info == "blunt" then return kind == "blunt" or kind == "fist"
+    elseif info == "any" then return true end
     local name = GetItemInfo(itemId)
     if not name then return true end -- meg nincs betoltve: ne dobjuk el
     if name:find(L["Sharpening Stone"], 1, true) then return kind == "edged" or kind == "fist" end
     if name:find(L["Weightstone"], 1, true) then return kind == "blunt" or kind == "fist" end
-    -- Scroll of Imbue (mage): csak botra (staff, subclass 10)
-    if name:find(L["Scroll of Imbue"], 1, true) then
-        local _, _, _, _, _, _, subID = GetItemInfoInstant(GetInventoryItemID("player", hand))
-        return subID == 10
-    end
     return true
 end
 NS.ItemFitsWeapon = ItemFitsWeapon
+
+-- Ez az item ehhez a sorhoz valo-e: nev szerint, vagy fegyver soroknal a tooltip szerint
+-- barmilyen ideiglenes fegyver enchant (nem kell minden kovet / olajat / scrollt nevrol ismerni).
+local function SlotMatches(slot, iid, name)
+    if slot.hand and WeaponEnchantOf(iid) then return true end
+    for _, pat in ipairs(slot.names) do
+        if name:find(pat, 1, true) then return true end
+    end
+    return false
+end
 
 -- Beallitott item, vagy nev alapjan az elso talalat a taskakban. Fegyvernel csak olyan,
 -- ami a mostani fegyverre rafer (fegyvercserenel igy magatol valt kore / olajra).
@@ -258,10 +338,8 @@ FindItemRaw = function(slot)
             local iid = GetItemID(bag, s)
             local name = iid and GetItemInfo(iid)
             if iid and not name then awaitingInfo = true end -- meg nincs betoltve: GET_ITEM_INFO_RECEIVED-re ujra
-            if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) then
-                for _, pat in ipairs(slot.names) do
-                    if name:find(pat, 1, true) then return iid end
-                end
+            if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) and SlotMatches(slot, iid, name) then
+                return iid
             end
         end
     end
@@ -1323,10 +1401,8 @@ NS.BuffAlternatives = function(slot)
             for s = 1, (GetSlots(bag) or 0) do
                 local iid = GetItemID(bag, s)
                 local name = iid and not seen[iid] and GetItemInfo(iid)
-                if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) then
-                    for _, pat in ipairs(slot.names) do
-                        if name:find(pat, 1, true) then seen[iid] = true; out[#out + 1] = { kind = "item", id = iid } break end
-                    end
+                if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) and SlotMatches(slot, iid, name) then
+                    seen[iid] = true; out[#out + 1] = { kind = "item", id = iid }
                 end
             end
         end

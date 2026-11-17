@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.9", date = "2026-11-17", items = {
+        "Weapon enchant rows recognise items by their tooltip ('Use:' text) instead of a fixed name list: any stone, oil, "
+            .. "poison or Scroll of Imbue that temporarily enchants a weapon is found, and only offered for a weapon it fits "
+            .. "(sharp / blunt, or the named type: dagger, staff, sword...).",
+    } },
     { version = "0.6.8", date = "2026-11-17", items = {
         "Weapon enchant rows: mage Scroll of Imbue (e.g. Lesser Flame) counts as a weapon enchant, offered only when a staff is equipped.",
     } },
