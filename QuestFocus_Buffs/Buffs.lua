@@ -741,6 +741,9 @@ end
 
 -- Mely slotok kernek figyelmet: van item, es a buff hianyzik / hamarosan lejar
 local lastAlertKey
+-- slot kulcs -> true: errol a hianyrol mar villantunk. Csak az elso megjeleneskor villan;
+-- ha ignoralod (X / harc) es ujra feljon ugyanazzal, mar nem. Ha megjavitod a buffot, torlodik.
+local flashed = {}
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end
     if QuestFocusDB.noBuffAlert or hiddenUntilCombat or UnitIsDeadOrGhost("player") then
@@ -754,7 +757,10 @@ local function UpdateAlert(auras)
         local a = Action(slot)
         local left, stacks = Remaining(slot, a and a.id, auras)
         local short = ShortStacks(slot, stacks)
-        if left and (left == math.huge or left >= limit) and not short then dismissed[slot.key] = nil end
+        if left and (left == math.huge or left >= limit) and not short then
+            dismissed[slot.key] = nil
+            flashed[slot.key] = nil -- rendben van: legkozelebb ujra villanhat
+        end
         if a and not dismissed[slot.key]
             and (not left or (left ~= math.huge and left < limit) or short) then
             need[#need + 1] = { slot = slot, action = a, left = left, stacks = stacks }
@@ -832,8 +838,14 @@ local function UpdateAlert(auras)
                 ag:SetScript("OnFinished", function() f:SetAlpha(0) end)
                 alert.flash, alert.flashAnim = f, ag
             end
-            alert.flashAnim:Stop()
-            alert.flashAnim:Play()
+            local fresh = false
+            for _, n in ipairs(need) do
+                if not flashed[n.slot.key] then flashed[n.slot.key] = true; fresh = true end
+            end
+            if fresh then
+                alert.flashAnim:Stop()
+                alert.flashAnim:Play()
+            end
         end
     end
     for i, n in ipairs(need) do
