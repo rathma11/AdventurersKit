@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.31", date = "2026-11-17", items = {
+        "Marker hopping: when you reach a marked spawn point and the mob / object isn't there (no living nameplate with "
+            .. "that name after ~4 s), the point counts as checked for 5 minutes and the arrow moves on to the nearest "
+            .. "unchecked spawn point ('Not here right now - next spawn point').",
+    } },
     { version = "0.6.30", date = "2026-11-17", items = {
         "What next: the quest log route lists every quest now (scroll with the mouse wheel; the header says how many). "
             .. "Order: each next stop is the closest to the previous one; the yards are from you.",

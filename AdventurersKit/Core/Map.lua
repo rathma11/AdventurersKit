@@ -77,7 +77,31 @@ end
 -- sehova (inArea = true). Kulonben nem a puszta legkozelebbi pontot adja, hanem azt, ami
 -- kozel van ES korulotte sok spawn van (suru resz), igy nem egy magányos pontra visz.
 local IN_AREA, CLUSTER_R, CLUSTER_W = 150, 80, 40
-local function FindSpawnTarget(sources)
+
+-- Mar megnezett spawn pontok (odaertel, de nem volt ott a mob / object): VISIT_TTL mp-ig a
+-- kereses kihagyja oket (VISIT_R yardon belul), igy a marker a kovetkezo pontra lep.
+local VISIT_R, VISIT_TTL = 35, 300
+local visited = {}
+local function MarkVisited(p)
+    if p and p.wx then visited[#visited + 1] = { wc = p.wc, wx = p.wx, wy = p.wy, t = GetTime() } end
+end
+local function IsVisited(p)
+    local now = GetTime()
+    for i = #visited, 1, -1 do
+        local v = visited[i]
+        if now - v.t > VISIT_TTL then
+            table.remove(visited, i)
+        elseif v.wc == p.wc and (v.wx - p.wx) ^ 2 + (v.wy - p.wy) ^ 2 < VISIT_R * VISIT_R then
+            return true
+        end
+    end
+    return false
+end
+NS.MarkSpawnVisited = MarkVisited
+NS.ClearSpawnVisited = function() wipe(visited) end
+
+-- noArea: ne mondja, hogy "a teruleten vagy" (tovabblepesnel mindenkepp kell a kovetkezo pont)
+local function FindSpawnTarget(sources, noArea)
     local pc, px, py = PlayerWorldPos()
     if not pc then return FindNearest(sources) end
     local pts = {}
@@ -91,8 +115,9 @@ local function FindSpawnTarget(sources)
                         if type(x) == "number" and type(y) == "number" and x >= 0 and y >= 0 then
                             local wc, wx, wy = WorldPos(uiMap, x / 100, y / 100)
                             if wc == pc and wx then
-                                pts[#pts + 1] = { map = uiMap, x = x, y = y, name = src.name, wc = wc, wx = wx, wy = wy,
+                                local pt = { map = uiMap, x = x, y = y, name = src.name, wc = wc, wx = wx, wy = wy,
                                     d = math.sqrt((wx - px) ^ 2 + (wy - py) ^ 2), static = src.static }
+                                if src.static or not IsVisited(pt) then pts[#pts + 1] = pt end
                             end
                         end
                     end
@@ -105,7 +130,9 @@ local function FindSpawnTarget(sources)
     for _, p in ipairs(pts) do if not nearest or p.d < nearest.d then nearest = p end end
     -- vendor (egy konkret NPC, sokszor epuletben): oda mindig marker kell, nincs "teruleten vagy"
     if nearest.static then return nearest, nearest.d, false end
-    if nearest.d <= IN_AREA then return nearest, nearest.d, true end
+    if nearest.d <= IN_AREA and not noArea then return nearest, nearest.d, true end
+    -- tovabblepes: a legkozelebbi meg nem nezett pont (nem a suru resz, az lehet messzebb)
+    if noArea then return nearest, nearest.d, false end
     -- csak a kozelebbi pontokat nezzuk (a legkozelebbi tavolsaganak 3x-osaig), sulyozva a surusseggel
     local best, bestScore
     local limit = nearest.d * 3 + 200

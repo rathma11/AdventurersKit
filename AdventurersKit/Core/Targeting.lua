@@ -329,7 +329,7 @@ end
 
 arrow:SetScript("OnClick", function() ClearWaypoint() end)
 
-local function MarkObjective(i)
+local function MarkObjective(i, nextSpawn)
     local objs = state.objectives or {}
     local list = {}
     if i and objs[i] then
@@ -346,7 +346,7 @@ local function MarkObjective(i)
         Print(L["No known location for: %s"], state.title or "?")
         return
     end
-    local p, dist, inArea = FindSpawnTarget(sources)
+    local p, dist, inArea = FindSpawnTarget(sources, nextSpawn)
     if not p then
         Print(L["No coordinates found (it may be inside an instance)."])
         return
@@ -359,9 +359,52 @@ local function MarkObjective(i)
         return
     end
     SetWaypoint(p, p.name or state.title)
+    -- spawn pont (nem leadas, nem vendor): ha odaersz es nincs ott, a kovetkezore lepunk
+    if state.waypoint and not isTurnIn and not p.static then
+        state.waypoint.spawn, state.waypoint.objIndex = true, i
+    end
+    if nextSpawn then
+        Print(L["Not here right now - next spawn point: |cffffff00%s|r (%d yd)"], p.name or "?", dist or 0)
+        return
+    end
     Print(L["Marker: |cffffff00%s|r - %s %.1f, %.1f%s"], p.name or "?", ZoneName(p.map), p.x, p.y,
         dist and (" (%d yd)"):format(dist) or "")
 end
+
+-- Tovabblepes: ha a markerezett spawn pontnal allsz (ARRIVE_R) ARRIVE_T mp-ig, es a keresett
+-- mob nincs ott (nincs ilyen nevu elo nameplate a kozelben), a pont "megnezett" lesz, es a
+-- marker a kovetkezo, meg nem nezett spawn pontra lep. Objectnel (lada, novenyek) nincs
+-- nameplate: ott csak az ido szamit (ha ott volt, kozben ugyis felvetted).
+local ARRIVE_R, ARRIVE_T = 25, 4
+local arriveAt
+local function TargetVisible(name)
+    if not (name and C_NamePlate and C_NamePlate.GetNamePlates) then return false end
+    for _, np in ipairs(C_NamePlate.GetNamePlates() or {}) do
+        local u = np.namePlateUnitToken or (np.UnitFrame and np.UnitFrame.unit)
+        if u then
+            local ok, n = pcall(UnitName, u)
+            if ok and n == name and not UnitIsDead(u) then return true end
+        end
+    end
+    return false
+end
+local hopper = CreateFrame("Frame")
+local hopElapsed = 0
+hopper:SetScript("OnUpdate", function(_, dt)
+    hopElapsed = hopElapsed + dt
+    if hopElapsed < 1 then return end
+    hopElapsed = 0
+    local w = state.waypoint
+    if not (w and w.spawn and w.wx) or InCombatLockdown() or not state.questId then arriveAt = nil return end
+    local pc, px, py = PlayerWorldPos()
+    if not pc or pc ~= w.wc or (px - w.wx) ^ 2 + (py - w.wy) ^ 2 > ARRIVE_R * ARRIVE_R then arriveAt = nil return end
+    if TargetVisible(w.title) then arriveAt = nil return end -- itt van: nem lepunk tovabb
+    arriveAt = arriveAt or GetTime()
+    if GetTime() - arriveAt < ARRIVE_T then return end
+    arriveAt = nil
+    if NS.MarkSpawnVisited then NS.MarkSpawnVisited(w) end
+    MarkObjective(w.objIndex, true)
+end)
 
 -- A quest log-ban (es a terkep melletti quest panelen, ami ezt koveti) a quest kijelolese:
 -- a fejlecet, ami alatt van, kinyitjuk (a tobbi osszecsukott fejlec ugy marad).
