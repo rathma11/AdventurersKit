@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: QuestFocus - Bags
 ## Notes: QuestFocus module: quest item list, Bagnon highlight, use-item button and keybind
-## Version: 0.3.3
+## Version: 0.3.4
 ## Dependencies: QuestFocus
 ## OptionalDeps: Bagnon
 

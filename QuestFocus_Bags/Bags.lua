@@ -773,8 +773,8 @@ end
 ---------------------------------------------------------------------------
 -- Kapcsolok a beallitasokban
 ---------------------------------------------------------------------------
-local page = NS.AddOptionsTab(L["Bags"], 60)
-local fl = NS.OptFlow(page)
+-- a core adja a fult a modul ki/be kapcsolojaval a tetejen
+local page, fl = NS.ModulePage("QuestFocus_Bags")
 fl:Header(L["Quest items in your bags"])
 fl:Check(L["Quest item list next to the bags"],
     L["While your bags are open (Bagnon or Blizzard), lists your quest items next to them: which quest needs them, "]

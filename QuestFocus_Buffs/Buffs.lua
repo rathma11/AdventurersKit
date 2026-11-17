@@ -1224,8 +1224,8 @@ NS.MaybePromptFood = MaybePromptFood
 ---------------------------------------------------------------------------
 -- Beallitasok: "Buffs" ful
 ---------------------------------------------------------------------------
-local page = NS.AddOptionsTab(L["Buffs"], 70)
-local fl = NS.OptFlow(page)
+-- a core adja a fult a modul ki/be kapcsolojaval a tetejen
+local page, fl = NS.ModulePage("QuestFocus_Buffs")
 
 fl:Header(L["Reminder"])
 fl:Check(L["Reminder popup out of combat"],

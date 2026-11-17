@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.3.4", date = "2026-11-17", items = {
+        "Bags and Buffs tabs start with an 'Enable this module' switch (needs a UI reload; a disabled module keeps its tab so it can be turned back on).",
+    } },
     { version = "0.3.3", date = "2026-11-17", items = {
         "Usable quest items of every active quest are on the panel's left edge (up to 4, selected quest first) instead of the bag list.",
     } },

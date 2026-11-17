@@ -266,6 +266,102 @@ end
 NS.OptFlow = OptFlow
 
 ---------------------------------------------------------------------------
+-- Modulok (kulon addonok): ki/be kapcsolas az oldaluk tetejen. Addont csak /reload-dal
+-- lehet ki-be tolteni, ezert a valtas utan "Reload now". Kikapcsolt modulnak is van fule
+-- (a core hozza letre), hogy vissza lehessen kapcsolni.
+---------------------------------------------------------------------------
+local MODULES = {
+    { addon = "QuestFocus_Bags", label = L["Bags"], order = 60,
+      desc = L["Quest item list next to the bags, Bagnon coloring, usable quest item buttons on the panel."] },
+    { addon = "QuestFocus_Buffs", label = L["Buffs"], order = 70,
+      desc = L["Buff reminder (sleeping bag, XP food, weapon enchant, class buffs, tracking) and buff buttons."] },
+}
+
+local function CharName() return UnitName("player") end
+local function AddonInstalled(addon)
+    local get = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+    if not get then return true end
+    local ok, name, _, _, _, reason = pcall(get, addon)
+    return ok and name ~= nil and reason ~= "MISSING"
+end
+local function AddonEnabled(addon)
+    if C_AddOns and C_AddOns.GetAddOnEnableState then
+        return (C_AddOns.GetAddOnEnableState(addon, CharName()) or 0) > 0
+    elseif GetAddOnEnableState then
+        return (GetAddOnEnableState(CharName(), addon) or 0) > 0
+    end
+    return true
+end
+local function AddonLoaded(addon)
+    local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    return f and f(addon) and true or false
+end
+local function SetAddonEnabled(addon, on)
+    local f = on and ((C_AddOns and C_AddOns.EnableAddOn) or EnableAddOn)
+        or ((C_AddOns and C_AddOns.DisableAddOn) or DisableAddOn)
+    if f then f(addon, CharName()) end
+end
+
+StaticPopupDialogs["QUESTFOCUS_RELOAD"] = {
+    text = L["QuestFocus: modules are switched on/off by reloading the UI. Reload now?"],
+    button1 = L["Reload now"],
+    button2 = L["Later"],
+    OnAccept = function() ReloadUI() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+-- Modul oldal: tab + "Enable this module" kapcsolo a tetejen. Visszaad: page, flow.
+local function ModulePage(addon)
+    local def
+    for _, m in ipairs(MODULES) do if m.addon == addon then def = m end end
+    if not def then return end
+    if def.page then return def.page, def.flow end
+    local page = AddOptionsTab(def.label, def.order)
+    local fl = OptFlow(page)
+    fl:Check(L["Enable this module"], def.desc .. " " .. L["Separate addon (") .. addon .. L["); switching needs a UI reload."],
+        function() return AddonEnabled(addon) end,
+        function(v)
+            SetAddonEnabled(addon, v)
+            fl:Refresh()
+            if v ~= AddonLoaded(addon) then StaticPopup_Show("QUESTFOCUS_RELOAD") end
+        end)
+    local status = Desc(page, "")
+    status:SetWidth(240)
+    fl:Place(status, 30, 4)
+    local reload = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    reload:SetSize(110, 20)
+    reload:SetText(L["Reload now"])
+    reload:SetPoint("LEFT", status, "LEFT", 250, 0)
+    reload:SetScript("OnClick", function() ReloadUI() end)
+    fl:OnRefresh(function()
+        local en, lo = AddonEnabled(addon), AddonLoaded(addon)
+        if en == lo then
+            status:SetText(lo and ("|cff33ff99" .. L["Running."] .. "|r") or ("|cff808080" .. L["Off. Its settings appear here when it's on."] .. "|r"))
+            reload:Hide()
+        else
+            status:SetText("|cffffd100" .. (en and L["Turns on after a reload."] or L["Turns off after a reload."]) .. "|r")
+            reload:Show()
+        end
+    end)
+    page:HookScript("OnShow", function() fl:Refresh() end)
+    def.page, def.flow = page, fl
+    return page, fl
+end
+NS.ModulePage = ModulePage
+
+-- Bejelentkezeskor: a nem futo (de telepitett) moduloknak is legyen fule
+local modEv = CreateFrame("Frame")
+modEv:RegisterEvent("PLAYER_LOGIN")
+modEv:SetScript("OnEvent", function()
+    for _, m in ipairs(MODULES) do
+        if not m.page and not AddonLoaded(m.addon) and AddonInstalled(m.addon) then ModulePage(m.addon) end
+    end
+end)
+
+---------------------------------------------------------------------------
 -- Minimap gomb (bal klikk: beallitasok, jobb klikk: zona fokusz, huzhato)
 ---------------------------------------------------------------------------
 local OpenOptions -- lent
