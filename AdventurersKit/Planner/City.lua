@@ -422,43 +422,192 @@ local function NeedRow(i)
     return r
 end
 
--- Fejlec gombok (a bezaras mellett, jobbrol balra): Bank, aukcioshaz, class trainer.
--- Kattintasra marker a legkozelebbire (Questie town data, a sajat frakciod).
-local function HeadBtn(text, icon, coords, kind, tipTitle, tipText, anchor)
-    local b = FlatBtn(text, icon, coords)
-    b:SetPoint("RIGHT", anchor, "LEFT", -4, 0)
-    b:SetScript("OnClick", function()
-        local ok, p, d = pcall(NS.NearestTownsfolk, kind)
-        if not (ok and p) then
-            NS.Loud(NS.Print, L["No known %s nearby (Questie may still be loading its town data)."], tipTitle)
-            return
+---------------------------------------------------------------------------
+-- Directions: egy lenyilo menu a fejlecben, mint a varosi or utbaigazitasa. Minden sor a
+-- legkozelebbi ilyen NPC-t mutatja tavolsaggal; kattintasra marker. Szakma trainerek almenuben.
+---------------------------------------------------------------------------
+local TRK = "Interface\\Minimap\\Tracking\\"
+local GUIDE = {
+    { kind = "Auctioneer", label = L["Auction House"], icon = TRK .. "Auctioneer" },
+    { kind = "Banker", label = L["Bank"], icon = TRK .. "Banker" },
+    { kind = "Flight Master", label = L["Flight Master"], icon = TRK .. "FlightMaster" },
+    { kind = "Innkeeper", label = L["Inn"], icon = TRK .. "Innkeeper" },
+    { kind = "Class Trainer", label = L["Class Trainer"], icon = TRK .. "Class" },
+    { sub = "prof", label = L["Profession Trainer"], icon = TRK .. "Profession" },
+    { kind = "Weapon Master", label = L["Weapons Trainer"], icon = "Interface\\Icons\\INV_Sword_04" },
+    { kind = "Stable Master", label = L["Stable Master"], icon = TRK .. "StableMaster", class = "HUNTER" },
+    { kind = "Repair", label = L["Repair"], icon = TRK .. "Repair" },
+    { kind = "Food", label = L["Food & Drink"], icon = TRK .. "Food" },
+    { kind = "Ammo", label = L["Ammo"], icon = TRK .. "Ammunition", class = "HUNTER" },
+    { kind = "Battlemaster", label = L["Battlemaster"], icon = TRK .. "BattleMaster" },
+}
+local PROFS = {
+    { 171, L["Alchemy"] }, { 164, L["Blacksmithing"] }, { 185, L["Cooking"] }, { 333, L["Enchanting"] },
+    { 202, L["Engineering"] }, { 129, L["First Aid"] }, { 356, L["Fishing"] }, { 182, L["Herbalism"] },
+    { 165, L["Leatherworking"] }, { 186, L["Mining"] }, { 393, L["Skinning"] }, { 197, L["Tailoring"] },
+    { 762, L["Riding"] },
+}
+
+local MENU_W, MENU_ROW = 230, 18
+local function MakeMenu(name)
+    local m = CreateFrame("Frame", name, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    m:SetFrameStrata("DIALOG")
+    m:SetWidth(MENU_W)
+    m:EnableMouse(true)
+    m:Hide()
+    if m.SetBackdrop then
+        m:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+        m:SetBackdropColor(0.06, 0.05, 0.03, 0.96)
+        m:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
+    end
+    m.rows = {}
+    return m
+end
+local menu, subMenu = MakeMenu("AdventurersKitGuideMenu"), MakeMenu("AdventurersKitGuideSubMenu")
+
+local function MenuRow(m, i)
+    local r = m.rows[i]
+    if r then return r end
+    r = CreateFrame("Button", nil, m)
+    r:SetSize(MENU_W - 12, MENU_ROW)
+    r:SetPoint("TOPLEFT", 6, -6 - (i - 1) * MENU_ROW)
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(14, 14)
+    r.icon:SetPoint("LEFT", 2, 0)
+    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.text:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+    r.text:SetJustifyH("LEFT")
+    r.right = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.right:SetPoint("RIGHT", -4, 0)
+    r.right:SetJustifyH("RIGHT")
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 0.82, 0, 0.15)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    m.rows[i] = r
+    return r
+end
+
+local function GoTo(e)
+    if not e.point then
+        NS.Loud(NS.Print, L["No known %s nearby (Questie may still be loading its town data)."], e.label)
+        return
+    end
+    NS.SetWaypoint(e.point, e.point.name)
+    NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%d yd)"], e.point.name or "?", e.dist or 0)
+    menu:Hide(); subMenu:Hide()
+end
+
+-- sorok kitoltese: entries = { label, icon, point, dist, sub, mine }
+local function FillMenu(m, entries, onSub)
+    for _, r in ipairs(m.rows) do r:Hide() end
+    for i, e in ipairs(entries) do
+        local r = MenuRow(m, i)
+        r.icon:SetTexture(e.icon)
+        r.icon:SetShown(e.icon ~= nil)
+        local col = (e.sub or e.point) and (e.mine and "|cff40ff40" or "|cffffd100") or "|cff808080"
+        r.text:SetText(col .. e.label .. "|r")
+        if e.sub then
+            r.right:SetText("|cffffd100>|r")
+        elseif e.point then
+            r.right:SetText(("|cff99ccff%d yd|r"):format(e.dist or 0))
+        else
+            r.right:SetText("|cff606060-|r")
         end
-        NS.SetWaypoint(p, p.name)
-        NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%d yd)"], p.name or "?", d or 0)
-    end)
-    b:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(tipTitle, 1, 1, 1)
-        local ok, p, d = pcall(NS.NearestTownsfolk, kind)
-        if ok and p then GameTooltip:AddLine((L["Nearest: %s (%d yd)"]):format(p.name or "?", d or 0), 0.8, 0.8, 0.8) end
-        GameTooltip:AddLine(tipText, 0.5, 0.5, 0.5)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return b
+        r:SetScript("OnClick", function(self)
+            if e.sub then onSub(self, e) else GoTo(e) end
+        end)
+        r:SetScript("OnEnter", function(self)
+            if e.sub then onSub(self, e) return end
+            subMenu:SetShown(subMenu:IsShown() and m == subMenu)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(e.label, 1, 1, 1)
+            if e.point then
+                GameTooltip:AddLine((L["Nearest: %s (%d yd)"]):format(e.point.name or "?", e.dist or 0), 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(L["Click: marker on the nearest one"], 0.5, 0.5, 0.5)
+            else
+                GameTooltip:AddLine(L["None known on this continent for your faction."], 0.6, 0.6, 0.6, true)
+            end
+            GameTooltip:Show()
+        end)
+        r:Show()
+    end
+    m:SetHeight(12 + #entries * MENU_ROW)
 end
--- a minimap kovetes (tracking) sajat kis ikonjai: ugyanaz, amit a jatek a bankar / aukcios folott mutat
-city.bankBtn = HeadBtn(L["Bank"], "Interface\\Minimap\\Tracking\\Banker", { 0, 1, 0, 1 }, "Banker", L["Banker"],
-    L["Click: marker on the nearest banker."], cClose)
-city.ahBtn = HeadBtn(L["AH"], "Interface\\Minimap\\Tracking\\Auctioneer", { 0, 1, 0, 1 }, "Auctioneer", L["Auction House"],
-    L["Click: marker on the nearest auctioneer."], city.bankBtn)
-do -- trainer: a sajat class ikonja (ha a koordinatak elerhetok), kulonben konyv
+
+local function Nearest(kind)
+    local ok, p, d = pcall(NS.NearestTownsfolk, kind)
+    if ok and p then return p, d end
+end
+
+local function ShowProfMenu(anchorRow)
+    local mine = {}
+    local QP = NS.Module("QuestieProfessions")
+    if QP and QP.GetPlayerProfessions then
+        local ok, t = pcall(QP.GetPlayerProfessions, QP)
+        if ok and type(t) == "table" then mine = t end
+    end
+    local list = {}
+    for _, pr in ipairs(PROFS) do
+        local p, d = Nearest("Prof:" .. pr[1])
+        list[#list + 1] = { label = pr[2], point = p, dist = d, mine = mine[pr[1]] ~= nil }
+    end
+    -- a sajat szakmaid elol
+    table.sort(list, function(a, b)
+        if a.mine ~= b.mine then return a.mine end
+        return a.label < b.label
+    end)
+    FillMenu(subMenu, list)
+    subMenu:ClearAllPoints()
+    subMenu:SetPoint("TOPLEFT", anchorRow, "TOPRIGHT", 8, 6)
+    subMenu:Show()
+end
+
+local function ShowGuideMenu(anchor)
     local cls = select(2, UnitClass("player"))
-    local tc = CLASS_ICON_TCOORDS and cls and CLASS_ICON_TCOORDS[cls]
-    city.trainerBtn = HeadBtn(L["Trainer"], tc and "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
-        or "Interface\\Icons\\INV_Misc_Book_09", tc and { tc[1], tc[2], tc[3], tc[4] } or nil, "Class Trainer",
-        L["Class trainer"], L["Click: marker on the nearest trainer of your class."], city.ahBtn)
+    local list = {}
+    for _, g in ipairs(GUIDE) do
+        if not g.class or g.class == cls then
+            local e = { label = g.label, icon = g.icon, sub = g.sub }
+            if not g.sub then e.point, e.dist = Nearest(g.kind) end
+            list[#list + 1] = e
+        end
+    end
+    FillMenu(menu, list, function(row) ShowProfMenu(row) end)
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
+    subMenu:Hide()
+    menu:Show()
 end
+-- kattintas mashova / ESC: bezar
+menu:SetScript("OnHide", function() subMenu:Hide() end)
+tinsert(UISpecialFrames, "AdventurersKitGuideMenu")
+city:HookScript("OnHide", function() menu:Hide() end)
+
+city.guideBtn = FlatBtn(L["Directions"], TRK .. "None")
+city.guideBtn.icon:SetTexture("Interface\\GossipFrame\\GossipGossipIcon")
+city.guideBtn.icon:SetTexCoord(0, 1, 0, 1)
+do -- kis lefele nyil a szoveg utan
+    local b = city.guideBtn
+    b.arrow = b:CreateTexture(nil, "ARTWORK")
+    b.arrow:SetSize(10, 10)
+    b.arrow:SetPoint("LEFT", b.text, "RIGHT", 3, -1)
+    b.arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+    b:SetWidth(b:GetWidth() + 12)
+end
+city.guideBtn:SetPoint("RIGHT", cClose, "LEFT", -4, 0)
+city.guideBtn:SetScript("OnClick", function(self)
+    if menu:IsShown() then menu:Hide() else ShowGuideMenu(self) end
+end)
+city.guideBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(L["Directions"], 1, 1, 1)
+    GameTooltip:AddLine(L["Like asking a guard: bank, auction house, trainers, inn, flight master... with the distance to the nearest one. Click one for a marker."], 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+city.guideBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 ---------------------------------------------------------------------------
 -- Atmeretezes: jobb also sarok fogantyu. Szelesseg szabadon (CITY_MIN_W..CITY_MAX_W),

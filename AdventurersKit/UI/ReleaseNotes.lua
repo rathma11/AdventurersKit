@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.17", date = "2026-11-17", items = {
+        "City list: the Bank / AH / Trainer buttons are replaced by one 'Directions' drop-down, like asking a guard: "
+            .. "Auction House, Bank, Flight Master, Inn, Class Trainer, Profession Trainer (sub-menu, your professions first), "
+            .. "Weapons Trainer, Repair, Food & Drink, Battlemaster (hunters: Stable Master, Ammo). Each shows the distance "
+            .. "to the nearest one; click for a marker.",
+    } },
     { version = "0.6.16", date = "2026-11-17", items = {
         "Buff reminder, out in the world (not in cities / inns): 'Bags filling up / full' and 'Gear worn / broken' rows, "
             .. "using the City to-do thresholds. Click the icon for a marker on the nearest vendor / repairer; X hides it until fixed. "

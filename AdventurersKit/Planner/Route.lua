@@ -148,6 +148,15 @@ local function FolkIds(kind)
         local c = T and type(T.classSpecificTownsfolk) == "table" and T.classSpecificTownsfolk[cls]
         return c and c["Class Trainer"]
     end
+    if kind == "Stable Master" then
+        local c = T and type(T.classSpecificTownsfolk) == "table" and T.classSpecificTownsfolk.HUNTER
+        return (c and c["Stable Master"]) or (T and type(T.townsfolk) == "table" and T.townsfolk["Stable Master"])
+    end
+    -- szakma trainer: "Prof:<profession id>" (Questie professionTrainers)
+    local prof = tonumber(kind:match("^Prof:(%d+)$"))
+    if prof then
+        return T and type(T.professionTrainers) == "table" and T.professionTrainers[prof]
+    end
     return T and type(T.townsfolk) == "table" and T.townsfolk[kind]
 end
 NS.NearestTownsfolk = function(kind)
