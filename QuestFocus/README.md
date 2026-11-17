@@ -1,4 +1,6 @@
-# QuestFocus (WoW: Forever)
+# Adventurer's Kit (WoW: Forever)
+
+Formerly **QuestFocus**. Since 0.4.0 the addon is shown as *Adventurer's Kit* in the game; the folders, slash commands (`/qf`), SavedVariables and the `QFocus` macro keep their old names, so settings and keybinds carry over.
 
 Requires **Questie**. TomTom is optional: if it is installed, its arrow is used. Bagnon is optional: if it is installed, the quest item features hook into its bag window.
 

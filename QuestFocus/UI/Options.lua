@@ -31,7 +31,7 @@ local function SpellIcon(name)
 end
 
 local opt = CreateFrame("Frame")
-opt.name = "QuestFocus"
+opt.name = "Adventurer's Kit"
 local optCategory
 
 local TAB_W, DESC_W = 130, 420
@@ -43,7 +43,7 @@ local function OptLabel(parent, text, template)
     return fs
 end
 
-local optTitle = OptLabel(opt, "QuestFocus", "GameFontNormalLarge")
+local optTitle = OptLabel(opt, "Adventurer's Kit", "GameFontNormalLarge")
 optTitle:SetPoint("TOPLEFT", 16, -16)
 local optSub = OptLabel(opt, L["Settings grouped by feature. Every option has a short description; hover it for a tooltip too."],
     "GameFontHighlightSmall")
@@ -360,7 +360,7 @@ mmBtn:RegisterEvent("PLAYER_LOGIN")
 mmBtn:SetScript("OnEvent", function() UpdateMinimapButton() end)
 local function MinimapTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("QuestFocus", 0.2, 1, 0.6)
+    GameTooltip:SetText("Adventurer's Kit", 0.2, 1, 0.6)
     if state.title then GameTooltip:AddLine("Quest: " .. state.title, 1, 1, 1) end
     local zf = QuestFocusDB and QuestFocusDB.zoneFocus
     GameTooltip:AddLine(L["Zone focus: "] .. (zf and (zf.zone or "?") or L["off"]), 1, 0.82, 0)
@@ -391,7 +391,7 @@ local pageGen = AddOptionsTab(L["General"], 10)
 local gen = OptFlow(pageGen)
 gen:Header(L["Panel"])
 gen:Check(L["Show the panel"],
-    L["The QuestFocus panel with the selected quest, its objectives and the time left. Same as typing /qf."],
+    L["The panel with the selected quest, its objectives and the time left. Same as typing /qf."],
     function() return not QuestFocusDB.hidePanel end,
     function(v) QuestFocusDB.hidePanel = not v; Panel_Update() end)
 gen:Number(L["Font size"],
@@ -800,7 +800,7 @@ if copyFrame.SetBackdrop then
 end
 local copyTitle = copyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 copyTitle:SetPoint("TOPLEFT", 14, -12)
-copyTitle:SetText(L["QuestFocus debug - press Ctrl+C to copy, then Esc"])
+copyTitle:SetText(L["Adventurer's Kit debug - press Ctrl+C to copy, then Esc"])
 local copyClose = CreateFrame("Button", nil, copyFrame, "UIPanelCloseButton")
 copyClose:SetPoint("TOPRIGHT", -4, -4)
 local copyScroll = CreateFrame("ScrollFrame", "QuestFocusCopyScroll", copyFrame, "UIPanelScrollFrameTemplate")
@@ -846,8 +846,8 @@ dbgClear:SetPoint("LEFT", dbgCopy, "RIGHT", 6, 0)
 dbgClear:SetText(L["Clear errors"])
 dbgClear:SetScript("OnClick", function() wipe(NS.errors); RefreshDebug() end)
 
-local cbErrors = OptCheck(L["Lua error popup for QuestFocus errors"],
-    L["Off: QuestFocus errors don't open the error window, they are only listed here (and one line in chat). "]
+local cbErrors = OptCheck(L["Lua error popup for Adventurer's Kit errors"],
+    L["Off: our errors don't open the error window, they are only listed here (and one line in chat). "]
     .. L["On: the normal Lua error window shows them too. Other addons are not affected."],
     function() return QuestFocusDB.showErrors end,
     function(v) QuestFocusDB.showErrors = v end, pageDebug)
@@ -867,7 +867,7 @@ opt:SetScript("OnShow", function()
 end)
 
 if Settings and Settings.RegisterCanvasLayoutCategory then
-    optCategory = Settings.RegisterCanvasLayoutCategory(opt, "QuestFocus")
+    optCategory = Settings.RegisterCanvasLayoutCategory(opt, "Adventurer's Kit")
     Settings.RegisterAddOnCategory(optCategory)
 elseif InterfaceOptions_AddCategory then
     InterfaceOptions_AddCategory(opt)

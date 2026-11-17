@@ -1070,7 +1070,7 @@ NS.ShowFoodPicker = ShowFoodPicker
 -- Kovetes valto billentyu: /castsequence Find Minerals, Find Herbs - minden nyomasra a masikra
 -- valt (harcban is mukodik, mert a sorrendet a jatek viszi, nem az addon)
 ---------------------------------------------------------------------------
-BINDING_HEADER_QUESTFOCUSBUFFS = "QuestFocus - Buffs"
+BINDING_HEADER_QUESTFOCUSBUFFS = "Adventurer's Kit - Buffs"
 _G["BINDING_NAME_CLICK QuestFocusTrackToggle:LeftButton"] = L["Switch tracking (Find Minerals / Find Herbs)"]
 local trackBtn = CreateFrame("Button", "QuestFocusTrackToggle", UIParent, "SecureActionButtonTemplate")
 trackBtn:RegisterForClicks("AnyUp", "AnyDown")
@@ -1796,6 +1796,6 @@ fl:Header(L["Other"])
 fl:Button(L["Forget learned buffs"], 200,
     L["Forget which buff each item gives; learned again the next time you use it from the reminder. Same as /qf buffreset."],
     function() if NS.ResetBuffLearn then NS.ResetBuffLearn() end end, 4)
-fl:Text(L["Tracking (Find Minerals / Find Herbs) can be switched with a key: Options > Keybindings > AddOns > QuestFocus - Buffs."], 2)
+fl:Text(L["Tracking (Find Minerals / Find Herbs) can be switched with a key: Options > Keybindings > AddOns > Adventurer's Kit - Buffs."], 2)
 
 page:HookScript("OnShow", function() fl:Refresh() end)

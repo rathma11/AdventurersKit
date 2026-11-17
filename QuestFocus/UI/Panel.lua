@@ -113,6 +113,28 @@ close:SetScript("OnClick", function()
     Print(L["Panel hidden. It comes back when you click a quest, or: /qf"])
 end)
 
+-- Fokusz torlese: a kijelolt quest a logban marad, csak a kijeloles + marker + makro
+-- celpontjai torlodnek (mint a /qf clear). Csak akkor latszik, ha van kijelolt quest.
+local clearBtn = CreateFrame("Button", nil, panel)
+clearBtn:SetSize(16, 16)
+clearBtn:SetPoint("RIGHT", close, "LEFT", -2, 0)
+clearBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+clearBtn:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Highlight", "ADD")
+clearBtn:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Down")
+clearBtn:Hide()
+clearBtn:SetScript("OnClick", function()
+    if NS.C.ClearQuest then NS.C.ClearQuest() end
+    NS.Loud(Print, L["Focus cleared (the quest stays in your log)."])
+end)
+clearBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetText(L["Clear focus"], 1, 1, 1)
+    GameTooltip:AddLine(L["Unselects this quest: marker and macro targets are cleared, the quest stays in your log. Same as /qf clear."], 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+panel.clearBtn = clearBtn
+
 local function Divider(y)
     local t = panel:CreateTexture(nil, "ARTWORK")
     t:SetHeight(1)
@@ -505,6 +527,7 @@ local function Panel_Update()
         panel:Hide()
         return
     end
+    clearBtn:SetShown(state.questId ~= nil)
     if not state.questId then
         -- Nincs kijelolt quest: javaslatok (QuestFocusPlanner.lua)
         for i = 1, #panel.lines do panel.lines[i]:Hide() end

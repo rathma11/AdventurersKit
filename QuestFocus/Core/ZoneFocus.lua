@@ -103,14 +103,14 @@ end
 -- (zonankent egyszer egy jatekmenetben, csak ha van questunk abban a zonaban)
 local askedZone = {}
 StaticPopupDialogs["QUESTFOCUS_ZONEFOCUS"] = {
-    text = L["QuestFocus: you have %d quest(s) in |cffffff00%s|r.\nFocus on this zone? The other quests leave the Questie tracker (they come back when you turn it off)."],
+    text = L["Adventurer's Kit: you have %d quest(s) in |cffffff00%s|r.\nFocus on this zone? The other quests leave the Questie tracker (they come back when you turn it off)."],
     button1 = L["Focus"],
     button2 = L["Not now"],
     button3 = L["Don't ask again"],
     OnAccept = function() ZoneFocusOn() end,
     OnAlt = function()
         QuestFocusDB.noZonePrompt = true
-        Print(L["Zone question turned off. Turn it back on: Options > QuestFocus > Ask when entering a new zone."])
+        Print(L["Zone question turned off. Turn it back on: Options > Adventurer's Kit > Zone focus > Ask when entering a new zone."])
     end,
     timeout = 30,
     whileDead = false,
@@ -120,7 +120,7 @@ StaticPopupDialogs["QUESTFOCUS_ZONEFOCUS"] = {
 
 -- Fokusz be van kapcsolva, es masik zonaba ertel: rakerdezunk, hogy valtson-e
 -- (QuestFocusDB.zoneAutoFollow eseten kerdes nelkul valt, mint regen)
-local SWITCH_TEXT = L["QuestFocus: you have %d quest(s) in |cffffff00%s|r.\nSwitch the Questie tracker to this zone? (zone focus is now on |cffffff00%s|r)"]
+local SWITCH_TEXT = L["Adventurer's Kit: you have %d quest(s) in |cffffff00%s|r.\nSwitch the Questie tracker to this zone? (zone focus is now on |cffffff00%s|r)"]
 StaticPopupDialogs["QUESTFOCUS_ZONESWITCH"] = {
     text = "",
     button1 = L["Switch"],

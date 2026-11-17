@@ -1,7 +1,7 @@
 ## Interface: 16001
-## Title: QuestFocus
-## Notes: Quest target macro (QFocus), markers, tooltips and quest item tools based on Questie data
-## Version: 0.3.9
+## Title: Adventurer's Kit
+## Notes: Questing kit: QFocus target macro, markers, route and pickup planner, city list, tooltips (Questie data)
+## Version: 0.4.0
 ## OptionalDeps: Questie, TomTom, Bagnon
 ## SavedVariables: QuestFocusDB
 

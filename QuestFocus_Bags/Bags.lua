@@ -18,7 +18,7 @@ local COLORS = {
     leftover = { 0.55, 0.55, 0.55 }, -- nincs hozza aktiv quest
 }
 
-BINDING_HEADER_QUESTFOCUS = "QuestFocus"
+BINDING_HEADER_QUESTFOCUS = "Adventurer's Kit"
 _G["BINDING_NAME_CLICK QuestFocusUseItem:LeftButton"] = L["Use the selected quest's item"]
 
 ---------------------------------------------------------------------------
@@ -648,7 +648,7 @@ local function MakeUseButton(i)
             GameTooltip:AddLine((sel and "|cff33ff99> " or "|cffffd100") .. (n.title or "?") .. "|r", 1, 1, 1)
         end
         if i == 1 and not GetBindingKey("CLICK QuestFocusUseItem:LeftButton") then
-            GameTooltip:AddLine(L["Key: Options > Keybindings > AddOns > QuestFocus"], 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["Key: Options > Keybindings > AddOns > Adventurer's Kit"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
@@ -802,9 +802,9 @@ fl:Check(L["Color quest items in Bagnon"],
     end)
 fl:Header(L["Using quest items"])
 fl:Check(L["Usable quest items on the panel"],
-    L["Quest items you have to use (e.g. throw at a mob) get a button on the left edge of the QuestFocus panel, "]
+    L["Quest items you have to use (e.g. throw at a mob) get a button on the left edge of the panel, "]
     .. L["up to 4, the selected quest's item first (green frame). They are left out of the bag list. "]
-    .. L["Key for the first one: Options > Keybindings > AddOns > QuestFocus."],
+    .. L["Key for the first one: Options > Keybindings > AddOns > Adventurer's Kit."],
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; RefreshBagList(); UpdateUseButton() end)
 fl:Button(L["Destroy leftover quest items"], 200,

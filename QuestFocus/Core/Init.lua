@@ -10,7 +10,7 @@ local ICON_HUNT = "Ability_Hunter_SniperShot"   -- celkereszt: mobok
 local ICON_TURNIN = "INV_Misc_Note_01"          -- level: leadas
 local ICON_IDLE = "INV_Misc_Map_01"             -- nincs kijelolt quest
 local MACRO_MAX = 255
-local PREFIX = "|cff33ff99QuestFocus|r: "
+local PREFIX = "|cff33ff99Adventurer's Kit|r: "
 
 local QF = CreateFrame("Frame", "QuestFocusEventFrame")
 local state = {

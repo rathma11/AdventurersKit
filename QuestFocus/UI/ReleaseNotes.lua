@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.0", date = "2026-11-17", items = {
+        "New name: Adventurer's Kit (formerly QuestFocus). Folders, /qf, the QFocus macro and your settings stay the same.",
+        "Panel: a small button next to the close button clears the focus (the quest stays in your log), same as /qf clear.",
+        "Summary of 0.3.1 - 0.3.9: buff tracking rework (ticks, off-hand / poisons / shaman imbue, custom items and buffs, item count), "
+            .. "module on/off switches, usable quest items on the panel, per-state macro icons, zone switch prompt, "
+            .. "unknown length for battleground quests, route distances from you.",
+    } },
     { version = "0.3.9", date = "2026-11-17", items = {
         "Route list: every stop shows its straight-line distance from you (no more '+N yd' from the previous stop). The order is still nearest-next.",
     } },

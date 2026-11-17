@@ -85,7 +85,7 @@ local function BuildMacroBody(objectives, onlyIndex)
     local CLEAR, DEADCLR = "/cleartarget", "/cleartarget [dead]"
     local pick = useNP and state.pick or nil
     if pick == "busy" then
-        CLEAR = '/run UIErrorsFrame:AddMessage("QuestFocus: nearby quest mobs are taken",1,.6,.2)'
+        CLEAR = '/run UIErrorsFrame:AddMessage("QFocus: nearby quest mobs are taken",1,.6,.2)'
     elseif pick then
         CLEAR = "/target " .. pick
     end
@@ -141,7 +141,7 @@ local function BuildMacroBody(objectives, onlyIndex)
         end
     end
     if n == 0 then
-        return '/run print("QuestFocus: no targetable mob")', 0
+        return '/run print("QFocus: no targetable mob")', 0
     end
     for _, t in ipairs(tail) do lines[#lines + 1] = t end
     return table.concat(lines, "\n"), n
@@ -286,7 +286,7 @@ local function SetWaypoint(p, title)
     if TomTom and TomTom.AddWaypoint then
         if state.tomtomUid and TomTom.RemoveWaypoint then pcall(TomTom.RemoveWaypoint, TomTom, state.tomtomUid) end
         local ok, uid = pcall(TomTom.AddWaypoint, TomTom, p.map, p.x / 100, p.y / 100,
-            { title = title, persistent = false, crazy = true, from = "QuestFocus" })
+            { title = title, persistent = false, crazy = true, from = "Adventurer's Kit" })
         if ok then state.tomtomUid = uid end
     end
 

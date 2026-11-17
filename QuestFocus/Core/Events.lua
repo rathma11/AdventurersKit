@@ -66,7 +66,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_TARGET_CHANGED" then
         if UnitExists("target") and targetNames[UnitName("target") or ""] and TapDenied("target")
             and not UnitIsDead("target") and UIErrorsFrame then
-            UIErrorsFrame:AddMessage(L["QuestFocus: this mob is already tapped by someone else"], 1, 0.3, 0.3)
+            UIErrorsFrame:AddMessage(L["QFocus: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
         -- Target valtas: a ping sor ki/be (uj celpontra pingel, a mostanira nem)
         -- Kesleltetve! A /target sor meg a macro futasa KOZBEN valtja ki ezt az esemenyt;
@@ -92,7 +92,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
         C_Timer.After(1, RestorePanelPos)
         InstallHooks()
         if not _G.QuestieLoader then
-            NS.PrintAlways(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])
+            NS.PrintAlways(L["|cffff5555Questie not found.|r Install it, Adventurer's Kit does not work without it."])
         end
         -- Utolso kijelolt quest visszaallitasa, ha a Questie mar betoltott
         C_Timer.After(8, function()
