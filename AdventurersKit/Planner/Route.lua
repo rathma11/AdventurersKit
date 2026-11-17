@@ -72,9 +72,9 @@ local function BuildRoute(pc, px, py, maxN)
             end
         end
     end
-    -- A "kovetkezo" nyillal atugrott questek (Planner\QuestNav.lua, csak memoriaban) az utvonal
-    -- vegere kerulnek, az atugras sorrendjeben (a legregebben atugrott elol)
-    local deferred = NS.deferredQuests or {}
+    -- A "kovetkezo" nyillal atugrott questek (Planner\QuestNav.lua, karakterenkent mentve) az
+    -- utvonal vegere kerulnek; ha csak ilyenek vannak, azok jonnek, ugyanugy legkozelebbi elol
+    local deferred = NS.DeferredQuests and NS.DeferredQuests() or {}
     local later = {}
     for i = #stops, 1, -1 do
         if deferred[stops[i].qid] then
@@ -82,31 +82,22 @@ local function BuildRoute(pc, px, py, maxN)
             later[#later + 1] = table.remove(stops, i)
         end
     end
-    table.sort(later, function(a, b) return deferred[a.qid] < deferred[b.qid] end)
     local route, cx, cy = {}, px, py
     local maxLen = maxN or ROUTE_LEN
-    while #route < maxLen and #stops > 0 do
-        local bi, bp, bd
-        for i, s in ipairs(stops) do
-            local p, d = Nearest(s.sources, pc, cx, cy)
-            if p and (not bd or d < bd) then bi, bp, bd = i, p, d end
-        end
-        if not bi then break end
-        local s = table.remove(stops, bi)
-        -- leg: az elozo allomastol (a sorrendhez); dist: tolad legvonalban (ezt mutatjuk)
-        s.point, s.leg = bp, bd
-        s.dist = math.sqrt((bp.wx - px) ^ 2 + (bp.wy - py) ^ 2)
-        route[#route + 1] = s
-        cx, cy = bp.wx, bp.wy
-    end
-    for _, s in ipairs(later) do
-        if #route >= maxLen then break end
-        local p, d = Nearest(s.sources, pc, cx, cy)
-        if p then
-            s.point, s.leg = p, d
-            s.dist = math.sqrt((p.wx - px) ^ 2 + (p.wy - py) ^ 2)
+    for _, list in ipairs({ stops, later }) do
+        while #route < maxLen and #list > 0 do
+            local bi, bp, bd
+            for i, s in ipairs(list) do
+                local p, d = Nearest(s.sources, pc, cx, cy)
+                if p and (not bd or d < bd) then bi, bp, bd = i, p, d end
+            end
+            if not bi then break end
+            local s = table.remove(list, bi)
+            -- leg: az elozo allomastol (a sorrendhez); dist: tolad legvonalban (ezt mutatjuk)
+            s.point, s.leg = bp, bd
+            s.dist = math.sqrt((bp.wx - px) ^ 2 + (bp.wy - py) ^ 2)
             route[#route + 1] = s
-            cx, cy = p.wx, p.wy
+            cx, cy = bp.wx, bp.wy
         end
     end
     return route

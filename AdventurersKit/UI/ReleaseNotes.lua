@@ -5,6 +5,16 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.62", date = "2026-11-17", items = {
+        "Quests you skip with the next arrow stay skipped after a reload or relog (saved per character). A loading "
+            .. "screen no longer brings them back.",
+        "All skips end when the quest you moved to is ready to turn in, or you turn in any quest. One skipped quest "
+            .. "comes back when you pick it yourself (quest log, tracking, route row, back arrow), when it makes "
+            .. "progress (a kill or drop), when you get within ~150 yd of its target after being farther away, or when "
+            .. "it leaves your log.",
+        "If every other quest is skipped, the route lists the skipped ones nearest first, and the next arrow cycles "
+            .. "through them.",
+    } },
     { version = "0.6.61", date = "2026-11-17", items = {
         "The route on the quest panel shows at most 3 quests; scroll for the rest (or hover its header). The space it "
             .. "frees goes to the Also nearby list.",

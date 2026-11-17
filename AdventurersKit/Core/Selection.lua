@@ -50,6 +50,8 @@ local function SelectQuest(questId, title, isComplete, mark)
     state.questId = questId
     state.title = title or state.title
     state.isComplete = isComplete and true or false
+    -- ha atugrott quest volt (Planner\QuestNav.lua), mar nem az: te valasztottad
+    if NS.OnFocusEnter then pcall(NS.OnFocusEnter, questId) end
     QuestFocusDB.lastQuest = questId
     if mark then QuestFocusDB.hidePanel = false end -- kattintasra a bezart panel visszajon
     -- kattintasra a belepeskori varakozas (UI\Panel.lua) se tartsa vissza a panelt

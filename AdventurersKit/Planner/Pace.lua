@@ -104,6 +104,8 @@ local function ScanProgress()
                             while #p.hits > 12 do table.remove(p.hits, 1) end
                             p.last = c
                             ShowToastFwd(qid, title, o)
+                            -- haladt (kill / drop): ha atugrott quest volt, mar nem az (Planner\QuestNav.lua)
+                            if NS.OnQuestProgress then pcall(NS.OnQuestProgress, qid) end
                         else
                             p.last = c
                         end
