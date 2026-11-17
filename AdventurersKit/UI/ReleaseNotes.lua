@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.27", date = "2026-11-17", items = {
+        "Switching to another quest (also by tracking it) removes the old quest's marker and puts the arrow on the new quest's "
+            .. "target; if the new quest has no known location, no old arrow is left pointing the wrong way.",
+    } },
     { version = "0.6.26", date = "2026-11-17", items = {
         "Panel with a focused quest: no icon in front of the title, and the map / clear focus buttons sit right after the quest name.",
     } },

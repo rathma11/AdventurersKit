@@ -38,14 +38,18 @@ local function SelectQuest(questId, title, isComplete, mark)
     end
     if mark then state.lastMarkQuest, state.lastMarkTime = questId, now end
     local changed = questId ~= state.questId
+    local hadQuest = state.questId ~= nil -- belepeskori visszaallitasnal (nem volt elotte) nem jelolunk
     if changed then state.extra = nil end -- a ticker 3 mp-en belul ujraszamolja
     state.questId = questId
     state.title = title or state.title
     state.isComplete = isComplete and true or false
     QuestFocusDB.lastQuest = questId
     if mark then QuestFocusDB.hidePanel = false end -- kattintasra a bezart panel visszajon
+    -- masik questre valtottal (kattintas, kovetes / track, Questie tracker): a regi quest
+    -- markere nem maradhat (a nyil kulonben rossz helyre mutat); az uj quest celjara tesszuk
+    if changed then ClearWaypoint() end
     Refresh(not changed)
-    if mark then MarkObjective(state.objIndex) end
+    if mark or (changed and hadQuest) then MarkObjective(state.objIndex) end
 end
 
 NS.SelectQuest, NS.SelectObjective = SelectQuest, SelectObjective
