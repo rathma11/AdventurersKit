@@ -427,6 +427,7 @@ local function IsXPAura(a)
 end
 
 -- Hatralevo mp (nil = nincs buff, math.huge = nem jar le), masodik ertek: stackek szama
+local SlotSpellRef -- lent definialva (SlotSpell)
 local function Remaining(slot, itemId, auras)
     if slot.tracking then
         -- nem buff, hanem a minimap kovetes: lent (NS.TrackingRemaining)
@@ -456,8 +457,12 @@ local function Remaining(slot, itemId, auras)
     if slot.isClass then
         for _, name in ipairs(slot.spells) do
             local a = auras[name]
-            -- blessing: egy masik paladin blessingje nem a tied (a sajatodat kulon felteheted)
-            if a and slot.key == "c_blessing" and a.mine == false then a = nil end
+            -- blessing: egy masik paladin MAS blessingje nem a tied (pl. rajtad Might, te Kingset
+            -- teszel mellé); ha ugyanaz, amit te tennel fel, az szamit (ketszer nem lehet rajtad)
+            if a and slot.key == "c_blessing" and a.mine == false then
+                local mineSpell = SlotSpellRef and SlotSpellRef(slot)
+                if not mineSpell or name:gsub("^Greater ", "") ~= mineSpell then a = nil end
+            end
             if a then
                 -- megjegyezzuk, melyiket hasznalod (ezt tesszuk fel legkozelebb)
                 QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
@@ -619,6 +624,7 @@ local function SlotSpell(slot)
     if ok(seen) then return seen end
     for _, c in ipairs(castable) do if SpellKnown(c) then return c end end
 end
+SlotSpellRef = SlotSpell
 
 -- Mivel lehet "megjavitani" a slotot: { kind = "item", id } vagy { kind = "spell", name }
 local function Action(slot)

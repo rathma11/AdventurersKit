@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.42", date = "2026-11-17", items = {
+        "Paladin blessing row: another paladin's blessing counts only if it's the same one you would cast "
+            .. "(it can't be on you twice); a different one (e.g. Might on you, you cast Kings) still asks for yours. "
+            .. "Other class buffs from others (Fortitude, Arcane Intellect, Mark of the Wild) count as before.",
+    } },
     { version = "0.6.41", date = "2026-11-17", items = {
         "Buff reminder: buffs someone else puts on you (e.g. a paladin's blessing or aura) no longer count for your own "
             .. "rows: they don't clear 'missing' for an item buff (XP food, elixir, sleeping bag...), aren't learned as an "
