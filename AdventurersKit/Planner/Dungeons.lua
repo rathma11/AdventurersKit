@@ -60,10 +60,11 @@ local function InRange(lo, hi, level)
 end
 
 -- { name, lo, hi, quests = { {qid, name, level, requires, note, inLog} } }
-local function CollectJournal(f, level)
+-- only: csak ez a dungeon, szintsavtol fuggetlenul (dungeon prep, Planner\Prep.lua)
+local function CollectJournal(f, level, only)
     local fac = UnitFactionGroup and UnitFactionGroup("player")
     local out = {}
-    for name, d in pairs(f.DB) do
+    for name, d in pairs(only and { [only] = f.DB[only] } or f.DB) do
         local lo, hi = tostring(d.level or ""):match("(%d+)%D+(%d+)")
         lo, hi = tonumber(lo), tonumber(hi)
         local hidden = false
@@ -71,7 +72,7 @@ local function CollectJournal(f, level)
             local ok, h = pcall(f.FactionHiddenFor, name, fac)
             hidden = ok and h and true or false
         end
-        if lo and hi and not hidden and InRange(lo, hi, level) then
+        if lo and hi and not hidden and (only or InRange(lo, hi, level)) then
             local e = { name = name, lo = lo, hi = hi, quests = {} }
             for _, q in ipairs(type(d.quests) == "table" and d.quests or {}) do
                 local qf = q.faction
@@ -86,11 +87,11 @@ local function CollectJournal(f, level)
     return out
 end
 
-local function CollectQuestie(level)
+local function CollectQuestie(level, only)
     local byName = {}
     local out = {}
     for _, c in ipairs(CLASSIC) do
-        if InRange(c[2], c[3], level) then
+        if (only and c[1] == only) or (not only and InRange(c[2], c[3], level)) then
             local e = { name = c[1], lo = c[2], hi = c[3], quests = {} }
             byName[c[1]] = e
             out[#out + 1] = e
@@ -236,9 +237,39 @@ local function Row(i)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
-    r:SetScript("OnClick", function(self)
+    -- dungeon (fejlec) sor: "Prep" gomb a dungeon prep modhoz (Planner\Prep.lua)
+    r.prep = CreateFrame("Button", nil, r)
+    r.prep:SetSize(34, DJ_ROW_H - 3)
+    r.prep:SetPoint("RIGHT", r, "RIGHT", -150, 0)
+    r.prep.text = r.prep:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.prep.text:SetAllPoints()
+    r.prep.text:SetText(L["Prep"])
+    r.prep.text:SetTextColor(0.4, 1, 0.4)
+    local phl = r.prep:CreateTexture(nil, "HIGHLIGHT")
+    phl:SetAllPoints()
+    phl:SetColorTexture(0.4, 1, 0.4, 0.15)
+    r.prep:SetScript("OnClick", function(self)
+        local row = self:GetParent()
+        if row.dungeon and NS.StartPrep then NS.StartPrep(row.dungeon) end
+        dj:Hide()
+    end)
+    r.prep:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L["Prep this dungeon"], 0.4, 1, 0.4)
+        GameTooltip:AddLine(L["The quest panel lists this dungeon's quests you can still pick up (nearest first, with the marker on the quest giver), then the entrance. Same as /qf dungeon <name>; right-click a dungeon row works too."], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    r.prep:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r.prep:Hide()
+    r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    r:SetScript("OnClick", function(self, button)
         local d = self.data
         if not d then return end
+        if button == "RightButton" then
+            if self.dungeon and NS.StartPrep then NS.StartPrep(self.dungeon) end
+            dj:Hide()
+            return
+        end
         if FDJ() then
             OpenInJournal(self.dungeon, d.qid)
         elseif d.qid then
@@ -261,6 +292,7 @@ local function Row(i)
         end
         GameTooltip:AddLine(FDJ() and L["Click: open in Dungeon Journal"] or (d.qid and L["Click: marker on the quest giver"] or " "),
             0.5, 0.5, 0.5)
+        GameTooltip:AddLine(L["Right click: prep this dungeon (quests to pick up, then the entrance)"], 0.4, 1, 0.4)
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -281,6 +313,8 @@ local function Refresh()
         n = n + 1
         local h = Row(n)
         h.data, h.dungeon = e, e.name
+        h.prep:Show()
+        h.text:SetPoint("RIGHT", -188, 0)
         local fits = level >= e.lo and level <= e.hi
         h.bg:SetColorTexture(0.75, 0.25, 0.1, fits and 0.30 or 0.14)
         h.text:SetText(("|cffffa070%s|r"):format(e.name))
@@ -295,6 +329,8 @@ local function Refresh()
             nq = nq + 1
             local r = Row(n)
             r.data, r.dungeon = q, e.name
+            r.prep:Hide()
+            r.text:SetPoint("RIGHT", -150, 0)
             r.bg:SetColorTexture(0, 0, 0, 0)
             local col = GetQuestDifficultyColor and q.level and GetQuestDifficultyColor(q.level)
             local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
@@ -315,6 +351,7 @@ local function Refresh()
         n = 1
         local r = Row(1)
         r.data, r.dungeon = nil, nil
+        r.prep:Hide()
         r.bg:SetColorTexture(0, 0, 0, 0)
         r.text:SetText("|cff999999" .. L["No dungeon for your level right now."] .. "|r")
         r.right:SetText("")
@@ -329,11 +366,46 @@ local function Refresh()
     scroll:SetPoint("BOTTOMRIGHT", dj, "TOPLEFT", DJ_W - (needBar and 34 or 12), -38 - visH)
     if scroll.ScrollBar then scroll.ScrollBar:SetShown(needBar) end
     if not needBar then scroll:SetVerticalScroll(0) end
-    dj.foot:SetText(f and L["Click: opens the quest in Dungeon Journal. Wheel: scroll. Drag to move."]
+    dj.foot:SetText((f and L["Click: opens the quest in Dungeon Journal. Wheel: scroll. Drag to move."]
         or L["Click: marker on the quest giver. Wheel: scroll. Drag to move. (Dungeon Journal addon: more dungeons and details.)"])
+        .. "\n" .. L["Prep / right click: collect a dungeon's quests, then an arrow to its entrance (/qf dungeon <name>)."])
     dj.foot:ClearAllPoints()
     dj.foot:SetPoint("TOPLEFT", dj, "TOPLEFT", 14, -38 - visH - 6)
     dj:SetHeight(38 + visH + 14 + (dj.foot:GetStringHeight() or 12) + 8)
+end
+
+-- Egy dungeon questjei (szintsavtol fuggetlenul): { name, lo, hi, quests } vagy nil
+NS.CollectDungeon = function(name)
+    local f = FDJ()
+    local level = UnitLevel("player") or 1
+    local list = (f and f.DB[name]) and CollectJournal(f, level, name) or CollectQuestie(level, name)
+    return list[1]
+end
+-- Ismert dungeon nevek (a Journal-bol, kulonben a classic listabol), plusz a bejarat tablabol
+NS.DungeonNames = function()
+    local seen, out = {}, {}
+    local function add(n) if n and not seen[n] then seen[n] = true; out[#out + 1] = n end end
+    local f = FDJ()
+    if f then
+        local fac = UnitFactionGroup and UnitFactionGroup("player")
+        for name, d in pairs(f.DB) do
+            local hidden = false
+            if f.FactionHiddenFor then
+                local ok, h = pcall(f.FactionHiddenFor, name, fac)
+                hidden = ok and h and true or false
+            end
+            -- a Journal DB-ben NPC-k is lehetnek: csak a szintsavos (dungeon) bejegyzesek
+            if not hidden and tostring(d.level or ""):match("%d+%D+%d+") then add(name) end
+        end
+    else
+        for _, c in ipairs(CLASSIC) do add(c[1]) end
+    end
+    for name in pairs(NS.DungeonEntrances or {}) do
+        -- Journal mellett az alias nevek (pl. "Dire Maul") nem kellenek
+        if not f or f.DB[name] then add(name) end
+    end
+    table.sort(out)
+    return out
 end
 
 NS.ToggleDungeonList = function()

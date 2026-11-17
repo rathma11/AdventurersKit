@@ -5,6 +5,21 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.65", date = "2026-11-17", items = {
+        "Dungeon prep mode: pick a dungeon and the panel turns into a checklist for it. It lists the dungeon's quests "
+            .. "you can still pick up (quest giver, zone, distance; nearest first), the ones already in your log "
+            .. "(ticked), and last the entrance with its zone. The marker / TomTom arrow goes to the nearest quest "
+            .. "giver; when you have them all, it moves to the entrance. Click a row to send the marker there, "
+            .. "right-click for automatic again.",
+        "Start it with the Prep button (or a right click) on a dungeon in the dungeon list, or /qf dungeon <name> "
+            .. "(part of the name is enough, e.g. /qf dungeon scarlet). Leave it with the X next to the title or "
+            .. "/qf dungeon off. It is saved per character and comes back after a reload. Clicking a quest in your log "
+            .. "also ends it.",
+        "In prep mode the QFocus macro does not target mobs: near a quest giver (60 yd) it targets that NPC, "
+            .. "otherwise it does nothing.",
+        "Entrance locations for the classic dungeons and Forever's own (Krol'dok Stronghold, Alcaz Prison, Blackmaw "
+            .. "Hold, Shaper's Terrace, Hall of Thanes and more) are built in; no extra addon needed.",
+    } },
     { version = "0.6.64", date = "2026-11-17", items = {
         "Sleeping bag: the city list no longer flashes up for a moment right after you lie down.",
     } },

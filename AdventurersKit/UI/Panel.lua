@@ -127,11 +127,19 @@ clearBtn:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Highlight", 
 clearBtn:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Down")
 clearBtn:Hide()
 clearBtn:SetScript("OnClick", function()
+    -- dungeon prep modban: a prep mod vege (Planner\Prep.lua)
+    if NS.PrepActive and NS.PrepActive() then NS.StopPrep() return end
     if NS.C.ClearQuest then NS.C.ClearQuest() end
     NS.Loud(Print, L["Focus cleared (the quest stays in your log)."])
 end)
 clearBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    if NS.PrepActive and NS.PrepActive() then
+        GameTooltip:SetText(L["Leave dungeon prep"], 1, 1, 1)
+        GameTooltip:AddLine(L["Ends the dungeon prep mode: the marker and the macro are cleared. Same as /qf dungeon off."], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+        return
+    end
     GameTooltip:SetText(L["Clear focus"], 1, 1, 1)
     GameTooltip:AddLine(L["Unselects this quest: marker and macro targets are cleared, the quest stays in your log. Same as /qf clear."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
@@ -872,7 +880,19 @@ local function Panel_Update()
         panel:Hide()
         return
     end
-    clearBtn:SetShown(state.questId ~= nil)
+    -- dungeon prep mod (Planner\Prep.lua): a fokusz torles gomb ott a prep mod vege, kozvetlenul
+    -- a cim utan (nyilak / terkep nelkul)
+    local prepMode = not state.questId and NS.PrepActive and NS.PrepActive() and NS.ShowPrep and true or false
+    if not prepMode and NS.HidePrep then NS.HidePrep() end
+    clearBtn:SetShown(state.questId ~= nil or prepMode)
+    clearBtn:ClearAllPoints()
+    if prepMode then
+        clearBtn:SetPoint("LEFT", panel.title, "RIGHT", 4, 0)
+        mapBtn:Hide(); prevBtn:Hide(); nextBtn:Hide()
+    else
+        clearBtn:SetPoint("LEFT", mapBtn, "RIGHT", 4, 0)
+        if state.questId then mapBtn:Show(); prevBtn:Show(); nextBtn:Show() end
+    end
     -- cimsor: quest modban nincs ikon elol (a cim a bal szelen kezdodik), a terkep es a
     -- fokusz torles gomb a quest neve utan jon; javaslat modban ikon + cim, mint eddig
     panel.title:ClearAllPoints()
@@ -894,6 +914,12 @@ local function Panel_Update()
         if panel.hsRow then panel.hsRow:Hide() end
         if panel.escortRow then panel.escortRow:Hide() end
         panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName("idle"))
+        if prepMode then
+            if NS.HideSuggestions then NS.HideSuggestions() end
+            NS.ShowPrep()
+            ShowPanel()
+            return
+        end
         if NS.ShowSuggestions and NS.ShowSuggestions() then ShowPanel() else panel:Hide() end
         return
     end

@@ -38,6 +38,9 @@ local function SlashHandler(msg)
         if NS.ShowCityList then NS.ShowCityList() end
     elseif msg == "dungeon" or msg == "dungeons" then
         if NS.ToggleDungeonList then NS.ToggleDungeonList() end
+    elseif msg:match("^dungeons?%s") then
+        -- /qf dungeon <nev> (reszleges nev is): dungeon prep mod; /qf dungeon off: vege
+        if NS.PrepCommand then NS.PrepCommand(raw:match("^%S+%s+(.+)$")) end
     elseif msg == "export" then
         if NS.OpenShareSettings then NS.OpenShareSettings("export") end
     elseif msg == "import" then
@@ -137,6 +140,7 @@ local function SlashHandler(msg)
         Print(L["  /qf unmark - remove marker"])
         Print(L["  /qf clear - clear selection + marker"])
         Print(L["  /qf city - city list here; /qf cityreset - clear ignored places"])
+        Print(L["  /qf dungeon - dungeon list; /qf dungeon <name> - dungeon prep (quests, then the entrance); /qf dungeon off - end it"])
         Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])
     end
 end

@@ -33,6 +33,9 @@ end
 
 local function SelectQuest(questId, title, isComplete, mark)
     if not questId or questId == 0 then return end
+    -- dungeon prep mod (Planner\Prep.lua): automatikus kijeloles nem veszi at a panelt; ha te
+    -- kattintasz egy questre, a prep mod veget er
+    if NS.PrepBlocksSelect and NS.PrepBlocksSelect(mark) then return end
     if not QuestieAvailable() then
         Print(L["Questie is not loaded, without it I don't know where the mobs are."])
     end
