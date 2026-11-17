@@ -1121,12 +1121,12 @@ local function OutsideWarnings()
     -- tele): a szazalek magaban meg nem ok egy hosszu utra. Ha arus van a kozelben, a
     -- "Vendor nearby" sor ugyis szol (mar felig tele taskanal).
     -- Lepcsozetes: minel telibb a taska, annal messzebbi arusert is megeri elmenni.
-    --   70%+: arus 100 yd-on belul, 80%+: 400 yd, 90%+: 600 yd, 95%+ (vagy kevesebb szabad
+    --   70%+: arus 100 yd-on belul, 80%+: 300 yd, 90%+: 600 yd, 95%+ (vagy kevesebb szabad
     --   hely a kuszobnel / tele): mindig, a legkozelebbit mutatja
     local reach
     if free == 0 or used >= 95 or (freeLimit > 0 and free < freeLimit) then reach = math.huge
     elseif used >= 90 then reach = 600
-    elseif used >= 80 then reach = 400
+    elseif used >= 80 then reach = 300
     elseif pctLimit > 0 and used >= pctLimit then reach = 100 end
     local urgent = reach and (reach == math.huge or (v.anyD and v.anyD <= reach))
     local bagsShown = false

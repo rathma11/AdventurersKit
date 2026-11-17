@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.45", date = "2026-11-17", items = {
+        "Bags row tiers: 80%+ full now reports a vendor within 300 yd (was 400).",
+    } },
     { version = "0.6.44", date = "2026-11-17", items = {
         "Bags row out in the world is tiered: 70%+ full when a vendor is within 100 yd, 80%+ within 400 yd, 90%+ within "
             .. "600 yd, 95%+ (or fewer free slots than your limit) always, with the nearest vendor. 'Vendor nearby' then "
