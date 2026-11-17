@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.52", date = "2026-11-17", items = {
+        "The quest panel keeps a steady maximum height. The \"Route (quest log)\" list gets only the rows that still "
+            .. "fit below the objectives and nearby quests. If some stops don't fit, its header shows \"+N hidden\": "
+            .. "click it to open the whole route in a scrollable list, click again to collapse. The panel remembers your choice.",
+        "\"Also nearby\" shows at most 3 rows plus a \"+N more\" row; hover it to see the rest. The macro still targets all of them.",
+    } },
     { version = "0.6.51", date = "2026-11-17", items = {
         "Escort quests without an event objective in Questie (e.g. Zimmix's Great Escape in Stranglethorn) are "
             .. "recognised from the quest's objective text (\"Escort X ...\"). The marker then points to the turn-in NPC.",

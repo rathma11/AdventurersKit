@@ -19,26 +19,35 @@ local function Row(i)
     return r
 end
 
+-- Gorgetheto sorlista (ScrollFrame + gyerek frame + sorok); a sorokon is mukodik a gorgo
+local function ScrollList()
+    local sc = CreateFrame("ScrollFrame", nil, panel)
+    local ch = CreateFrame("Frame", nil, sc)
+    ch:SetSize(10, 10)
+    sc:SetScrollChild(ch)
+    sc:EnableMouseWheel(true)
+    sc:SetScript("OnMouseWheel", function(self, delta)
+        local max = math.max(0, ch:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * NS.RowH() * 2)))
+    end)
+    sc:Hide()
+    ch.qfScroll = sc
+    local list = {}
+    local function get(i)
+        local r = list[i]
+        if r then return r end
+        r = MakeRow(ch)
+        list[i] = r
+        return r
+    end
+    return sc, ch, list, get
+end
+
 -- Utvonal (quest log): gorgetheto lista, az osszes allomassal; ListCounts-nyi sor latszik
 local ROUTE_ALL = 40
-local routeScroll = CreateFrame("ScrollFrame", nil, panel)
-local routeChild = CreateFrame("Frame", nil, routeScroll)
-routeChild:SetSize(10, 10)
-routeScroll:SetScrollChild(routeChild)
-routeScroll:EnableMouseWheel(true)
-routeScroll:SetScript("OnMouseWheel", function(self, delta)
-    local max = math.max(0, routeChild:GetHeight() - self:GetHeight())
-    self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * NS.RowH() * 2)))
-end)
-routeScroll:Hide()
-local routeRows = {}
-local function RouteRow(i)
-    local r = routeRows[i]
-    if r then return r end
-    r = MakeRow(routeChild)
-    routeRows[i] = r
-    return r
-end
+local routeScroll, routeChild, routeRows, RouteRow = ScrollList()
+-- Leadas modban ugyanez, ha az utvonal lenyitva (QuestFocusDB.routeExpanded)
+local tiScroll, tiChild, tiRows, TiRow = ScrollList()
 
 MakeRow = function(parent)
     local r = CreateFrame("Button", nil, parent)
@@ -100,9 +109,10 @@ MakeRow = function(parent)
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- gorgetes a soron is (a sor elkapja az egeret, a gorgo a listanak szol)
-    if parent == routeChild then
+    local sc = parent.qfScroll
+    if sc then
         r:EnableMouseWheel(true)
-        r:SetScript("OnMouseWheel", function(_, delta) routeScroll:GetScript("OnMouseWheel")(routeScroll, delta) end)
+        r:SetScript("OnMouseWheel", function(_, delta) sc:GetScript("OnMouseWheel")(sc, delta) end)
     end
     return r
 end
@@ -135,6 +145,8 @@ end
 NS.HideSuggestions = function()
     for _, r in ipairs(rows) do r:Hide() end
     routeScroll:Hide()
+    tiScroll:Hide()
+    if panel.tiToggle then panel.tiToggle:Hide() end
     for _, h in pairs(panel.sugHeaders or {}) do h:Hide() end
 end
 
@@ -255,51 +267,145 @@ NS.ShowSuggestions = function()
     return true
 end
 
--- Leadas modban a panel aljan: a quest logod tobbi questje utvonal-sorrendben (max 5),
--- ugyanugy mint a javaslatoknal (kattintas: arra a questre valt).
+-- Leadas modban a panel aljan: a quest logod tobbi questje utvonal-sorrendben, ugyanugy mint a
+-- javaslatoknal (kattintas: arra a questre valt). Legfeljebb TURNIN_ROUTE sor, de csak annyi,
+-- amennyi a panel maximalis magassagaba belefer (maxRows, UI\Panel.lua szamolja). Ha nem fer ki
+-- mind, a fejlec lenyithato kapcsolo ("+N rejtett"); lenyitva a teljes utvonal gorgetheto,
+-- fix magassagu listaban. Az allapot: QuestFocusDB.routeExpanded.
 -- y-tol rajzol, visszaadja az uj y-t. A Panel_Update hivja (UI\Panel.lua).
 local TURNIN_ROUTE = 5
+local TURNIN_SCROLL_ROWS = 4 -- lenyitva legalabb ennyi sor magas a gorgetheto lista
 local tiRoute, tiKey = {}, ""
 local function TurnInRoute()
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return {} end
-    local ok, list = pcall(BuildRoute, pc, px, py, TURNIN_ROUTE + 1)
+    local ok, list = pcall(BuildRoute, pc, px, py, ROUTE_ALL + 1)
     if not ok or type(list) ~= "table" then return {} end
     local out = {}
     for _, s in ipairs(list) do
-        if s.qid ~= state.questId and #out < TURNIN_ROUTE then out[#out + 1] = s end
+        if s.qid ~= state.questId and #out < ROUTE_ALL then out[#out + 1] = s end
     end
     return out
 end
+-- csak az elso par allomas (+ a darabszam) szamit: ha ez valtozik, ujrarajzolunk
 local function TurnInKey(list)
-    local t = {}
-    for i, s in ipairs(list) do t[i] = s.qid .. ":" .. math.floor((s.dist or 0) / 25) end
+    local t = { #list }
+    for i, s in ipairs(list) do
+        if i > TURNIN_ROUTE then break end
+        t[#t + 1] = s.qid .. ":" .. math.floor((s.dist or 0) / 25)
+    end
     return table.concat(t, ",")
 end
-NS.ShowTurnInPickups = function(y)
+
+local function RouteText(i, s)
+    local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
+    local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
+    local eta = not s.done and NS.QuestEta(s.objs)
+    return ("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or "")
+end
+
+local ICON_PLUS = "|TInterface\Buttons\UI-PlusButton-Up:12:12|t "
+local ICON_MINUS = "|TInterface\Buttons\UI-MinusButton-Up:12:12|t "
+local function TiToggle()
+    local b = panel.tiToggle
+    if b then return b end
+    b = CreateFrame("Button", nil, panel)
+    b:SetSize(200, 14)
+    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    b.text:SetPoint("LEFT")
+    b.text:SetJustifyH("LEFT")
+    b.text:SetTextColor(0.75, 0.65, 0.45)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    b:SetScript("OnClick", function()
+        QuestFocusDB.routeExpanded = not QuestFocusDB.routeExpanded or nil
+        tiScroll:SetVerticalScroll(0)
+        if NS.Panel_Update then NS.Panel_Update() end
+    end)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText(L["Route (quest log)"], 1, 0.86, 0.5)
+        GameTooltip:AddLine(QuestFocusDB.routeExpanded
+            and L["Click: collapse, so the panel keeps its size."]
+            or L["Not all stops fit in the panel. Click: show the whole route in a scrollable list."], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    panel.tiToggle = b
+    return b
+end
+
+NS.ShowTurnInPickups = function(y, maxRows)
     if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then return y end
     tiRoute = TurnInRoute()
     tiKey = TurnInKey(tiRoute)
     if #tiRoute == 0 then return y end
+    local rowH, w = NS.RowH(), NS.PW() - 24
+    local shown = math.min(TURNIN_ROUTE, maxRows or TURNIN_ROUTE)
     y = y - 4
-    local h = Header(L["Route (quest log):"])
-    h:SetText(L["Route (quest log):"]) -- (a javaslat mod "N - scroll" szovege ne maradjon rajta)
-    h:ClearAllPoints()
-    h:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
-    h:Show()
+    if #tiRoute <= shown then
+        -- minden kifer: sima fejlec + sorok, mint eddig
+        local h = Header(L["Route (quest log):"])
+        h:SetText(L["Route (quest log):"]) -- (a javaslat mod "N - scroll" szovege ne maradjon rajta)
+        h:ClearAllPoints()
+        h:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
+        h:Show()
+        y = y - 15
+        for i, s in ipairs(tiRoute) do
+            local r = Row(i)
+            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
+            r.text:SetText(RouteText(i, s))
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+            r:SetSize(w, rowH)
+            r:Show()
+            y = y - rowH
+        end
+        return y
+    end
+    -- nem fer ki mind: lenyithato fejlec
+    local expanded = QuestFocusDB.routeExpanded
+    local t = TiToggle()
+    t.text:SetText(expanded
+        and (ICON_MINUS .. (L["Route (quest log, %d - scroll):"]):format(#tiRoute))
+        or (ICON_PLUS .. L["Route (quest log):"] .. "  |cff999999" .. (L["+%d hidden"]):format(#tiRoute - shown) .. "|r"))
+    t:SetSize(math.min(w, math.ceil(t.text:GetStringWidth()) + 4), 14)
+    t:ClearAllPoints()
+    t:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y + 1)
+    t:Show()
     y = y - 15
-    for i, s in ipairs(tiRoute) do
+    if expanded then
+        for _, r in ipairs(tiRows) do r:Hide() end
+        for i, s in ipairs(tiRoute) do
+            local r = TiRow(i)
+            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
+            r.text:SetText(RouteText(i, s))
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", tiChild, "TOPLEFT", 0, -(i - 1) * rowH)
+            r:SetSize(w, rowH)
+            r:Show()
+        end
+        local visible = math.min(#tiRoute, math.max(shown, TURNIN_SCROLL_ROWS))
+        tiChild:SetSize(w, #tiRoute * rowH)
+        tiScroll:ClearAllPoints()
+        tiScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        tiScroll:SetSize(w, visible * rowH)
+        local maxScroll = math.max(0, (#tiRoute - visible) * rowH)
+        if tiScroll:GetVerticalScroll() > maxScroll then tiScroll:SetVerticalScroll(maxScroll) end
+        tiScroll:Show()
+        return y - visible * rowH
+    end
+    for i = 1, shown do
+        local s = tiRoute[i]
         local r = Row(i)
         r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
-        local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
-        local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
-        local eta = not s.done and NS.QuestEta(s.objs)
-        r.text:SetText(("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or ""))
+        r.text:SetText(RouteText(i, s))
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-        r:SetSize(NS.PW() - 24, NS.RowH())
+        r:SetSize(w, rowH)
         r:Show()
-        y = y - NS.RowH()
+        y = y - rowH
     end
     return y
 end

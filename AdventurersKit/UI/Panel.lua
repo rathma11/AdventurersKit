@@ -623,6 +623,45 @@ local function GetExtraRow(i)
     return r
 end
 
+-- "Also nearby": ennyi sor latszik, ha a lista hosszabb (plusz egy "+N tovabbi" sor)
+local EXTRA_SHOW = 3
+-- a "+N tovabbi" sor kulon gomb (nem az extraRows-ban, igy a Bags nem tesz ra item gombot)
+local function GetExtraMoreRow()
+    local r = panel.extraMore
+    if r then return r end
+    r = CreateFrame("Button", nil, panel)
+    r:SetSize(PANEL_W - 24, 16)
+    r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
+    r.text:SetPoint("TOPLEFT", 16, 0)
+    r.text:SetPoint("BOTTOMRIGHT")
+    r.text:SetJustifyH("LEFT")
+    r.text:SetWordWrap(false)
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    r:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText(L["Also nearby"], 1, 0.86, 0.5)
+        for _, e in ipairs(self.hidden or {}) do
+            GameTooltip:AddLine(("|cffd8c8a0%s:|r %s"):format(e.title or "?", e.desc or "?"), 1, 1, 1)
+        end
+        GameTooltip:AddLine(L["The QFocus macro targets these mobs too."], 0.45, 0.45, 0.45, true)
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    panel.extraMore = r
+    return r
+end
+
+-- A panel maximalis magassaga quest modban: fejlec + statisztika + kb. 11 sornyi tartalom
+-- (objective-ek, kozeli questek, utvonal) + lablec. Az utvonal azt kapja, ami ebbol marad.
+-- Ha a panelt nagyobbra huztad (QuestFocusDB.panelH), az a hatar.
+local function MaxPanelHeight()
+    local rh = RowH()
+    local base = 112 + HEAD + 15 + 11 * (rh + 1) + 2 * 19 + 4 + (8 + rh + 12)
+    return math.max(base, tonumber(QuestFocusDB.panelH) or 0)
+end
+
 local function Panel_Update()
     if QuestFocusDB.hidePanel then
         panel:Hide()
@@ -645,6 +684,7 @@ local function Panel_Update()
         for i = 1, #panel.lines do panel.lines[i]:Hide() end
         for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
         panel.extraHeader:Hide()
+        if panel.extraMore then panel.extraMore:Hide() end
         if panel.hsRow then panel.hsRow:Hide() end
         if panel.escortRow then panel.escortRow:Hide() end
         panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName("idle"))
@@ -723,8 +763,10 @@ local function Panel_Update()
         panel.escortRow:Hide()
     end
     -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
+    -- Hosszu listanal EXTRA_SHOW sor + egy "+N tovabbi" sor (a macro mindet targeteli).
     local extras = (state.objIndex == nil) and state.extra or nil
     local nExtra = 0
+    local moreShown = false
     if extras and #extras > 0 then
         y = y - 4
         panel.extraHeader:ClearAllPoints()
@@ -732,7 +774,9 @@ local function Panel_Update()
         panel.extraHeader:Show()
         y = y - 15
         local seenQ = {}
+        local limit = #extras > EXTRA_SHOW + 1 and EXTRA_SHOW or #extras
         for i, e in ipairs(extras) do
+            if i > limit then break end
             local r = GetExtraRow(i)
             r.extra = e
             r.useQid, r.useObj, r.useQuestItem = e.qid, e.obj, not seenQ[e.qid]
@@ -747,10 +791,23 @@ local function Panel_Update()
             y = y - RowH() - 1
             nExtra = i
         end
+        if #extras > limit then
+            local r = GetExtraMoreRow()
+            r.hidden = {}
+            for i = limit + 1, #extras do r.hidden[#r.hidden + 1] = extras[i] end
+            r:SetSize(PW() - 24, RowH())
+            r.text:SetText(("|cff999999" .. L["+%d more (the macro targets them too)"] .. "|r"):format(#r.hidden))
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+            r:Show()
+            y = y - RowH() - 1
+            moreShown = true
+        end
     else
         panel.extraHeader:Hide()
     end
     for i = nExtra + 1, #panel.extraRows do panel.extraRows[i]:Hide() end
+    if not moreShown and panel.extraMore then panel.extraMore:Hide() end
     -- Hearthstone tipp: hany kesz quest adhato le ott, ahova a HS visz
     -- (leadas modban mar 1-tol, kulonben 2-tol mutatjuk)
     local hsList, hsName, hsCd
@@ -792,9 +849,12 @@ local function Panel_Update()
     elseif panel.hsRow then
         panel.hsRow:Hide()
     end
-    -- Leadas modban alul a kozeli felveheto questek (QuestFocusPlanner.lua)
+    -- Leadas modban alul a quest log utvonala (Planner\Suggestions.lua): annyi sor, amennyi a
+    -- panel maximalis magassagaba meg belefer; a tobbi lenyithato (gorgetheto) listaban.
     if state.isComplete and NS.ShowTurnInPickups then
-        local ok, ny = pcall(NS.ShowTurnInPickups, y)
+        local footer = 8 + RowH() + 12
+        local nFit = math.floor((MaxPanelHeight() - footer - (-y) - 4 - 15) / RowH())
+        local ok, ny = pcall(NS.ShowTurnInPickups, y, math.max(0, nFit))
         if ok and ny then y = ny end
     end
     if #objs == 0 then
