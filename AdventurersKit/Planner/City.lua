@@ -525,11 +525,15 @@ local GUIDE = {
     { kind = "Ammo", label = L["Ammo"], icon = TRK .. "Ammunition", class = "HUNTER" },
     { kind = "Battlemaster", label = L["Battlemaster"], icon = TRK .. "BattleMaster" },
 }
+local IC = "Interface\\Icons\\"
 local PROFS = {
-    { 171, L["Alchemy"] }, { 164, L["Blacksmithing"] }, { 185, L["Cooking"] }, { 333, L["Enchanting"] },
-    { 202, L["Engineering"] }, { 129, L["First Aid"] }, { 356, L["Fishing"] }, { 182, L["Herbalism"] },
-    { 165, L["Leatherworking"] }, { 186, L["Mining"] }, { 393, L["Skinning"] }, { 197, L["Tailoring"] },
-    { 762, L["Riding"] },
+    { 171, L["Alchemy"], IC .. "Trade_Alchemy" }, { 164, L["Blacksmithing"], IC .. "Trade_BlackSmithing" },
+    { 185, L["Cooking"], IC .. "INV_Misc_Food_15" }, { 333, L["Enchanting"], IC .. "Trade_Engraving" },
+    { 202, L["Engineering"], IC .. "Trade_Engineering" }, { 129, L["First Aid"], IC .. "Spell_Holy_SealOfSacrifice" },
+    { 356, L["Fishing"], IC .. "Trade_Fishing" }, { 182, L["Herbalism"], IC .. "Spell_Nature_NatureTouchGrow" },
+    { 165, L["Leatherworking"], IC .. "INV_Misc_ArmorKit_17" }, { 186, L["Mining"], IC .. "Trade_Mining" },
+    { 393, L["Skinning"], IC .. "INV_Misc_Pelt_Wolf_01" }, { 197, L["Tailoring"], IC .. "Trade_Tailoring" },
+    { 762, L["Riding"], IC .. "Spell_Nature_Swiftness" },
 }
 
 local MENU_W, MENU_ROW = 170, 18
@@ -590,6 +594,7 @@ local function FillMenu(m, entries, onSub)
     for i, e in ipairs(entries) do
         local r = MenuRow(m, i)
         r.icon:SetTexture(e.icon)
+        if e.crop then r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) else r.icon:SetTexCoord(0, 1, 0, 1) end
         r.icon:SetShown(e.icon ~= nil)
         local col = (e.sub or e.point) and (e.mine and "|cff40ff40" or "|cffffd100") or "|cff808080"
         r.text:SetText(col .. e.label .. "|r")
@@ -634,7 +639,7 @@ local function ShowProfMenu(anchorRow)
     local list = {}
     for _, pr in ipairs(PROFS) do
         local p, d = Nearest("Prof:" .. pr[1])
-        list[#list + 1] = { label = pr[2], point = p, dist = d, mine = mine[pr[1]] ~= nil }
+        list[#list + 1] = { label = pr[2], icon = pr[3], crop = true, point = p, dist = d, mine = mine[pr[1]] ~= nil }
     end
     -- a sajat szakmaid elol
     table.sort(list, function(a, b)

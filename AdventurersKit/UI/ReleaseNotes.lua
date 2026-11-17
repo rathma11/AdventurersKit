@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.20", date = "2026-11-17", items = {
+        "Directions > Profession Trainer: every profession has its icon.",
+    } },
     { version = "0.6.19", date = "2026-11-17", items = {
         "City list: the quest chain tag (chain icon + 2/5) is clickable: it opens your quest log at the quest of that "
             .. "chain you already have; hover shows which one.",
