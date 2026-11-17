@@ -103,12 +103,87 @@ cClose:SetScript("OnClick", function() city.closedHere = true; city:Hide() end)
 city.foot = city:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 city.foot:SetText(L["Click: marker on the quest giver. Wheel: scroll. Drag to move."])
 
+---------------------------------------------------------------------------
+-- Ignoralt helyek: QuestFocusDB.cityIgnore = { {c, x, y, name} }. Vilag koordinatan
+-- (yard) tarolva, CITY_IGNORE_R sugaron belul ignoralt (varos es fogados falu is).
+---------------------------------------------------------------------------
+local CITY_IGNORE_R = 500
+local function PlaceName()
+    local z, s = GetZoneText and GetZoneText() or "", GetMinimapZoneText and GetMinimapZoneText() or ""
+    if s ~= "" and s ~= z then return s .. " (" .. z .. ")" end
+    return z ~= "" and z or "?"
+end
+local function IgnoredHere()
+    local list = QuestFocusDB.cityIgnore
+    if not list or #list == 0 then return end
+    local pc, px, py = NS.PlayerWorldPos()
+    if not pc then return end
+    for i, e in ipairs(list) do
+        if e.c == pc then
+            local dx, dy = e.x - px, e.y - py
+            if dx * dx + dy * dy <= CITY_IGNORE_R * CITY_IGNORE_R then return i, e end
+        end
+    end
+end
+NS.CityIgnoredHere = IgnoredHere
+
+local function MakeBtn(text, w)
+    local b = CreateFrame("Button", nil, city, "UIPanelButtonTemplate")
+    b:SetSize(w, 20)
+    b:SetText(text)
+    if b:GetFontString() then b:GetFontString():SetFontObject("GameFontNormalSmall") end
+    return b
+end
+city.ignoreBtn = MakeBtn(L["Ignore this place"], 150)
+city.disableBtn = MakeBtn(L["Disable city list"], 150)
+city.ignoreBtn:SetScript("OnClick", function()
+    local i, e = IgnoredHere()
+    if i then
+        table.remove(QuestFocusDB.cityIgnore, i)
+        NS.Print(L["City list: |cffffff00%s|r is no longer ignored."], e.name or "?")
+        city.ignoreBtn:SetText(L["Ignore this place"])
+        return
+    end
+    local pc, px, py = NS.PlayerWorldPos()
+    if not pc then return end
+    QuestFocusDB.cityIgnore = QuestFocusDB.cityIgnore or {}
+    local name = PlaceName()
+    table.insert(QuestFocusDB.cityIgnore, { c = pc, x = px, y = py, name = name })
+    NS.Print(L["City list: |cffffff00%s|r ignored (also next time). |cffffff00/qf city|r opens it anyway, |cffffff00/qf cityreset|r clears the ignore list."], name)
+    city:Hide()
+end)
+city.ignoreBtn:SetScript("OnEnter", function(self)
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Ignore this place"])
+    NS.TT.Note(tt, L["Don't open the list automatically here (within ~500 yd), not even next time you come back."])
+    NS.TT.Finish(tt)
+end)
+city.ignoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+city.disableBtn:SetScript("OnClick", function()
+    QuestFocusDB.noCityMode = true
+    city:Hide()
+    NS.Print(L["City list disabled. Turn it back on: Options > City mode."])
+    NS.Panel_Update()
+end)
+city.disableBtn:SetScript("OnEnter", function(self)
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Disable city list"])
+    NS.TT.Note(tt, L["Turns off city mode everywhere. Turn it back on: Options > City mode."])
+    NS.TT.Finish(tt)
+end)
+city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
 -- Gorgetheto tartalom (egergorgo + csuszka)
 local cScroll = CreateFrame("ScrollFrame", "QuestFocusCityScroll", city, "UIPanelScrollFrameTemplate")
 cScroll:SetPoint("TOPLEFT", 12, -38)
 local cContent = CreateFrame("Frame", nil, cScroll)
 cContent:SetSize(CITY_W - 48, 10)
 cScroll:SetScrollChild(cContent)
+-- Sajat gorgo kezeles: rejtett csuszkaval is mukodik, 3 sor / kattanas
+cScroll:EnableMouseWheel(true)
+cScroll:SetScript("OnMouseWheel", function(self, delta)
+    local max = self:GetVerticalScrollRange() or 0
+    local v = math.max(0, math.min(max, self:GetVerticalScroll() - delta * CITY_ROW_H * 3))
+    if self.ScrollBar and self.ScrollBar:IsShown() then self.ScrollBar:SetValue(v) else self:SetVerticalScroll(v) end
+end)
 
 local cityRows = {}
 local function CityRow(i)
@@ -150,6 +225,9 @@ NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
 
 local function RefreshCityList()
     if QuestFocusDB.noCityMode or not NS.QuestieAvailable() then city:Hide() return end
+    local ignored = IgnoredHere()
+    if ignored and not city.forced then city:Hide() return end
+    city.ignoreBtn:SetText(ignored and L["Stop ignoring here"] or L["Ignore this place"])
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
     local ok, list = pcall(BuildPickups, pc, px, py, CITY_MAX)
@@ -188,7 +266,11 @@ local function RefreshCityList()
     if not needBar then cScroll:SetVerticalScroll(0) end
     city.foot:ClearAllPoints()
     city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, -38 - visH - 4)
-    city:SetHeight(38 + visH + 26)
+    city.ignoreBtn:ClearAllPoints()
+    city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, -38 - visH - 20)
+    city.disableBtn:ClearAllPoints()
+    city.disableBtn:SetPoint("LEFT", city.ignoreBtn, "RIGHT", 6, 0)
+    city:SetHeight(38 + visH + 52)
     if not city:IsShown() and not city.closedHere then city:Show() end
 end
 
@@ -217,8 +299,30 @@ city:SetScript("OnUpdate", function(_, dt)
     if not city:IsMouseOver() then RefreshCityList() end
 end)
 city:HookScript("OnHide", function() city.forced = nil end)
--- /qf city: kezzel is megnyithato (varoson kivul is)
-NS.ShowCityList = function() city.closedHere = nil; city.forced = not InCity() or nil; RefreshCityList() end
+-- /qf city: kezzel is megnyithato (varoson kivul es ignoralt helyen is)
+NS.ShowCityList = function()
+    city.closedHere = nil
+    city.forced = (not InCity() or IgnoredHere()) and true or nil
+    RefreshCityList()
+end
+NS.ResetCityIgnore = function()
+    local n = QuestFocusDB.cityIgnore and #QuestFocusDB.cityIgnore or 0
+    QuestFocusDB.cityIgnore = {}
+    NS.Print(L["City list: ignore list cleared (%d places)."], n)
+end
+
+-- Ujraprobalkozas: belepeskor / relog utan a Questie meg toltodhet (vagy a hely meg nem
+-- ismert), ilyenkor az elso frissites semmit nem ad. Amig varosban vagyunk es a lista nincs
+-- kint (es nem zartuk be / ignoraltuk), 4 mp-enkent ujraprobalja.
+local cityRetry, cityRetryElapsed = CreateFrame("Frame"), 0
+cityRetry:SetScript("OnUpdate", function(_, dt)
+    cityRetryElapsed = cityRetryElapsed + dt
+    if cityRetryElapsed < 4 then return end
+    cityRetryElapsed = 0
+    if city:IsShown() or city.closedHere or QuestFocusDB.noCityMode or not InCity() then return end
+    if InCombatLockdown() or IgnoredHere() then return end
+    RefreshCityList()
+end)
 
 local qpopTicker = CreateFrame("Frame")
 local qpopElapsed = 0

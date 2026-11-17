@@ -36,6 +36,8 @@ SlashCmdList.QUESTFOCUS = function(msg)
         if NS.ToggleBagList then NS.ToggleBagList() end
     elseif msg == "city" then
         if NS.ShowCityList then NS.ShowCityList() end
+    elseif msg == "cityreset" then
+        if NS.ResetCityIgnore then NS.ResetCityIgnore() end
     elseif msg == "buffreset" then
         if NS.ResetBuffLearn then NS.ResetBuffLearn() end
     elseif msg == "junk" then

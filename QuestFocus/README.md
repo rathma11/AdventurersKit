@@ -104,7 +104,8 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/qf zone` | toggle zone focus: only quests of the current zone stay in the Questie tracker |
 | `/qf minimap` | toggle the minimap button |
 | `/qf bags` | toggle the quest item list next to the bags |
-| `/qf city` | list of quests to pick up nearby (city mode list) |
+| `/qf city` | list of quests to pick up nearby (city mode list; opens even in an ignored place) |
+| `/qf cityreset` | clear the list of places where the city list is ignored |
 | `/qf junk` | destroy unsellable leftover quest items (asks for each one) |
 | `/qf debug` | diagnostics to chat |
 | `/qf copy` | diagnostics in a selectable text box (Ctrl+C to copy); also the **Copy** button on the Debug tab |
