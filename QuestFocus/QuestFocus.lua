@@ -742,8 +742,34 @@ panel:SetMovable(true)
 panel:SetClampedToScreen(true)
 panel:EnableMouse(true)
 panel:RegisterForDrag("LeftButton")
-panel:SetScript("OnDragStart", panel.StartMoving)
-panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+panel:SetScript("OnDragStart", function(self) self.isMoving = true; self:StartMoving() end)
+-- Pozicio: a bal FELSO sarkot mentjuk magunk (QuestFocusDB.panelPos), nem a WoW layout
+-- cache-et, mert az a legkozelebbi pontot (pl. also/kozep) menti, es valtozo magassagnal
+-- a panel lefele csuszott / kilogott a kepernyorol.
+local function SavePanelPos()
+    local l, t = panel:GetLeft(), panel:GetTop()
+    if not (l and t) then return end
+    panel:ClearAllPoints()
+    panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+    if QuestFocusDB then QuestFocusDB.panelPos = { l = math.floor(l + 0.5), t = math.floor(t + 0.5) } end
+end
+local function RestorePanelPos()
+    if panel.SetUserPlaced then pcall(panel.SetUserPlaced, panel, false) end
+    local p = QuestFocusDB and QuestFocusDB.panelPos
+    if p and p.l and p.t then
+        panel:ClearAllPoints()
+        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p.l, p.t)
+    else
+        SavePanelPos() -- elso alkalommal: a mostani (regi) helyet atvesszuk
+    end
+end
+NS.RestorePanelPos = RestorePanelPos
+panel:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    self.isMoving = nil
+    SavePanelPos()
+    if self.SetUserPlaced then pcall(self.SetUserPlaced, self, false) end
+end)
 if panel.SetBackdrop then
     panel:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -878,6 +904,14 @@ NS.ApplyPanelWidth = ApplyPanelWidth
 
 -- A bal felso sarok maradjon a helyen (atmeretezes / tartalomvaltas eseten)
 local function AnchorTopLeft()
+    -- ha van mentett pozicio, mindig oda (igy a kepernyo szelen torteno "clamp" eltolas
+    -- sem marad meg tartosan, a panel visszaall a mentett tetejere)
+    local p = QuestFocusDB and QuestFocusDB.panelPos
+    if p and p.l and p.t and not panel.isMoving then
+        panel:ClearAllPoints()
+        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p.l, p.t)
+        return
+    end
     local p1 = panel:GetPoint(1)
     local l, t = panel:GetLeft(), panel:GetTop()
     if p1 ~= "TOPLEFT" and l and t then
@@ -1605,6 +1639,9 @@ QF:SetScript("OnEvent", function(self, event, arg1)
         if QuestFocusDB.panelScale then QuestFocusDB.panelScale = nil; panel:SetScale(1) end
         ApplyFontSize()
         ApplyPanelWidth()
+        RestorePanelPos()
+        -- a WoW layout cache a login utan meg atrakhatja: meg egyszer a sajat mentesunket
+        C_Timer.After(1, RestorePanelPos)
         InstallHooks()
         if not _G.QuestieLoader then
             Print(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])
