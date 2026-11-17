@@ -523,7 +523,7 @@ mac:Check(L["Auto attack (/startattack)"],
 -- Ping: harom valasztas (egyszerre egy): kerdezze csapatba lepeskor / mindig / soha
 do
     local PING_DESC = {
-        ask = L["When you join a group, a small window asks whether to ping in that group (you can change this setting there too). Solo: no ping."],
+        ask = L["When you join a group, a small window asks whether to ping in that group (you can change this setting there too). Solo it always pings."],
         on = L["The macro always pings the target at the end (ping system); party members see it too."],
         off = L["The macro never pings."],
     }

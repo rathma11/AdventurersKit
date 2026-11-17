@@ -140,7 +140,9 @@ NS.UsePing = function()
     local m = NS.PingMode()
     if m == "on" then return true end
     if m == "off" then return false end
-    return NS.pingSession == true and IsInGroup and IsInGroup() or false
+    -- "ask": egyedul mindig pingel, csapatban a csapatba lepeskor adott valasz szerint
+    if not (IsInGroup and IsInGroup()) then return true end
+    return NS.pingSession == true
 end
 
 -- belso exportok a tobbi core fajlnak

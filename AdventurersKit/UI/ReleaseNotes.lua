@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.38", date = "2026-11-17", items = {
+        "Macro ping in 'ask' mode: solo it always pings; in a group it follows your answer to the question.",
+    } },
     { version = "0.6.37", date = "2026-11-17", items = {
         "Macro ping: the default is 'ask when I join a group' (if you had turned ping off before, it stays off).",
     } },
