@@ -189,16 +189,46 @@ end
 local GetSlots = C_Container and C_Container.GetContainerNumSlots or GetContainerNumSlots
 local GetItemID = C_Container and C_Container.GetContainerItemID or GetContainerItemID
 
--- Beallitott item, vagy nev alapjan az elso talalat a taskakban
+-- Fegyver tipusa a kezben: "edged" (kard, balta, tor, polearm), "blunt" (buzogany, bot),
+-- "fist", "ranged" / nil (nincs fegyver). A ko / olaj / poison ehhez kell, hogy illjen.
+local EDGED = { [0] = true, [1] = true, [6] = true, [7] = true, [8] = true, [15] = true }
+local BLUNT = { [4] = true, [5] = true, [10] = true }
+local function WeaponKind(hand)
+    local id = GetInventoryItemID("player", hand)
+    if not id then return end
+    local _, _, _, _, _, classID, subID = GetItemInfoInstant(id)
+    if classID ~= 2 then return end
+    if EDGED[subID] then return "edged" end
+    if BLUNT[subID] then return "blunt" end
+    if subID == 13 then return "fist" end
+    return "ranged"
+end
+NS.WeaponKind = WeaponKind
+
+-- Rafer-e ez az item a fegyverre (nev alapjan): Sharpening Stone = eles, Weightstone = tompa,
+-- olaj / poison / ismeretlen = barmelyik kozelharci fegyver
+local function ItemFitsWeapon(itemId, hand)
+    local kind = WeaponKind(hand)
+    if not kind or kind == "ranged" then return false end
+    local name = GetItemInfo(itemId)
+    if not name then return true end -- meg nincs betoltve: ne dobjuk el
+    if name:find(L["Sharpening Stone"], 1, true) then return kind == "edged" or kind == "fist" end
+    if name:find(L["Weightstone"], 1, true) then return kind == "blunt" or kind == "fist" end
+    return true
+end
+NS.ItemFitsWeapon = ItemFitsWeapon
+
+-- Beallitott item, vagy nev alapjan az elso talalat a taskakban. Fegyvernel csak olyan,
+-- ami a mostani fegyverre rafer (fegyvercserenel igy magatol valt kore / olajra).
 local function FindItem(slot)
     local id = DB().buffItems[slot.key]
-    if id then return id end
-    if #slot.names == 0 then return end
+    if id and (not slot.hand or ItemFitsWeapon(id, slot.hand)) then return id end
+    if #slot.names == 0 then return slot.hand and nil or id end
     for bag = 0, 4 do
         for s = 1, (GetSlots(bag) or 0) do
             local iid = GetItemID(bag, s)
             local name = iid and GetItemInfo(iid)
-            if name then
+            if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) then
                 for _, pat in ipairs(slot.names) do
                     if name:find(pat, 1, true) then return iid end
                 end
@@ -296,12 +326,9 @@ local function Remaining(slot, itemId, auras)
     end
     if slot.hand then
         -- fegyver enchant / poison / shaman imbue: a fegyveren levo ideiglenes enchant
-        if slot.hand == 17 then
-            -- off hand: csak ha ott fegyver van (pajzs / off-hand item / ures: nem szolunk)
-            local id = GetInventoryItemID("player", 17)
-            local classID = id and select(6, GetItemInfoInstant(id))
-            if classID ~= 2 then return math.huge end
-        end
+        -- csak kozelharci fegyverre van ertelme (pajzs / off-hand item / ures / ranged: nem szolunk)
+        local wk = WeaponKind(slot.hand)
+        if not wk or wk == "ranged" then return math.huge end
         local ok, hasMain, mainMs, _, _, hasOff, offMs = pcall(GetWeaponEnchantInfo)
         if not ok then return end
         local has, ms = hasMain, mainMs
@@ -850,7 +877,14 @@ local function UpdateAlert(auras)
         elseif not a and not left and not slot.isClass and not slot.customSpell and slot.key ~= "food"
             and not NS.BuffSlotOff(slot) and not dismissed[slot.key] then
             -- bepipalt itemes tipus (alvozsak, fegyver enchant, sajat item), de nincs ilyen a taskaban
-            need[#need + 1] = { slot = slot, left = nil, info = L["none in your bags - click to choose, or drag an item here"] }
+            local info = L["none in your bags - click to choose, or drag an item here"]
+            if slot.hand then
+                local wk = WeaponKind(slot.hand)
+                info = (wk == "blunt" and L["no weightstone / oil for this weapon in your bags - click to choose, or drag one here"])
+                    or (wk == "edged" and L["no sharpening stone / oil for this weapon in your bags - click to choose, or drag one here"])
+                    or L["nothing for this weapon in your bags - click to choose, or drag one here"]
+            end
+            need[#need + 1] = { slot = slot, left = nil, info = info }
             key = key .. slot.key .. ":none;"
         end
     end
@@ -987,7 +1021,19 @@ ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("UNIT_AURA")
 ev:RegisterEvent("UNIT_INVENTORY_CHANGED")
 ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+ev:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 local pending = false
+
+-- Fegyvercsere (harcon kivul): a FindItem magatol a rafero kore / olajra / poisonra valt.
+-- Ha nincs ilyen a taskaban, a buff emlekezteto soraban latszik (kattintva valaszthatsz).
+local weaponCheckPending = false
+local function CheckWeapons()
+    if InCombatLockdown() then weaponCheckPending = true return end
+    weaponCheckPending = false
+    -- az uj fegyvernel ujra szolhat (ha a regi miatt X-szel elrejtetted)
+    for _, s in ipairs(SLOTS) do if s.hand then dismissed[s.key] = nil end end
+    Rebuild()
+end
 local function Soon()
     if pending then return end
     pending = true
@@ -1008,6 +1054,12 @@ ev:SetScript("OnEvent", function(_, event, unit)
         if unit == "player" then Soon() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         Rebuild()
+        if weaponCheckPending then C_Timer.After(1, CheckWeapons) end
+    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+        if unit == 16 or unit == 17 then
+            Soon()
+            C_Timer.After(1, CheckWeapons)
+        end
     elseif event == "BAG_UPDATE_DELAYED" then
         if NS.ClearFoodCache then NS.ClearFoodCache() end
         Soon()
@@ -1224,7 +1276,7 @@ NS.BuffAlternatives = function(slot)
             for s = 1, (GetSlots(bag) or 0) do
                 local iid = GetItemID(bag, s)
                 local name = iid and not seen[iid] and GetItemInfo(iid)
-                if name then
+                if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) then
                     for _, pat in ipairs(slot.names) do
                         if name:find(pat, 1, true) then seen[iid] = true; out[#out + 1] = { kind = "item", id = iid } break end
                     end
@@ -1674,56 +1726,69 @@ end
 RefreshList = function()
     for _, r in ipairs(rows) do r:Hide(); r.slot = nil end
     local n = 0
-    -- beepitett tipusok (pipaval), utana a sajat itemek (X-szel)
-    local customHeaderAt
-    for pass = 1, 2 do
-        for _, slot in ipairs(SLOTS) do
-            if (pass == 1) == (not slot.custom) then
-                n = n + 1
-                if pass == 2 and not customHeaderAt then customHeaderAt = n end
-                local r = GetRow(n)
-                r.slot = slot
-                local on = Watched(slot)
-                local tex, sub = SlotIconAndName(slot)
-                r.icon.tex:SetTexture(tex)
-                r.icon.tex:SetDesaturated(not on)
-                r.label:SetText(slot.label)
-                r.label:SetTextColor(on and 1 or 0.5, on and 1 or 0.5, on and 1 or 0.5)
-                r.sub:SetText(sub)
-                r.check:SetShown(not slot.custom)
-                r.check:SetChecked(on)
-                r.close:SetShown(slot.custom and true or false)
-                local perm = slot.permanent
-                r.min:SetShown(on and not perm)
-                r.minLabel:SetShown(on and not perm)
-                r.onlyMissing:SetShown(on and perm and true or false)
-                -- ha nincs X, a perc mezo a sor vegere csuszik
-                r.minLabel:ClearAllPoints()
-                r.onlyMissing:ClearAllPoints()
-                if slot.custom then
-                    r.minLabel:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
-                    r.onlyMissing:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
-                else
-                    r.minLabel:SetPoint("RIGHT", r, "RIGHT", -4, 0)
-                    r.onlyMissing:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+    -- harom szegmens: itemek (alvozsak, XP kaja, fegyver), class buffok, egyeb (Add buff)
+    local GROUPS = {
+        { title = L["Items: sleeping bag, XP food, weapon enchants"], test = function(s) return not s.custom and not s.isClass end },
+        { title = L["Class buffs"], test = function(s) return s.isClass and not s.custom end },
+        { title = L["Other (added by you)"], test = function(s) return s.custom end },
+    }
+    listFrame.headers = listFrame.headers or {}
+    local y = 0
+    for gi, g in ipairs(GROUPS) do
+        local h = listFrame.headers[gi]
+        if not h then
+            h = listFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            h:SetTextColor(1, 0.82, 0)
+            listFrame.headers[gi] = h
+        end
+        local any = false
+        for _, slot in ipairs(SLOTS) do if g.test(slot) then any = true break end end
+        h:SetShown(any)
+        if any then
+            h:SetText(g.title)
+            h:ClearAllPoints()
+            h:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 2, y - (gi > 1 and 6 or 0))
+            y = y - (gi > 1 and 6 or 0) - 16
+            for _, slot in ipairs(SLOTS) do
+                if g.test(slot) then
+                    n = n + 1
+                    local r = GetRow(n)
+                    r.slot = slot
+                    local on = Watched(slot)
+                    local tex, sub = SlotIconAndName(slot)
+                    r.icon.tex:SetTexture(tex)
+                    r.icon.tex:SetDesaturated(not on)
+                    r.label:SetText(slot.label)
+                    r.label:SetTextColor(on and 1 or 0.5, on and 1 or 0.5, on and 1 or 0.5)
+                    r.sub:SetText(sub)
+                    r.check:SetShown(not slot.custom)
+                    r.check:SetChecked(on)
+                    r.close:SetShown(slot.custom and true or false)
+                    local perm = slot.permanent
+                    r.min:SetShown(on and not perm)
+                    r.minLabel:SetShown(on and not perm)
+                    r.onlyMissing:SetShown(on and perm and true or false)
+                    -- ha nincs X, a perc mezo a sor vegere csuszik
+                    r.minLabel:ClearAllPoints()
+                    r.onlyMissing:ClearAllPoints()
+                    if slot.custom then
+                        r.minLabel:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
+                        r.onlyMissing:SetPoint("RIGHT", r.close, "LEFT", -8, 0)
+                    else
+                        r.minLabel:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+                        r.onlyMissing:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+                    end
+                    if on and not perm and not r.min:HasFocus() then r.min:SetText(Minutes(slot)) end
+                    r:ClearAllPoints()
+                    r:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 0, y)
+                    r:Show()
+                    y = y - ROW
                 end
-                if on and not perm and not r.min:HasFocus() then r.min:SetText(Minutes(slot)) end
-                r:ClearAllPoints()
-                r:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 0, -(n - 1) * ROW - (customHeaderAt and 18 or 0))
-                r:Show()
             end
         end
     end
-    if not listFrame.customHeader then
-        listFrame.customHeader = listFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-        listFrame.customHeader:SetText(L["Other items"])
-    end
-    listFrame.customHeader:ClearAllPoints()
-    if customHeaderAt then
-        listFrame.customHeader:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 2, -(customHeaderAt - 1) * ROW - 2)
-    end
-    listFrame.customHeader:SetShown(customHeaderAt ~= nil)
-    listFrame:SetHeight(math.max(n * ROW + (customHeaderAt and 18 or 0), 20))
+    if listFrame.customHeader then listFrame.customHeader:Hide() end
+    listFrame:SetHeight(math.max(-y, 20))
     if page.Remeasure then page.Remeasure() end
 end
 NS.RefreshBuffOptions = RefreshList
