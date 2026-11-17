@@ -677,6 +677,47 @@ local function MaxPanelHeight()
     return 112 + HEAD + 15 + 11 * (rh + 1) + 2 * 19 + 4 + (8 + rh + 12)
 end
 
+-- Belepeskor a panel rejtve marad, amig a tartalma be nem all (kulonben a sorok egymas utan
+-- "csusznak bele": objective-ek, kozeli questek, utvonal...). A Panel_Update kozben is
+-- lefut (a magassag szamolodik), csak nem latszik. Feloldas: ha a belepeskori visszaallitas
+-- megtortent (NS.loginRestored, Core\Events.lua) es a panel magassaga 1.5 mp-ig nem valtozott
+-- (vagy 10 mp utan mindenkepp), illetve azonnal, ha te kattintasz egy questre.
+local hold = true
+local function ShowPanel()
+    if hold then panel:Hide() else panel:Show() end
+end
+local function ReleasePanelHold()
+    if not hold then return end
+    hold = false
+    if NS.C.Panel_Update then NS.C.Panel_Update() end
+end
+do
+    local w = CreateFrame("Frame")
+    local t, since, stable, lastH, wait = 0, 0, 0, nil, 0
+    w:SetScript("OnUpdate", function(self, dt)
+        if not hold then self:SetScript("OnUpdate", nil) return end
+        t = t + dt
+        if t < 0.5 then return end
+        if not NS.loginRestored then t = 0 return end
+        since = since + t
+        t = 0
+        -- a kozeli questek listaja (3 mp-es ticker) egyszer mar meglegyen
+        local ready = not state.questId or state.extra ~= nil or QuestFocusDB.noNearbyQuests
+        local h = math.floor(panel:GetHeight() + 0.5)
+        if ready and h == lastH then stable = stable + 0.5 else stable = 0 end
+        lastH = h
+        if stable >= 1.5 or since >= 10 then
+            self:SetScript("OnUpdate", nil)
+            ReleasePanelHold()
+        elseif ready and NS.C.Panel_Update then
+            -- rejtve is ujrarendezzuk, hogy a magassag kovesse a tartalmat
+            wait = wait + 1
+            if wait % 2 == 0 then NS.C.Panel_Update() end
+        end
+    end)
+end
+NS.ReleasePanelHold = ReleasePanelHold
+
 local function Panel_Update()
     if QuestFocusDB.hidePanel then
         panel:Hide()
@@ -703,7 +744,7 @@ local function Panel_Update()
         if panel.hsRow then panel.hsRow:Hide() end
         if panel.escortRow then panel.escortRow:Hide() end
         panel.icon:SetTexture("Interface\\Icons\\" .. NS.MacroIconName("idle"))
-        if NS.ShowSuggestions and NS.ShowSuggestions() then panel:Show() else panel:Hide() end
+        if NS.ShowSuggestions and NS.ShowSuggestions() then ShowPanel() else panel:Hide() end
         return
     end
     if NS.HideSuggestions then NS.HideSuggestions() end
@@ -777,9 +818,37 @@ local function Panel_Update()
     elseif panel.escortRow then
         panel.escortRow:Hide()
     end
+    -- Hearthstone tipp: hany kesz quest adhato le ott, ahova a HS visz
+    -- (leadas modban mar 1-tol, kulonben 2-tol mutatjuk). Elore szamoljuk: helyet foglal.
+    local hsList, hsName, hsCd
+    if NS.HearthTurnIns then
+        local ok, a, b, c = pcall(NS.HearthTurnIns)
+        if ok then hsList, hsName, hsCd = a, b, c end
+    end
+    local hsShow = hsList and (#hsList >= 2 or state.isComplete)
     -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
-    -- Hosszu listanal EXTRA_SHOW sor + egy "+N tovabbi" sor (a macro mindet targeteli).
     local extras = (state.objIndex == nil) and state.extra or nil
+    local nE = extras and #extras or 0
+    -- Hely elosztasa a panel maximalis magassagaban (MaxPanelHeight, a fogantyuval allithato):
+    --   1. "Also nearby" legfeljebb EXTRA_SHOW + 1 sor (min. 2)
+    --   2. utvonal (leadas modban) legfeljebb 5 sor
+    --   3. ami meg marad, abbol tobb "Also nearby" sor
+    -- Osszehuzaskor igy eloszor az utvonal fogy el, utana a kozeli questek.
+    local rh = RowH()
+    local routeN = 0
+    if state.isComplete and NS.PrepareTurnInRoute then
+        local ok, n = pcall(NS.PrepareTurnInRoute)
+        if ok and n then routeN = n end
+    end
+    local avail = MaxPanelHeight() - (8 + rh + 12) - (-y) - (hsShow and (rh + 5) or 0)
+        - (routeN > 0 and 19 or 0) - (nE > 0 and 19 or 0)
+    local nbRows = math.max(math.min(nE, 2), math.min(nE, EXTRA_SHOW + 1, math.floor(avail / (rh + 1))))
+    avail = avail - nbRows * (rh + 1)
+    local rRows = math.max(0, math.min(5, routeN, math.floor(avail / rh)))
+    avail = avail - rRows * rh
+    if nbRows >= math.min(nE, EXTRA_SHOW + 1) then
+        nbRows = math.min(nE, nbRows + math.max(0, math.floor(avail / (rh + 1))))
+    end
     local nExtra = 0
     local moreShown = false
     if extras and #extras > 0 then
@@ -789,7 +858,8 @@ local function Panel_Update()
         panel.extraHeader:Show()
         y = y - 15
         local seenQ = {}
-        local limit = #extras > EXTRA_SHOW + 1 and EXTRA_SHOW or #extras
+        -- ha nem fer ki mind: nbRows - 1 sor + egy "+N tovabbi" sor (a macro mindet targeteli)
+        local limit = nE > nbRows and math.max(1, nbRows - 1) or nE
         for i, e in ipairs(extras) do
             if i > limit then break end
             local r = GetExtraRow(i)
@@ -823,14 +893,7 @@ local function Panel_Update()
     end
     for i = nExtra + 1, #panel.extraRows do panel.extraRows[i]:Hide() end
     if not moreShown and panel.extraMore then panel.extraMore:Hide() end
-    -- Hearthstone tipp: hany kesz quest adhato le ott, ahova a HS visz
-    -- (leadas modban mar 1-tol, kulonben 2-tol mutatjuk)
-    local hsList, hsName, hsCd
-    if NS.HearthTurnIns then
-        local ok, a, b, c = pcall(NS.HearthTurnIns)
-        if ok then hsList, hsName, hsCd = a, b, c end
-    end
-    if hsList and (#hsList >= 2 or state.isComplete) then
+    if hsShow then
         local r = panel.hsRow
         if not r then
             r = CreateFrame("Button", nil, panel)
@@ -869,7 +932,7 @@ local function Panel_Update()
     if state.isComplete and NS.ShowTurnInPickups then
         local footer = 8 + RowH() + 12
         local nFit = math.floor((MaxPanelHeight() - footer - (-y) - 4 - 15) / RowH())
-        local ok, ny = pcall(NS.ShowTurnInPickups, y, math.max(0, nFit))
+        local ok, ny = pcall(NS.ShowTurnInPickups, y, math.max(0, nFit), true)
         if ok and ny then y = ny end
     end
     if #objs == 0 then
@@ -879,7 +942,7 @@ local function Panel_Update()
     end
     UpdateStats()
     PanelFinish(y)
-    panel:Show()
+    ShowPanel()
 end
 
 

@@ -350,10 +350,21 @@ local function TiToggle()
     return b
 end
 
-NS.ShowTurnInPickups = function(y, maxRows)
-    if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then return y end
+-- Az utvonal elore kiszamolasa (a Panel_Update ebbol osztja el a helyet); visszaadja a hosszat
+NS.PrepareTurnInRoute = function()
+    if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then tiRoute = {} return 0 end
     tiRoute = TurnInRoute()
     tiKey = TurnInKey(tiRoute)
+    return #tiRoute
+end
+
+-- prepared: a PrepareTurnInRoute ebben a frissitesben mar lefutott (nem szamoljuk ujra)
+NS.ShowTurnInPickups = function(y, maxRows, prepared)
+    if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then return y end
+    if not prepared then
+        tiRoute = TurnInRoute()
+        tiKey = TurnInKey(tiRoute)
+    end
     if #tiRoute == 0 then return y end
     local rowH, w = NS.RowH(), NS.PW() - 24
     local shown = math.min(TURNIN_ROUTE, maxRows or TURNIN_ROUTE)

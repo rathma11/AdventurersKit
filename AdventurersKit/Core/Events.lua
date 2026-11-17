@@ -126,6 +126,8 @@ QF:SetScript("OnEvent", function(self, event, arg1)
                 if title then SelectQuest(id, title, done, false) end
             end
             if not state.questId then Panel_Update() end
+            -- a panel ettol kezdve megjelenhet, ha a tartalma beallt (UI\Panel.lua)
+            NS.loginRestored = true
         end)
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- Harcban a gombot nem lehet atallitani, a regi nameplate token pedig mar mas mobra

@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.55", date = "2026-11-17", items = {
+        "After login the quest panel waits until its content has settled (objectives, nearby quests, route) and then "
+            .. "appears at once, instead of rows sliding in one by one. Clicking a quest shows it right away.",
+        "\"Also nearby\" follows the panel's height too. When you shrink the panel, the route goes first, then the nearby "
+            .. "list (down to 1 row + \"+N more\"). When you drag it taller, the nearby list grows past 3 rows.",
+    } },
     { version = "0.6.54", date = "2026-11-17", items = {
         "Fix: after you expanded the route list, resizing and clicking near the bottom of the panel stopped working. "
             .. "The list's off-screen rows were invisible but still caught the mouse. Only the visible rows are active now, "

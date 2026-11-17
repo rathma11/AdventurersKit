@@ -50,6 +50,8 @@ local function SelectQuest(questId, title, isComplete, mark)
     state.isComplete = isComplete and true or false
     QuestFocusDB.lastQuest = questId
     if mark then QuestFocusDB.hidePanel = false end -- kattintasra a bezart panel visszajon
+    -- kattintasra a belepeskori varakozas (UI\Panel.lua) se tartsa vissza a panelt
+    if mark and NS.ReleasePanelHold then NS.ReleasePanelHold() end
     -- masik questre valtottal (kattintas, kovetes / track, Questie tracker): a regi quest
     -- markere nem maradhat (a nyil kulonben rossz helyre mutat); az uj quest celjara tesszuk
     if changed then ClearWaypoint() end
