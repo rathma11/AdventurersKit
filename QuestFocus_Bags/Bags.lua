@@ -125,6 +125,9 @@ local function BankCounts()
     return counts
 end
 
+-- Modul ki/be (Options > Bags > Module on): kikapcsolva betoltve marad, de semmit nem csinal
+local function On() return not NS.ModuleOn or NS.ModuleOn("QuestFocus_Bags") end
+
 local function ItemHasUse(id)
     if C_Item and C_Item.GetItemSpell then return C_Item.GetItemSpell(id) ~= nil end
     return GetItemSpell and GetItemSpell(id) ~= nil
@@ -133,7 +136,7 @@ end
 -- Hasznalhato (Use:) item egy meg nem leadhato aktiv queshez: ezek a panel melletti
 -- gombokra kerulnek, nem a taska melletti listaba
 local function IsPanelUseItem(e)
-    if QuestFocusDB.noUseButton or not e.needs or not ItemHasUse(e.id) then return false end
+    if not On() or QuestFocusDB.noUseButton or not e.needs or not ItemHasUse(e.id) then return false end
     for _, n in ipairs(e.needs) do if not n.questDone then return true end end
     return false
 end
@@ -269,7 +272,7 @@ local function HookOne(B)
     if not (type(B) == "table" and B.Item and B.Item.UpdateBorder) or B.qfItemHooked then return end
     B.qfItemHooked = true
     hooksecurefunc(B.Item, "UpdateBorder", function(self)
-        if not QuestFocusDB.noBagGlow then
+        if not QuestFocusDB.noBagGlow and On() then
             local id = self.info and self.info.itemID
             local kind = id and self.searched and scan.status[id]
             if kind then
@@ -470,7 +473,7 @@ end
 RefreshBagList = function()
     Scan()
     MaybeRefreshBagnon()
-    if not (anchorFrame and anchorFrame:IsShown()) or QuestFocusDB.noBagList then list:Hide() return end
+    if not (anchorFrame and anchorFrame:IsShown()) or QuestFocusDB.noBagList or not On() then list:Hide() return end
 
     local rows = {}
     for _, e in ipairs(scan.items) do rows[#rows + 1] = e end
@@ -659,7 +662,7 @@ local useGeo
 local function UpdateUseButton()
     if InCombatLockdown() then return end
     local panel = NS.panel
-    local list = (not QuestFocusDB.noUseButton and panel and panel:IsShown()) and scan.usable or {}
+    local list = (On() and not QuestFocusDB.noUseButton and panel and panel:IsShown()) and scan.usable or {}
     -- Nem a panelhez horgonyzunk (attol a panel vedett lenne): kepernyo-pozicio alapjan
     local l, t = NS.PanelEdge("left"), NS.PanelEdge("top")
     useGeo = l and t and (math.floor(l) .. ":" .. math.floor(t)) or nil
@@ -774,7 +777,14 @@ end
 -- Kapcsolok a beallitasokban
 ---------------------------------------------------------------------------
 -- a core adja a fult a modul ki/be kapcsolojaval a tetejen
-local page, fl = NS.ModulePage("QuestFocus_Bags")
+local page, fl = NS.ModulePage("QuestFocus_Bags", function()
+    bagFocus = nil
+    lastStatusKey = nil
+    RefreshBagList()
+    UpdateUseButton()
+    local B = Bags()
+    if B and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
+end)
 fl:Header(L["Quest items in your bags"])
 fl:Check(L["Quest item list next to the bags"],
     L["While your bags are open (Bagnon or Blizzard), lists your quest items next to them: which quest needs them, "]

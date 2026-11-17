@@ -519,12 +519,15 @@ local function Anchor()
     end
 end
 
+-- Modul ki/be (Options > Buffs > Module on): kikapcsolva betoltve marad, de semmit nem csinal
+local function On() return not NS.ModuleOn or NS.ModuleOn("QuestFocus_Buffs") end
+
 -- Secure attributumok + lathatosag: csak harcon kivul
 local function Rebuild()
     if InCombatLockdown() then bar.dirty = true return end
     bar.dirty = nil
     -- A gombsor alapbol ki van kapcsolva (a buff idok ugyis latszanak a buff kereten)
-    if not QuestFocusDB.showBuffBar then bar:Hide() return end
+    if not QuestFocusDB.showBuffBar or not On() then bar:Hide() return end
     local x, auras = 0, HelpfulAuras()
     for _, b in ipairs(buttons) do
         local slot = b.slot
@@ -565,7 +568,7 @@ local warned = {}
 
 -- Egyszer szolunk (kepernyo + chat), amikor egy buff a kuszob ala esik. A gombsortol fuggetlen.
 local function CheckWarnings(auras)
-    if QuestFocusDB.noBuffWarn then return end
+    if QuestFocusDB.noBuffWarn or not On() then return end
     for _, slot in ipairs(SLOTS) do
         local a = Action(slot)
         local canFix = a ~= nil
@@ -746,7 +749,7 @@ local lastAlertKey
 local flashed = {}
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end
-    if QuestFocusDB.noBuffAlert or hiddenUntilCombat or UnitIsDeadOrGhost("player") then
+    if QuestFocusDB.noBuffAlert or not On() or hiddenUntilCombat or UnitIsDeadOrGhost("player") then
         if alert:IsShown() then alert:Hide() end
         lastAlertKey = nil
         return
@@ -1214,7 +1217,7 @@ end
 
 -- Bejelentkezes utan egyszer felajanljuk, ha nincs XP kaja beallitva, de van etel a taskaban
 local function MaybePromptFood()
-    if InCombatLockdown() or QuestFocusDB.noFoodPrompt or DB().buffItems.food or DB().noBuff_food then return end
+    if InCombatLockdown() or not On() or QuestFocusDB.noFoodPrompt or DB().buffItems.food or DB().noBuff_food then return end
     local xp, other = FoodCandidates()
     if #xp + #other == 0 then return end
     ShowFoodPicker()
@@ -1225,7 +1228,11 @@ NS.MaybePromptFood = MaybePromptFood
 -- Beallitasok: "Buffs" ful
 ---------------------------------------------------------------------------
 -- a core adja a fult a modul ki/be kapcsolojaval a tetejen
-local page, fl = NS.ModulePage("QuestFocus_Buffs")
+local page, fl = NS.ModulePage("QuestFocus_Buffs", function(on)
+    lastAlertKey = nil
+    if not on and not InCombatLockdown() then alert:Hide() end
+    Rebuild()
+end)
 
 fl:Header(L["Reminder"])
 fl:Check(L["Reminder popup out of combat"],

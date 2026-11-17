@@ -5,8 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.3.5", date = "2026-11-17", items = {
+        "Bags and Buffs tabs start with a 'Module on' switch (on by default): off keeps the module loaded but it does nothing; no reload needed.",
+        "Fixes a syntax error in 0.3.4 that broke the options window.",
+    } },
     { version = "0.3.4", date = "2026-11-17", items = {
-        "Bags and Buffs tabs start with an 'Enable this module' switch (needs a UI reload; a disabled module keeps its tab so it can be turned back on).",
+        "Module enable switch via the AddOns list (replaced in 0.3.5; this build had an options error).",
     } },
     { version = "0.3.3", date = "2026-11-17", items = {
         "Usable quest items of every active quest are on the panel's left edge (up to 4, selected quest first) instead of the bag list.",
