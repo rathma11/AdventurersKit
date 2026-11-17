@@ -21,7 +21,7 @@ NS.ClearWaypoint, NS.AddQuestTooltip, NS.QuestieAvailable = ClearWaypoint, AddQu
 
 SLASH_QUESTFOCUS1 = "/qf"
 SLASH_QUESTFOCUS2 = "/questfocus"
-SlashCmdList.QUESTFOCUS = function(msg)
+local function SlashHandler(msg)
     local raw = (msg or ""):match("^%s*(.-)%s*$")
     msg = raw:lower()
     if msg == "options" or msg == "config" or msg == "opt" then
@@ -38,6 +38,11 @@ SlashCmdList.QUESTFOCUS = function(msg)
         if NS.ShowCityList then NS.ShowCityList() end
     elseif msg == "cityreset" then
         if NS.ResetCityIgnore then NS.ResetCityIgnore() end
+    elseif msg == "chat" then
+        QuestFocusDB.quietChat = not QuestFocusDB.quietChat
+        Print(L["Chat messages: %s"], QuestFocusDB.quietChat and L["off (only the login line and command replies)"] or L["on"])
+    elseif msg == "notes" or msg == "changelog" then
+        if NS.OpenReleaseNotes then NS.OpenReleaseNotes() end
     elseif msg == "buffreset" then
         if NS.ResetBuffLearn then NS.ResetBuffLearn() end
     elseif msg == "junk" then
@@ -121,5 +126,9 @@ SlashCmdList.QUESTFOCUS = function(msg)
         Print(L["  /qf icon <iconname> - custom icon; /qf icon - automatic"])
         Print(L["  /qf unmark - remove marker"])
         Print(L["  /qf clear - clear selection + marker"])
+        Print(L["  /qf city - city list here; /qf cityreset - clear ignored places"])
+        Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])
     end
 end
+-- a parancsok valasza mindig kikerul a chatre (akkor is, ha a chat uzenetek ki vannak kapcsolva)
+SlashCmdList.QUESTFOCUS = function(msg) NS.Loud(SlashHandler, msg) end

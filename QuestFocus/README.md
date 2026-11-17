@@ -106,6 +106,8 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/qf bags` | toggle the quest item list next to the bags |
 | `/qf city` | list of quests to pick up nearby (city mode list; opens even in an ignored place) |
 | `/qf cityreset` | clear the list of places where the city list is ignored |
+| `/qf chat` | turn chat messages on/off (off: only the login line and command replies) |
+| `/qf notes` | release notes |
 | `/qf junk` | destroy unsellable leftover quest items (asks for each one) |
 | `/qf debug` | diagnostics to chat |
 | `/qf copy` | diagnostics in a selectable text box (Ctrl+C to copy); also the **Copy** button on the Debug tab |
@@ -146,6 +148,10 @@ Hover a row to see the item tooltip. Click it to highlight the item in the bag: 
 
 ## Settings (optional)
 Esc → Options → AddOns → **QuestFocus**, or `/qf options`. New options are off by default.
+
+The settings are grouped into tabs on the left, in this order: General (panel, font size, chat messages, minimap button), Macro & marker, Route & progress, Quest pickup (level range, nearby popup, city mode and ignored places), Zone focus, Bags and Buffs (only when that module is enabled), Release notes and Debug. Every option has a short description under it.
+
+**Chat messages** (General tab, `/qf chat`): when off, QuestFocus writes only one line at login, plus the replies to your own `/qf` commands and button clicks. **Release notes**: `/qf notes`, or the Release notes tab. After an update the login line also shows what's new.
 - **Spell in the macro (tagging):** drag a spell from your spellbook (P) into the slot, or type its name. The QFocus macro then also casts it on the mob after targeting (e.g. Moonfire, Arcane Shot, Shoot). It does not cast at turn-in.
 - **Auto attack:** also starts auto attack after targeting.
 - **Ping the target** and **own arrow** on/off (same as `/qf ping` and `/qf arrow`).

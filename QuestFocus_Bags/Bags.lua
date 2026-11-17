@@ -738,14 +738,15 @@ end
 ---------------------------------------------------------------------------
 -- Kapcsolok a beallitasokban
 ---------------------------------------------------------------------------
-local cbBag = NS.OptCheck(L["Quest item list next to the bags"],
+local page = NS.AddOptionsTab(L["Bags"], 60)
+local fl = NS.OptFlow(page)
+fl:Header(L["Quest items in your bags"])
+fl:Check(L["Quest item list next to the bags"],
     L["While your bags are open (Bagnon or Blizzard), lists your quest items next to them: which quest needs them, "]
-    .. L["how many are surplus, what is in the bank, which ones start a quest. Click a row to select the quest."],
+    .. L["how many are surplus, what is in the bank, which ones start a quest. Click a row to select the quest. Toggle: /qf bags."],
     function() return not QuestFocusDB.noBagList end,
     function(v) QuestFocusDB.noBagList = not v; RefreshBagList() end)
-cbBag:SetPoint("TOPLEFT", NS.optNote, "BOTTOMLEFT", -2, -12)
-
-local cbGlow = NS.OptCheck(L["Color quest items in Bagnon"],
+fl:Check(L["Color quest items in Bagnon"],
     L["Yellow: needed for an active quest. Green: you have enough (objective done, keep it for the turn-in). Blue: starts a quest. Grey: no active quest."],
     function() return not QuestFocusDB.noBagGlow end,
     function(v)
@@ -754,16 +755,13 @@ local cbGlow = NS.OptCheck(L["Color quest items in Bagnon"],
         local B = Bags()
         if B and B.Frames and B.Frames.Update then pcall(B.Frames.Update, B.Frames) end
     end)
-cbGlow:SetPoint("TOPLEFT", cbBag, "BOTTOMLEFT", 0, -6)
-
-local cbUse = NS.OptCheck(L["Quest item button next to the panel"],
+fl:Header(L["Using quest items"])
+fl:Check(L["Quest item button next to the panel"],
     L["If the selected quest needs a usable item (e.g. to throw at a mob), a button appears left of the QuestFocus panel. "]
     .. L["You can bind a key to it: Options > Keybindings > AddOns > QuestFocus."],
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; UpdateUseButton() end)
-cbUse:SetPoint("TOPLEFT", cbGlow, "BOTTOMLEFT", 0, -6)
-NS.optLast = cbUse -- a kovetkezo fajl kapcsoloi ez ala kerulnek
-
-NS.opt:HookScript("OnShow", function()
-    cbBag.refresh(); cbGlow.refresh(); cbUse.refresh()
-end)
+fl:Button(L["Destroy leftover quest items"], 200,
+    L["Unsellable quest items no active quest needs any more. Asks one by one before destroying. Same as /qf junk."],
+    function() if NS.DiscardLeftovers then NS.DiscardLeftovers() end end, 28)
+page:HookScript("OnShow", function() fl:Refresh() end)

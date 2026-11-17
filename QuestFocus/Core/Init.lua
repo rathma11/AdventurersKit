@@ -26,10 +26,25 @@ local state = {
     tomtomUid = nil,
 }
 
-local function Print(msg, ...)
+-- Chat uzenetek: QuestFocusDB.quietChat eseten csak az kerul ki, amit te kertel
+-- (/qf parancsok, gombok: NS.Loud alatt) es a bejelentkezo sor (PrintAlways).
+local loud = 0
+local function PrintAlways(msg, ...)
     if select("#", ...) > 0 then msg = msg:format(...) end
     DEFAULT_CHAT_FRAME:AddMessage(PREFIX .. msg)
 end
+local function Print(msg, ...)
+    if loud == 0 and QuestFocusDB and QuestFocusDB.quietChat then return end
+    PrintAlways(msg, ...)
+end
+-- fn(...) futtatasa ugy, hogy a chat uzenetei akkor is kikeruljenek, ha a chat ki van kapcsolva
+local function Loud(fn, ...)
+    loud = loud + 1
+    local ok, err = pcall(fn, ...)
+    loud = loud - 1
+    if not ok then error(err, 0) end
+end
+NS.Print, NS.PrintAlways, NS.Loud = Print, PrintAlways, Loud
 
 
 -- belso exportok a tobbi core fajlnak

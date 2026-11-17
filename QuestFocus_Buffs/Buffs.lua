@@ -1224,37 +1224,36 @@ NS.MaybePromptFood = MaybePromptFood
 ---------------------------------------------------------------------------
 -- Beallitasok: "Buffs" ful
 ---------------------------------------------------------------------------
-local page = NS.AddOptionsTab(L["Buffs"])
+local page = NS.AddOptionsTab(L["Buffs"], 70)
+local fl = NS.OptFlow(page)
 
-local cbBar = NS.OptCheck(L["Buff buttons under the panel (off by default)"],
-    L["Sleeping bag, XP food and weapon enchant buttons with the time left. Click to use the item. "]
-    .. L["Off by default: the buff frame already shows the timers; the reminder popup works without these."],
-    function() return QuestFocusDB.showBuffBar end,
-    function(v) QuestFocusDB.showBuffBar = v; Rebuild() end, page)
-cbBar:SetPoint("TOPLEFT", page, "TOPLEFT", -2, 0)
-
-local cbWarn = NS.OptCheck(L["Warn before a buff expires"],
-    L["One message (screen + chat) when a buff has less time left than the minutes below."],
+fl:Header(L["Reminder"])
+fl:Check(L["Reminder popup out of combat"],
+    L["When a buff is missing or about to run out, a small popup above the panel shows the item; click its icon to apply it. "]
+    .. L["The X hides it until that buff is applied again."],
+    function() return not QuestFocusDB.noBuffAlert end,
+    function(v) QuestFocusDB.noBuffAlert = not v; wipe(dismissed); lastAlertKey = nil end)
+fl:Check(L["Warn before a buff expires"],
+    L["One chat message when a buff has less time left than its minutes below (needs chat messages on, General tab)."],
     function() return not QuestFocusDB.noBuffWarn end,
-    function(v) QuestFocusDB.noBuffWarn = not v end, page)
-cbWarn:SetPoint("TOPLEFT", cbBar, "BOTTOMLEFT", 0, -6)
+    function(v) QuestFocusDB.noBuffWarn = not v end)
+fl:Check(L["Ask for XP food at login"],
+    L["If no XP food is set but you have food in your bags, a picker opens once after login."],
+    function() return not QuestFocusDB.noFoodPrompt end,
+    function(v) QuestFocusDB.noFoodPrompt = not v end)
 
-local hint = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-hint:SetPoint("TOPLEFT", cbWarn, "BOTTOMLEFT", 2, -12)
-hint:SetWidth(520)
-hint:SetJustifyH("LEFT")
-hint:SetText(L["Items: drag one from your bags onto a slot. Right click: automatic / none. "]
+fl:Header(L["Buffs to watch"])
+fl:Text(L["Items: drag one from your bags onto a slot. Right click: automatic / none. "]
     .. L["Sleeping bag and weapon enchant are found by name if no item is set; XP food must be dragged in once. "]
     .. L["The buff an item gives is learned the first time you use it from the button. "]
     .. L["The number box: warn this many minutes before the buff runs out (Enter to save). "]
-    .. L["Class buffs: by default the one you last had on is cast; drag a spell from your spellbook (P) onto the slot to choose."])
+    .. L["Class buffs: by default the one you last had on is cast; drag a spell from your spellbook (P) onto the slot to choose."], 2)
 
 local slotUI = {}
-local last = hint
 for i, slot in ipairs(SLOTS) do
     local s = CreateFrame("Button", nil, page)
     s:SetSize(34, 34)
-    s:SetPoint("TOPLEFT", last, "BOTTOMLEFT", i == 1 and 2 or 0, i == 1 and -14 or -8)
+    fl:Place(s, 4, i == 1 and 12 or 8)
     s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     s.bg = s:CreateTexture(nil, "BACKGROUND")
     s.bg:SetAllPoints()
@@ -1352,27 +1351,25 @@ for i, slot in ipairs(SLOTS) do
         end
     end)
     slotUI[i] = s
-    last = s
+    fl:OnRefresh(s.refresh)
 end
 
-local cbAlert = NS.OptCheck(L["Reminder popup out of combat"],
-    L["When a buff is missing or about to run out, a small popup above the panel shows the item; click its icon to apply it. "]
-    .. L["The X hides it until that buff is applied again."],
-    function() return not QuestFocusDB.noBuffAlert end,
-    function(v) QuestFocusDB.noBuffAlert = not v; wipe(dismissed); lastAlertKey = nil end, page)
-cbAlert:SetPoint("TOPLEFT", last, "BOTTOMLEFT", -2, -14)
+fl:Button(L["Choose XP food from bags"], 200,
+    L["Lists the food in your bags (XP food first) to pick the one the reminder should use."], ShowFoodPicker, 4)
+fl:Button(L["Forget learned buffs"], 200,
+    L["Forget which buff each item gives; learned again the next time you use it from the button. Same as /qf buffreset."],
+    function() if NS.ResetBuffLearn then NS.ResetBuffLearn() end end, 4)
 
-local pickBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-pickBtn:SetSize(170, 22)
-pickBtn:SetPoint("TOPLEFT", cbAlert, "BOTTOMLEFT", 2, -10)
-pickBtn:SetText(L["Choose XP food from bags"])
-pickBtn:SetScript("OnClick", ShowFoodPicker)
+fl:Header(L["Buttons"])
+fl:Check(L["Buff buttons under the panel"],
+    L["Sleeping bag, XP food and weapon enchant buttons with the time left; click to use the item. "]
+    .. L["Off by default: the buff frame already shows the timers, and the reminder popup works without these."],
+    function() return QuestFocusDB.showBuffBar end,
+    function(v) QuestFocusDB.showBuffBar = v; Rebuild() end)
+fl:Text(L["Tracking (Find Minerals / Find Herbs) can be switched with a key: Options > Keybindings > AddOns > QuestFocus - Buffs."], 2)
 
 NS.RefreshBuffOptions = function()
     for _, s in ipairs(slotUI) do s.refresh() end
 end
 
-page:SetScript("OnShow", function()
-    cbBar.refresh(); cbWarn.refresh(); cbAlert.refresh()
-    for _, s in ipairs(slotUI) do s.refresh() end
-end)
+page:HookScript("OnShow", function() fl:Refresh() end)

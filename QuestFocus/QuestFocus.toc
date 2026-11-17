@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: QuestFocus
 ## Notes: Quest target macro (QFocus), markers, tooltips and quest item tools based on Questie data
-## Version: 0.2.0
+## Version: 0.3.0
 ## OptionalDeps: Questie, TomTom, Bagnon
 ## SavedVariables: QuestFocusDB
 
@@ -30,5 +30,8 @@ Planner\City.lua
 Planner\Suggestions.lua
 Planner\Events.lua
 Planner\Options.lua
+
+# Release notes (Options ful + bejelentkezo sor)
+UI\ReleaseNotes.lua
 
 # Kiegeszitok kulon addonokban: QuestFocus_Bags, QuestFocus_Buffs

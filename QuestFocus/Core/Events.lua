@@ -92,7 +92,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
         C_Timer.After(1, RestorePanelPos)
         InstallHooks()
         if not _G.QuestieLoader then
-            Print(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])
+            NS.PrintAlways(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])
         end
         -- Utolso kijelolt quest visszaallitasa, ha a Questie mar betoltott
         C_Timer.After(8, function()
