@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.7", date = "2026-11-17", items = {
+        "City list title row: Trainer (nearest trainer of your class) and AH (nearest auctioneer) next to Bank; "
+            .. "hover shows the nearest one and its distance, click puts a marker on it.",
+    } },
     { version = "0.6.6", date = "2026-11-17", items = {
         "Fix: 'attempt to call a nil value' in GetItemCount / GetItemInfoInstant (Bags, Buffs). Item lookups now use the "
             .. "C_Item API first and the old one as a fallback, both protected, so a broken item function can't stop the modules.",

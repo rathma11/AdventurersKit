@@ -377,28 +377,37 @@ local function NeedRow(i)
     return r
 end
 
--- Bank gomb a fejlecben (a bezaras mellett)
-city.bankBtn = CreateFrame("Button", nil, city, "UIPanelButtonTemplate")
-city.bankBtn:SetSize(60, 20)
-city.bankBtn:SetPoint("RIGHT", cClose, "LEFT", -4, 0)
-city.bankBtn:SetText(L["Bank"])
-if city.bankBtn:GetFontString() then city.bankBtn:GetFontString():SetFontObject("GameFontNormalSmall") end
-city.bankBtn:SetScript("OnClick", function()
-    local ok, p, d = pcall(NS.NearestTownsfolk, "Banker")
-    if not (ok and p) then
-        NS.Loud(NS.Print, L["No known banker nearby."])
-        return
-    end
-    NS.SetWaypoint(p, p.name)
-    NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%d yd)"], p.name or "?", d or 0)
-end)
-city.bankBtn:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText(L["Bank"], 1, 1, 1)
-    GameTooltip:AddLine(L["Marker on the nearest banker."], 0.8, 0.8, 0.8)
-    GameTooltip:Show()
-end)
-city.bankBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+-- Fejlec gombok (a bezaras mellett, jobbrol balra): Bank, aukcioshaz, class trainer.
+-- Kattintasra marker a legkozelebbire (Questie town data, a sajat frakciod).
+local function HeadBtn(text, width, kind, tipTitle, tipText, anchor)
+    local b = CreateFrame("Button", nil, city, "UIPanelButtonTemplate")
+    b:SetSize(width, 20)
+    b:SetPoint("RIGHT", anchor, "LEFT", -4, 0)
+    b:SetText(text)
+    if b:GetFontString() then b:GetFontString():SetFontObject("GameFontNormalSmall") end
+    b:SetScript("OnClick", function()
+        local ok, p, d = pcall(NS.NearestTownsfolk, kind)
+        if not (ok and p) then
+            NS.Loud(NS.Print, L["No known %s nearby (Questie may still be loading its town data)."], tipTitle)
+            return
+        end
+        NS.SetWaypoint(p, p.name)
+        NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%d yd)"], p.name or "?", d or 0)
+    end)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(tipTitle, 1, 1, 1)
+        local ok, p, d = pcall(NS.NearestTownsfolk, kind)
+        if ok and p then GameTooltip:AddLine((L["Nearest: %s (%d yd)"]):format(p.name or "?", d or 0), 0.8, 0.8, 0.8) end
+        GameTooltip:AddLine(tipText, 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+city.bankBtn = HeadBtn(L["Bank"], 46, "Banker", L["Banker"], L["Click: marker on the nearest banker."], cClose)
+city.ahBtn = HeadBtn(L["AH"], 36, "Auctioneer", L["Auction House"], L["Click: marker on the nearest auctioneer."], city.bankBtn)
+city.trainerBtn = HeadBtn(L["Trainer"], 58, "Class Trainer", L["Class trainer"], L["Click: marker on the nearest trainer of your class."], city.ahBtn)
 
 local function InCity() return IsResting and IsResting() end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end

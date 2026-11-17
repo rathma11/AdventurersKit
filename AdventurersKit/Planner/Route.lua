@@ -142,6 +142,12 @@ local function FolkIds(kind)
         return db and type(db.vendorList) == "table" and db.vendorList[kind]
     end
     local T = NS.Module("Townsfolk")
+    if kind == "Class Trainer" then
+        -- a sajat classod trainerei (Questie: classSpecificTownsfolk[CLASS]["Class Trainer"])
+        local cls = select(2, UnitClass("player"))
+        local c = T and type(T.classSpecificTownsfolk) == "table" and T.classSpecificTownsfolk[cls]
+        return c and c["Class Trainer"]
+    end
     return T and type(T.townsfolk) == "table" and T.townsfolk[kind]
 end
 NS.NearestTownsfolk = function(kind)
