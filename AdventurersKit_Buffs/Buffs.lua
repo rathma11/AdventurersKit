@@ -2069,7 +2069,8 @@ RefreshList = function()
     -- harom szegmens: itemek (alvozsak, XP kaja, fegyver), class buffok, egyeb (Add buff)
     local GROUPS = {
         { title = L["Items: sleeping bag, XP food, weapon enchants"], test = function(s) return not s.custom and not s.isClass end },
-        { title = L["Class buffs"], test = function(s) return s.isClass and not s.custom end },
+        { title = L["Class buffs"], test = function(s) return s.isClass and not s.custom and not s.tracking end },
+        { title = L["Tracking (minimap: herbs, minerals, fish, beasts...)"], test = function(s) return s.tracking end },
         { title = L["Other (added by you)"], test = function(s) return s.custom end },
     }
     listFrame.headers = listFrame.headers or {}

@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.33", date = "2026-11-17", items = {
+        "Buffs tab: Tracking has its own section (it's not a class buff).",
+    } },
     { version = "0.6.32", date = "2026-11-17", items = {
         "Buff reminder Tracking row: if you know Find Minerals / Find Herbs / Find Fish, only these count and the reminder "
             .. "casts one of them (other tracking like Track Beasts doesn't silence it). Switch on the Buffs tab (Other).",
