@@ -62,15 +62,25 @@ local CLASS_BUFFS = {
     },
 }
 local _, PLAYER_CLASS = UnitClass("player")
+-- Kovetes (tracking): mindenkinek, ha ismer ilyet. Classicban egyszerre csak EGY lehet aktiv
+-- (pl. Find Minerals vagy Find Herbs); a nyillal / a "Switch tracking" billentyuvel valthato.
+local TRACKING = { key = "c_track", label = L["Tracking"], permanent = true, tracking = true,
+    spells = { "Find Minerals", "Find Herbs", "Find Treasure", "Find Fish",
+               "Track Beasts", "Track Humanoids", "Track Undead", "Track Demons", "Track Elementals",
+               "Track Giants", "Track Dragonkin", "Track Hidden", "Sense Undead", "Sense Demons" } }
+CLASS_BUFFS.ALL = { TRACKING }
+
 -- Minden class buff neve (barmelyik classe): ilyen nem lehet egy item "megtanult" buffja
 local CLASS_SPELL_SET = {}
 for _, list in pairs(CLASS_BUFFS) do
     for _, s in ipairs(list) do for _, n in ipairs(s.spells) do CLASS_SPELL_SET[n] = true end end
 end
-for _, s in ipairs(CLASS_BUFFS[PLAYER_CLASS] or {}) do
-    s.names = {}
-    s.isClass = true
-    SLOTS[#SLOTS + 1] = s
+for _, list in ipairs({ CLASS_BUFFS[PLAYER_CLASS] or {}, CLASS_BUFFS.ALL }) do
+    for _, s in ipairs(list) do
+        s.names = {}
+        s.isClass = true
+        SLOTS[#SLOTS + 1] = s
+    end
 end
 
 local function DB()
@@ -186,6 +196,10 @@ end
 
 -- Hatralevo mp (nil = nincs buff, math.huge = nem jar le), masodik ertek: stackek szama
 local function Remaining(slot, itemId, auras)
+    if slot.tracking then
+        -- nem buff, hanem a minimap kovetes: lent (NS.TrackingRemaining)
+        return NS.TrackingRemaining and NS.TrackingRemaining(slot)
+    end
     if slot.isClass then
         for _, name in ipairs(slot.spells) do
             local a = auras[name]
@@ -264,6 +278,42 @@ local function SpellIconOf(name)
         return GetSpellTexture(name)
     end)
     return ok and tex or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+-- Aktiv kovetes (tracking) neve vagy ikonja
+local function ActiveTracking()
+    local tex
+    if GetTrackingTexture then
+        local ok, t = pcall(GetTrackingTexture)
+        if ok then tex = t end
+    end
+    if not tex and C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo then
+        local ok, n = pcall(C_Minimap.GetNumTrackingTypes)
+        for i = 1, (ok and n or 0) do
+            local ok2, a, b, c = pcall(C_Minimap.GetTrackingInfo, i)
+            if ok2 then
+                if type(a) == "table" then
+                    if a.active then return a.name, a.texture end
+                elseif c then
+                    return a, b -- name, texture, active
+                end
+            end
+        end
+    end
+    return nil, tex
+end
+
+NS.TrackingRemaining = function(slot)
+    local name, tex = ActiveTracking()
+    if not (name or tex) then return end
+    for _, s in ipairs(slot.spells) do
+        if s == name or (tex and SpellKnown(s) and SpellIconOf(s) == tex) then
+            QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
+            QuestFocusDB.classSeen[slot.key] = s
+            return math.huge
+        end
+    end
+    return math.huge -- valami mas kovetes aktiv (pl. masik addonbol): nem szolunk
 end
 
 -- Melyik spellt tegyuk fel: beallitott > legutobb rajtad latott > az elso ismert
@@ -994,6 +1044,30 @@ local function ShowFoodPicker()
     picker:Show()
 end
 NS.ShowFoodPicker = ShowFoodPicker
+
+---------------------------------------------------------------------------
+-- Kovetes valto billentyu: /castsequence Find Minerals, Find Herbs - minden nyomasra a masikra
+-- valt (harcban is mukodik, mert a sorrendet a jatek viszi, nem az addon)
+---------------------------------------------------------------------------
+_G["BINDING_NAME_CLICK QuestFocusTrackToggle:LeftButton"] = L["Switch tracking (Find Minerals / Find Herbs)"]
+local trackBtn = CreateFrame("Button", "QuestFocusTrackToggle", UIParent, "SecureActionButtonTemplate")
+trackBtn:RegisterForClicks("AnyUp", "AnyDown")
+local function SetupTrackToggle()
+    if InCombatLockdown() then return end
+    local known = {}
+    for _, s in ipairs({ "Find Minerals", "Find Herbs" }) do
+        if SpellKnown(s) then known[#known + 1] = s end
+    end
+    if #known == 0 then trackBtn:SetAttribute("type", nil) return end
+    trackBtn:SetAttribute("type", "macro")
+    trackBtn:SetAttribute("macrotext", #known == 2 and ("/castsequence " .. known[1] .. ", " .. known[2])
+        or ("/cast " .. known[1]))
+end
+local trackEv = CreateFrame("Frame")
+trackEv:RegisterEvent("PLAYER_LOGIN")
+trackEv:RegisterEvent("SPELLS_CHANGED")
+trackEv:RegisterEvent("PLAYER_REGEN_ENABLED")
+trackEv:SetScript("OnEvent", function() C_Timer.After(2, SetupTrackToggle) end)
 
 ---------------------------------------------------------------------------
 -- Flyout (oldalra nyilo ikonsor) a buff emlekezteto soraihoz: alternativak

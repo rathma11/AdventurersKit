@@ -60,6 +60,9 @@ When a marker is placed, the addon compares walking with your Hearthstone and wi
 - **Hearth home:** if completed quests can be turned in where your Hearthstone takes you, the panel shows e.g. "Hearth home: 3 quests to turn in at Booty Bay", with the cooldown if there is one. Hover it to see which quests. It shows from 1 quest in turn-in mode, otherwise from 2, and only when you are far from your Hearthstone location.
 - **Flight:** uses the flight points you know, if the client provides them (`C_TaxiMap`). The flight time is estimated in a straight line.
 
+### Tracking (Find Minerals / Find Herbs)
+If you know a tracking spell and none is active, the buff reminder shows it; the arrow switches between them. In Classic only one tracking can be active at a time, and an addon cannot switch them on its own. Instead there is a keybinding: Options > Keybindings > AddOns > QuestFocus > **Switch tracking**. Each press switches between Find Minerals and Find Herbs (`/castsequence`), and it works in combat too.
+
 ### Buff reminders
 Watched buffs (warning + reminder popup). An optional row of buttons under the panel is **off by default**, because the buff frame already shows the timers; turn it on on the Buffs tab:
 - **Sleeping bag:** found in your bags by name. The buff is spell 429959 and needs **3 stacks**. The button shows the stacks (e.g. `54m 2/3`), and fewer than 3 counts as low, the same as an expiring buff.
@@ -92,6 +95,7 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/qf city` | list of quests to pick up nearby (city mode list) |
 | `/qf junk` | destroy unsellable leftover quest items (asks for each one) |
 | `/qf debug` | diagnostics to chat |
+| `/qf copy` | diagnostics in a selectable text box (Ctrl+C to copy); also the **Copy** button on the Debug tab |
 | `/qf spell <name>` | tag spell in the macro (e.g. `/qf spell Moonfire`); `/qf spell` = clear, `/qf spell off` = disable |
 | `/qf next` | next objective (marker + macro); worth putting in a macro too |
 | `/qf all` | macro for all remaining mobs |

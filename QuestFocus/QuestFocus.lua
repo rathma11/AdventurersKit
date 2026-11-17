@@ -2150,8 +2150,73 @@ dbgChat:SetSize(120, 22)
 dbgChat:SetPoint("LEFT", dbgRefresh, "RIGHT", 6, 0)
 dbgChat:SetText(L["Print to chat"])
 dbgChat:SetScript("OnClick", function() for _, l in ipairs(DebugLines()) do Print(l) end end)
+-- Masolas: addon nem irhat a vagolapra, ezert egy kijelolheto szovegmezobe tesszuk
+-- (mar kijelolve), amibol Ctrl+C-vel ki lehet masolni
+local copyFrame = CreateFrame("Frame", "QuestFocusCopyFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+copyFrame:SetSize(560, 380)
+copyFrame:SetPoint("CENTER")
+copyFrame:SetFrameStrata("FULLSCREEN_DIALOG")
+copyFrame:EnableMouse(true)
+copyFrame:SetMovable(true)
+copyFrame:RegisterForDrag("LeftButton")
+copyFrame:SetScript("OnDragStart", copyFrame.StartMoving)
+copyFrame:SetScript("OnDragStop", copyFrame.StopMovingOrSizing)
+copyFrame:Hide()
+if copyFrame.SetBackdrop then
+    copyFrame:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 16, edgeSize = 20,
+        insets = { left = 5, right = 5, top = 5, bottom = 5 },
+    })
+    copyFrame:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
+    copyFrame:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
+end
+local copyTitle = copyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+copyTitle:SetPoint("TOPLEFT", 14, -12)
+copyTitle:SetText(L["QuestFocus debug - press Ctrl+C to copy, then Esc"])
+local copyClose = CreateFrame("Button", nil, copyFrame, "UIPanelCloseButton")
+copyClose:SetPoint("TOPRIGHT", -4, -4)
+local copyScroll = CreateFrame("ScrollFrame", "QuestFocusCopyScroll", copyFrame, "UIPanelScrollFrameTemplate")
+copyScroll:SetPoint("TOPLEFT", 14, -36)
+copyScroll:SetPoint("BOTTOMRIGHT", -32, 14)
+local copyBox = CreateFrame("EditBox", nil, copyScroll)
+copyBox:SetMultiLine(true)
+copyBox:SetFontObject(ChatFontNormal)
+copyBox:SetWidth(500)
+copyBox:SetAutoFocus(false)
+copyBox:SetScript("OnEscapePressed", function() copyFrame:Hide() end)
+-- csak olvashato: ha atirnad, visszaallitjuk
+copyBox:SetScript("OnTextChanged", function(self, user)
+    if user and self.text then self:SetText(self.text); self:HighlightText() end
+end)
+copyScroll:SetScrollChild(copyBox)
+
+local function PlainText(s)
+    return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""))
+end
+
+local function ShowCopy()
+    local lines = {}
+    for _, l in ipairs(DebugLines()) do lines[#lines + 1] = PlainText(l) end
+    local text = table.concat(lines, "\n")
+    copyBox.text = text
+    copyBox:SetText(text)
+    copyFrame:Show()
+    copyBox:SetFocus()
+    copyBox:HighlightText()
+    copyScroll:SetVerticalScroll(0)
+end
+NS.ShowCopy = ShowCopy
+
+local dbgCopy = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
+dbgCopy:SetSize(80, 22)
+dbgCopy:SetPoint("LEFT", dbgChat, "RIGHT", 6, 0)
+dbgCopy:SetText(L["Copy"])
+dbgCopy:SetScript("OnClick", ShowCopy)
+
 local dbgLive = OptLabel(pageDebug, L["Live: refreshes every 0.5 s while open."], "GameFontDisableSmall")
-dbgLive:SetPoint("LEFT", dbgChat, "RIGHT", 10, 0)
+dbgLive:SetPoint("LEFT", dbgCopy, "RIGHT", 10, 0)
 
 local cbErrors = OptCheck(L["Lua error popup for QuestFocus errors"],
     L["Off: QuestFocus errors don't open the error window, they are only listed here (and one line in chat). "]
@@ -2214,6 +2279,8 @@ SlashCmdList.QUESTFOCUS = function(msg)
         OpenOptions()
     elseif msg == "debug" then
         for _, l in ipairs(DebugLines()) do Print(l) end
+    elseif msg == "copy" then
+        ShowCopy()
     elseif msg == "zone" then
         ToggleZoneFocus()
     elseif msg == "bags" then
