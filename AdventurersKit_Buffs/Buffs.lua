@@ -1120,9 +1120,18 @@ local function OutsideWarnings()
     -- Kint csak akkor szolunk, ha tenyleg fogy a hely (kevesebb szabad hely, mint a kuszob, vagy
     -- tele): a szazalek magaban meg nem ok egy hosszu utra. Ha arus van a kozelben, a
     -- "Vendor nearby" sor ugyis szol (mar felig tele taskanal).
-    local urgent = free == 0 or (freeLimit > 0 and free < freeLimit)
-        or (pctLimit > 0 and used >= pctLimit and freeLimit <= 0)
+    -- Lepcsozetes: minel telibb a taska, annal messzebbi arusert is megeri elmenni.
+    --   70%+: arus 100 yd-on belul, 80%+: 400 yd, 90%+: 600 yd, 95%+ (vagy kevesebb szabad
+    --   hely a kuszobnel / tele): mindig, a legkozelebbit mutatja
+    local reach
+    if free == 0 or used >= 95 or (freeLimit > 0 and free < freeLimit) then reach = math.huge
+    elseif used >= 90 then reach = 600
+    elseif used >= 80 then reach = 400
+    elseif pctLimit > 0 and used >= pctLimit then reach = 100 end
+    local urgent = reach and (reach == math.huge or (v.anyD and v.anyD <= reach))
+    local bagsShown = false
     if total > 0 and urgent then
+        bagsShown = true
         local far = v.anyD and (" - " .. (L["nearest vendor %d yd"]):format(math.floor(v.anyD + 0.5))) or ""
         out[#out + 1] = { slot = WARN_BAGS, status = free == 0 and L["full"] or L["filling up"],
             info = (L["%d%% used, %d free"]):format(used, free) .. far }
@@ -1142,7 +1151,8 @@ local function OutsideWarnings()
         dismissed.w_repair = nil
     end
     -- arus a kozelben: ha a taska legalabb felig tele, vagy javitani kellene (es itt lehet)
-    local wantSell = total > 0 and used >= VENDOR_BAG_PCT and v.sell
+    -- (ha a Bags sor mar kint van, az mutatja az arust: itt csak a javitas miatt szolunk)
+    local wantSell = total > 0 and used >= VENDOR_BAG_PCT and v.sell and not bagsShown
     local wantRep = worst and worst < VENDOR_REPAIR and v.rep
     if wantSell or wantRep then
         local p, d = wantRep and v.rep or v.sell, wantRep and v.repD or v.sellD
