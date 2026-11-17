@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.64", date = "2026-11-17", items = {
+        "Sleeping bag: the city list no longer flashes up for a moment right after you lie down.",
+    } },
     { version = "0.6.63", date = "2026-11-17", items = {
         "Lying in a sleeping bag out in the world no longer counts as being in town: the city list doesn't open, and "
             .. "the outside warnings (bags filling up, repair, vendor nearby) still show. Near an innkeeper it's town as before.",

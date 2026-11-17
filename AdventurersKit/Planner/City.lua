@@ -794,9 +794,13 @@ end
 -- Alvozsak (Cozy Sleeping Bag, buff 429959): kint a vilagban is "resting"-et ad, az nem varos.
 -- Harcban az aurak secret ertekek: ott a legutobbi (harcon kivuli) eredmeny marad.
 local SLEEP_BAG_ID = 429959
-local bagRest, bagRestAt = false, -10
+local bagRest, bagRestAt, bagRestWas = false, -10, nil
 local function SleepingBagRest()
-    if InCombatLockdown() or GetTime() - bagRestAt < 2 then return bagRest end
+    if InCombatLockdown() then return bagRest end
+    -- pihenes allapot valtozott (lefekudtel / felalltal): ne a regi cache-bol valaszoljon
+    local resting = IsResting and IsResting() or false
+    if resting == bagRestWas and GetTime() - bagRestAt < 2 then return bagRest end
+    bagRestWas = resting
     bagRestAt = GetTime()
     local found = false
     pcall(function()
