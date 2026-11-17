@@ -359,6 +359,38 @@ local function MarkObjective(i)
         dist and (" (%d yd)"):format(dist) or "")
 end
 
+-- A quest log-ban (es a terkep melletti quest panelen, ami ezt koveti) a quest kijelolese:
+-- a fejlecet, ami alatt van, kinyitjuk (a tobbi osszecsukott fejlec ugy marad).
+local function FocusInQuestLog(qid)
+    if not qid or not GetNumQuestLogEntries or not GetQuestLogTitle then return end
+    local function QidAt(i) return select(8, GetQuestLogTitle(i)) end
+    local function Find()
+        for i = 1, (GetNumQuestLogEntries()) do
+            if QidAt(i) == qid then return i end
+        end
+    end
+    local idx = Find()
+    if not idx and ExpandQuestHeader then
+        -- osszecsukott fejlecek egyenkent: ha nem ott van, visszacsukjuk
+        local i = 1
+        while i <= (GetNumQuestLogEntries()) do
+            local _, _, _, isHeader, isCollapsed = GetQuestLogTitle(i)
+            if isHeader and isCollapsed then
+                ExpandQuestHeader(i)
+                idx = Find()
+                if idx then break end
+                if CollapseQuestHeader then CollapseQuestHeader(i) end
+            end
+            i = i + 1
+        end
+    end
+    if not idx then return end
+    if SelectQuestLogEntry then pcall(SelectQuestLogEntry, idx) end
+    if C_QuestLog and C_QuestLog.SetSelectedQuest then pcall(C_QuestLog.SetSelectedQuest, qid) end
+    return idx
+end
+NS.FocusInQuestLog = FocusInQuestLog
+
 -- Terkep gomb (panel cim / objective sor): a cel helye a vilagterkepen. A markert akkor is
 -- lerakja, ha a teruleten vagy (ott a "nem kell marker" itt nem szamit), es a terkepet a
 -- cel zonajan nyitja meg. i = objective index, nil = a hatralevo objective-ek.
@@ -385,6 +417,7 @@ local function ShowObjectiveOnMap(i)
     if not wm then return end
     -- ha a kliensnek van terkep melletti quest panelje: azon a fokuszalt quest reszletei
     -- nyiljanak meg (kulonben csak a sima terkep)
+    FocusInQuestLog(state.questId)
     local qd = _G.QuestMapFrame_OpenToQuestDetails
     if qd and state.questId then
         pcall(qd, state.questId)

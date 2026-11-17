@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.5.5", date = "2026-11-17", items = {
+        "Map button: the focused quest's zone header is expanded and the quest is selected in the quest log "
+            .. "(the quest list next to the map follows it); other collapsed headers stay collapsed.",
+    } },
     { version = "0.5.4", date = "2026-11-17", items = {
         "Map button also opens the focused quest in the map's quest panel, when the client has one.",
     } },
