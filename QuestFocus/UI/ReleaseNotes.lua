@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.4", date = "2026-11-17", items = {
+        "XP food picker lists only XP food (food whose description mentions experience); others can still be dragged onto the XP food icon.",
+        "Hunters: main / off-hand enchant are off by default (tick them on the Buffs tab if you want them).",
+    } },
     { version = "0.4.3", date = "2026-11-17", items = {
         "Usable quest items: only for the selected quest and nearby objectives, as a small button at the end of the objective row on the panel.",
         "ALSO NEARBY row click: focuses that quest and that objective (marker + arrow + macro).",

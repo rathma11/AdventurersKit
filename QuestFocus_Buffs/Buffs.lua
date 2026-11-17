@@ -18,6 +18,10 @@ local SLOTS = {
     { key = "weapon_off", label = L["Off-hand enchant"], hand = 17,
       names = { L["Sharpening Stone"], L["Weightstone"], L["Wizard Oil"], L["Mana Oil"] }, warn = 1 },
 }
+-- Hunter: a fegyver enchant (main / off hand) alapbol ki van kapcsolva (ranged); bepipalhato.
+if select(2, UnitClass("player")) == "HUNTER" then
+    for _, s in ipairs(SLOTS) do if s.hand then s.defaultOff = true end end
+end
 -- Rogue: poisonok is (a nev alapjan keressuk a taskaban; kattintasra a fegyverre teszi)
 if select(2, UnitClass("player")) == "ROGUE" then
     for _, s in ipairs(SLOTS) do
@@ -106,6 +110,18 @@ local function DB()
     QuestFocusDB.buffItems = QuestFocusDB.buffItems or {}
     QuestFocusDB.buffLearn = QuestFocusDB.buffLearn or {}
     return QuestFocusDB
+end
+
+-- Ki van-e kapcsolva a tipus: noBuff_<key> = true (ki) / false (kifejezetten be) / nil (alap:
+-- slot.defaultOff, pl. hunter fegyver enchant). slot lehet a slot vagy a kulcsa.
+NS.BuffSlotOff = function(slot)
+    if type(slot) == "string" then
+        for _, s in ipairs(SLOTS) do if s.key == slot then slot = s break end end
+        if type(slot) == "string" then return DB()["noBuff_" .. slot] == true end
+    end
+    local v = DB()["noBuff_" .. slot.key]
+    if v == nil then return slot.defaultOff and true or false end
+    return v and true or false
 end
 
 -- Figyelmeztetesi kuszob percben, buffonkent (alap: slot.warn). 0 = csak ha hianyzik.
@@ -426,7 +442,7 @@ end
 
 -- Mivel lehet "megjavitani" a slotot: { kind = "item", id } vagy { kind = "spell", name }
 local function Action(slot)
-    if DB()["noBuff_" .. slot.key] then return end
+    if NS.BuffSlotOff(slot) then return end
     if slot.customSpell then
         -- csak ha te tudod castolni (kulonben az emlekezteto csak szol, gomb nelkul)
         local known = (slot.buffSpellId and IsPlayerSpell and IsPlayerSpell(slot.buffSpellId))
@@ -514,7 +530,7 @@ NS.BuffDebugLines = function()
             learned or (slot.isClass and "class" or "-"),
             left and (left == math.huge and "on" or ("%ds"):format(left)) or "|cffff4444none|r",
             slot.stacks and (" stacks " .. tostring(stacks or 0) .. "/" .. slot.stacks) or "",
-            DB()["noBuff_" .. slot.key] and " |cff808080(off)|r" or "",
+            NS.BuffSlotOff(slot) and " |cff808080(off)|r" or "",
             NS.buffDismissed and NS.buffDismissed[slot.key] and " |cff808080(closed with X)|r" or "")
     end
     return out
@@ -741,7 +757,7 @@ local function UpdateAlert(auras)
             and (not left or (left ~= math.huge and left < limit) or short) then
             need[#need + 1] = { slot = slot, action = a, left = left, stacks = stacks }
             key = key .. slot.key .. tostring(a.id or a.name) .. ";"
-        elseif not a and slot.key == "food" and not left and not DB().noBuff_food then
+        elseif not a and slot.key == "food" and not left and not NS.BuffSlotOff("food") then
             -- nincs XP kaja a taskaban: csak szolunk, gomb nelkul
             need[#need + 1] = { slot = slot, left = nil, info = L["no XP food in your bags - buy some at a vendor, or cook one if you can"] }
             key = key .. "food:none;"
@@ -1016,7 +1032,7 @@ local function PickRow(i)
     hl:SetColorTexture(1, 1, 1, 0.1)
     r:SetScript("OnClick", function(self)
         DB().buffItems.food = self.itemId
-        DB().noBuff_food = nil
+        DB().noBuff_food = false
         picker:Hide()
         Print((L["XP food set: %s"]):format(GetItemInfo(self.itemId) or self.itemId))
         lastAlertKey = nil
@@ -1051,13 +1067,17 @@ local function ShowFoodPicker()
         r:Show()
         y = y - 24
     end
+    -- csak az XP kajak (amiknek a leirasaban experience / XP van); sima kaja nem kell ide.
+    -- Ha a felismeres nem talal valamit, az item az ikonra huzva akkor is beallithato.
     for _, id in ipairs(xp) do add(id, true) end
-    for _, id in ipairs(other) do add(id, false) end
+    picker.empty:SetText(L["No XP food in your bags (food whose description mentions experience). You can still drag one onto the XP food icon in Options > Buffs."])
+    picker.empty:SetWidth(250)
+    picker.empty:SetJustifyH("LEFT")
     picker.empty:SetShown(n == 0)
     if n == 0 then
         picker.empty:ClearAllPoints()
         picker.empty:SetPoint("TOPLEFT", 14, y)
-        y = y - 20
+        y = y - 40
     end
     pNever:ClearAllPoints()
     pNever:SetPoint("TOPRIGHT", picker, "TOPRIGHT", -14, y - 6)
@@ -1164,7 +1184,7 @@ local function FlyBtn(i)
             QuestFocusDB.classPref[s.key] = a.name
         else
             DB().buffItems[s.key] = a.id
-            DB()["noBuff_" .. s.key] = nil
+            DB()["noBuff_" .. s.key] = false
             if s.key == "food" then StartLearning(a.id) end
         end
     end)
@@ -1205,9 +1225,9 @@ end
 
 -- Bejelentkezes utan egyszer felajanljuk, ha nincs XP kaja beallitva, de van etel a taskaban
 local function MaybePromptFood()
-    if InCombatLockdown() or not On() or QuestFocusDB.noFoodPrompt or DB().buffItems.food or DB().noBuff_food then return end
-    local xp, other = FoodCandidates()
-    if #xp + #other == 0 then return end
+    if InCombatLockdown() or not On() or QuestFocusDB.noFoodPrompt or DB().buffItems.food or NS.BuffSlotOff("food") then return end
+    local xp = FoodCandidates()
+    if #xp == 0 then return end
     ShowFoodPicker()
 end
 NS.MaybePromptFood = MaybePromptFood
@@ -1247,7 +1267,7 @@ fl:Text(L["Tick what you want watched. Icon: click to choose (food, stone / oil 
 
 local function Watched(slot)
     if slot.custom then return true end
-    return not DB()["noBuff_" .. slot.key]
+    return not NS.BuffSlotOff(slot)
 end
 
 local function AfterChange()
@@ -1373,7 +1393,7 @@ local function GetRow(i)
     r.check:SetScript("OnClick", function(self)
         local s = r.slot
         if not s or s.custom then return end
-        DB()["noBuff_" .. s.key] = (not self:GetChecked()) or nil
+        DB()["noBuff_" .. s.key] = not self:GetChecked()
         chooser:Hide()
         AfterChange()
         RefreshList()
