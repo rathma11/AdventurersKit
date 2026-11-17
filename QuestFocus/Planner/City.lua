@@ -5,7 +5,7 @@ local P = NS.P
 local announced, BuildPickups, EstimateQuestTime, FormatTime, NEARBY_RADIUS, qpop, ShowQuestPopup, state = P.announced, P.BuildPickups, P.EstimateQuestTime, P.FormatTime, P.NEARBY_RADIUS, P.qpop, P.ShowQuestPopup, P.state
 
 local CITY_RADIUS, CITY_MAX, CITY_VISIBLE, CITY_ROW_H = 600, 40, 12, 19
-local CITY_W = 470
+local CITY_W = 500
 
 ---------------------------------------------------------------------------
 -- Quest extra info: XP jutalom (Questie QuestXP), lanc pozicio (preQuestSingle /
@@ -170,6 +170,24 @@ city.disableBtn:SetScript("OnEnter", function(self)
     NS.TT.Finish(tt)
 end)
 city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+city.dungeonBtn = MakeBtn("    " .. L["Start dungeon"], 124)
+city.dungeonBtn:SetPoint("BOTTOMRIGHT", city, "BOTTOMRIGHT", -12, 12)
+do
+    local ic = city.dungeonBtn:CreateTexture(nil, "OVERLAY")
+    ic:SetSize(14, 14)
+    ic:SetPoint("LEFT", 6, 0)
+    ic:SetTexture(NS.DUNGEON_ICON)
+    ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+end
+city.dungeonBtn:SetScript("OnClick", function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
+city.dungeonBtn:SetScript("OnEnter", function(self)
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Start dungeon"])
+    NS.TT.Note(tt, NS.HasDungeonJournal() and L["Dungeons for your level and their quests; click one to open it in Dungeon Journal."]
+        or L["Dungeons for your level and their quests (click: marker on the quest giver)."])
+    NS.TT.Finish(tt)
+end)
+city.dungeonBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+city.dungeonBtn:Hide()
 
 -- Gorgetheto tartalom (egergorgo + csuszka)
 local cScroll = CreateFrame("ScrollFrame", "QuestFocusCityScroll", city, "UIPanelScrollFrameTemplate")
@@ -200,6 +218,9 @@ local function CityRow(i)
     r.right:SetPoint("RIGHT")
     r.right:SetWidth(126)
     r.right:SetJustifyH("RIGHT")
+    -- dungeon quest: kis "Start dungeon" gomb a sor jobb oldalan (az XP / tavolsag elott)
+    r.dBtn = NS.MakeDungeonButton(r, 14)
+    r.dBtn:SetPoint("RIGHT", r, "RIGHT", -128, 0)
     r.bg = r:CreateTexture(nil, "BACKGROUND")
     r.bg:SetAllPoints()
     r.bg:Hide()
@@ -237,6 +258,7 @@ local function RefreshCityList()
     if not ok or not list then return end
     for _, r in ipairs(cityRows) do r:Hide() end
     local y, n = 0, 0
+    local anyDungeon = false
     for _, d in ipairs(list) do
         if d.dist > CITY_RADIUS or n >= CITY_MAX then break end
         n = n + 1
@@ -248,18 +270,23 @@ local function RefreshCityList()
         local col = GetQuestDifficultyColor and d.level and GetQuestDifficultyColor(d.level)
         local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
         local tags = ""
-        -- dungeon / raid quest: halvany voros (raid: lila) hatter a soron
-        local dAbbr, dRaid = NS.QuestDungeon(d.quest)
+        -- dungeon / raid quest: halvany voros (raid: lila) hatter a soron + Start dungeon gomb
+        local dAbbr, dRaid = NS.QuestDungeon(d.quest, d.qid)
+        r.text:SetPoint("RIGHT", dAbbr and -146 or -128, 0)
         if dAbbr then
             r.bg:SetColorTexture(dRaid and 0.55 or 0.75, 0.2, dRaid and 0.85 or 0.1, 0.18)
             r.bg:Show()
+            r.dBtn.qid, r.dBtn.dungeon = d.qid, dAbbr
+            r.dBtn:Show()
+            anyDungeon = true
         else
             r.bg:Hide()
+            r.dBtn:Hide()
         end
-        if info.chainPos then tags = tags .. (" |cffb48cff%d/%d|r"):format(info.chainPos, info.chainLen) end
+        if info.chainPos then tags = tags .. (" %s|cffb48cff%d/%d|r"):format(NS.ChainMarkup(), info.chainPos, info.chainLen) end
         if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
         r.text:SetText(("%s[%s]|r %s%s%s|r%s  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
-            NS.DungeonTag(d.quest), hex, d.name or "?", tags, FormatTime(EstimateQuestTime(d.quest))))
+            NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", tags, FormatTime(EstimateQuestTime(d.quest))))
         r.right:SetText(("|cffd8c070%s|r  |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", cContent, "TOPLEFT", 0, y)
@@ -281,6 +308,8 @@ local function RefreshCityList()
     city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, -38 - visH - 20)
     city.disableBtn:ClearAllPoints()
     city.disableBtn:SetPoint("LEFT", city.ignoreBtn, "RIGHT", 6, 0)
+    -- van dungeon quest a listaban: Start dungeon gomb is
+    city.dungeonBtn:SetShown(anyDungeon)
     city:SetHeight(38 + visH + 52)
     if not city:IsShown() and not city.closedHere then city:Show() end
 end

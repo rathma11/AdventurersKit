@@ -77,10 +77,12 @@ if panel.SetBackdrop then
 end
 panel:Hide()
 
--- Fejlec: ikon + cim + alcim
+-- Fejlec: legfelul ikonsor (options, dungeon, fokusz torles, X), alatta ikon + cim + alcim.
+-- HEAD: ennyivel csuszik lejjebb minden az ikonsor miatt.
+local HEAD = 16
 local iconFrame = CreateFrame("Frame", nil, panel, BackdropTemplateMixin and "BackdropTemplate" or nil)
 iconFrame:SetSize(30, 30)
-iconFrame:SetPoint("TOPLEFT", 11, -11)
+iconFrame:SetPoint("TOPLEFT", 11, -11 - HEAD)
 if iconFrame.SetBackdrop then
     iconFrame:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10 })
     iconFrame:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3], 0.9)
@@ -93,19 +95,19 @@ panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
 
 panel.title = panel:CreateFontString(nil, "OVERLAY", "QuestFocusFontTitle")
 panel.title:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 8, -1)
-panel.title:SetWidth(PANEL_W - 80)
+panel.title:SetWidth(PANEL_W - 80) -- a vegen a fokusz torles gomb
 panel.title:SetJustifyH("LEFT")
 panel.title:SetWordWrap(false)
 panel.title:SetTextColor(1, 0.86, 0.5)
 
 panel.sub = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 panel.sub:SetPoint("TOPLEFT", panel.title, "BOTTOMLEFT", 0, -3)
-panel.sub:SetWidth(PANEL_W - 80)
+panel.sub:SetWidth(PANEL_W - 60)
 panel.sub:SetJustifyH("LEFT")
 panel.sub:SetWordWrap(false)
 
 local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
-close:SetSize(26, 26)
+close:SetSize(24, 24)
 close:SetPoint("TOPRIGHT", -3, -3)
 close:SetScript("OnClick", function()
     QuestFocusDB.hidePanel = true
@@ -117,7 +119,8 @@ end)
 -- celpontjai torlodnek (mint a /qf clear). Csak akkor latszik, ha van kijelolt quest.
 local clearBtn = CreateFrame("Button", nil, panel)
 clearBtn:SetSize(16, 16)
-clearBtn:SetPoint("RIGHT", close, "LEFT", -2, 0)
+-- a quest cimsoranak vegen (az ikonsorban nem lenne egyertelmu, mit torol)
+clearBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -11 - HEAD)
 clearBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
 clearBtn:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Highlight", "ADD")
 clearBtn:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Down")
@@ -135,6 +138,39 @@ end)
 clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 panel.clearBtn = clearBtn
 
+-- Ikonsor gombjai (jobbrol balra, az X mellett): dungeon, options
+local function ToolButton(icon, title, desc, onClick)
+    local b = CreateFrame("Button", nil, panel)
+    b:SetSize(16, 16)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetAllPoints()
+    b.tex:SetTexture(icon)
+    b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetScript("OnClick", onClick)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText(title, 1, 1, 1)
+        GameTooltip:AddLine(type(desc) == "function" and desc() or desc, 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+local dungeonBtn = ToolButton("Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", L["Dungeons"],
+    function()
+        return NS.HasDungeonJournal and NS.HasDungeonJournal()
+            and L["Dungeons for your level and their quests; click one to open it in Dungeon Journal. Same as /qf dungeon."]
+            or L["Dungeons for your level and their quests (click: marker on the quest giver). Same as /qf dungeon."]
+    end,
+    function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
+local optBtn = ToolButton("Interface\\Icons\\INV_Misc_Gear_01", L["Options"],
+    L["Opens the Adventurer's Kit options. Same as /qf options."],
+    function() if NS.C.OpenOptions then NS.C.OpenOptions() end end)
+panel.dungeonBtn, panel.optBtn = dungeonBtn, optBtn
+dungeonBtn:SetPoint("RIGHT", close, "LEFT", -2, 0)
+optBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -4, 0)
+
 local function Divider(y)
     local t = panel:CreateTexture(nil, "ARTWORK")
     t:SetHeight(1)
@@ -143,12 +179,12 @@ local function Divider(y)
     t:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.35)
     return t
 end
-panel.headDivider = Divider(-48)
+panel.headDivider = Divider(-48 - HEAD)
 
 -- Statisztika dobozok: haladas / hatralevo ido / tempo
 panel.stats = CreateFrame("Frame", nil, panel)
-panel.stats:SetPoint("TOPLEFT", 12, -55)
-panel.stats:SetPoint("TOPRIGHT", -12, -55)
+panel.stats:SetPoint("TOPLEFT", 12, -55 - HEAD)
+panel.stats:SetPoint("TOPRIGHT", -12, -55 - HEAD)
 panel.stats:SetHeight(38)
 panel.statBoxes = {}
 local boxW = (PANEL_W - 24 - 8) / 3
@@ -178,8 +214,8 @@ end
 
 -- Osszesitett haladas csik
 panel.bar = CreateFrame("StatusBar", nil, panel)
-panel.bar:SetPoint("TOPLEFT", 13, -99)
-panel.bar:SetPoint("TOPRIGHT", -13, -99)
+panel.bar:SetPoint("TOPLEFT", 13, -99 - HEAD)
+panel.bar:SetPoint("TOPRIGHT", -13, -99 - HEAD)
 panel.bar:SetHeight(6)
 panel.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 panel.bar:SetStatusBarColor(0.95, 0.75, 0.2)
@@ -208,7 +244,7 @@ local function ApplyPanelWidth()
     local w = PW()
     panel:SetWidth(w)
     panel.title:SetWidth(w - 80)
-    panel.sub:SetWidth(w - 80)
+    panel.sub:SetWidth(w - 60)
     panel.footer:SetWidth(w - 44)
     local bw = (w - 24 - 8) / 3
     for i, b in ipairs(panel.statBoxes) do
@@ -297,7 +333,7 @@ local function PanelChrome(mode, sectionText)
     local quest = mode == "quest" and (state.isComplete or not (NS.InCity and NS.InCity()))
     panel.stats:SetShown(quest)
     panel.bar:SetShown(quest)
-    local y = quest and -112 or -56
+    local y = (quest and -112 or -56) - HEAD
     if sectionText then
         panel.section:ClearAllPoints()
         panel.section:SetPoint("TOPLEFT", 14, y)

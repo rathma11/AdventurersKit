@@ -130,6 +130,8 @@ local function IsDone(qid)
     return db and type(db.complete) == "table" and db.complete[qid] and true or false
 end
 
+NS.QuestIsDone = IsDone
+
 local starterCache = {} -- qid -> quest giver forrasok
 
 local function BuildPickups(pc, px, py, maxN)
@@ -193,8 +195,13 @@ local RAIDS = {
     [2717] = "Molten Core", [2159] = "Onyxia's Lair", [1977] = "Zul'Gurub", [2677] = "Blackwing Lair",
     [3429] = "Ruins of Ahn'Qiraj", [3428] = "Temple of Ahn'Qiraj", [3456] = "Naxxramas",
 }
-local function QuestDungeon(q)
-    local zs = type(q) == "table" and tonumber(q.zoneOrSort)
+local function QuestDungeon(q, qid)
+    if type(q) ~= "table" then return end
+    -- Dungeon Journal (ha fent van): a Forever sajat dungeonjai is
+    qid = tonumber(qid or q.Id or q.id)
+    local jn = qid and NS.JournalDungeonOfQuest and NS.JournalDungeonOfQuest(qid)
+    if jn then return jn, false end
+    local zs = tonumber(q.zoneOrSort)
     if not zs then return end
     if DUNGEONS[zs] then return DUNGEONS[zs], false end
     if RAIDS[zs] then return RAIDS[zs], true end
@@ -202,8 +209,8 @@ end
 NS.QuestDungeon = QuestDungeon
 -- Listasor cimke: |cffff7040[Dungeon: Wailing Caverns]|r (raidnel lila); a sor elejere
 -- kerul (a hosszu quest nev a vegen vagodik le, igy a cimke mindig latszik)
-NS.DungeonTag = function(q)
-    local name, raid = QuestDungeon(q)
+NS.DungeonTag = function(q, qid)
+    local name, raid = QuestDungeon(q, qid)
     if not name then return "" end
     return raid and ("|cffc070ff[" .. L["Raid"] .. ": " .. name .. "]|r ")
         or ("|cffff7040[" .. L["Dungeon"] .. ": " .. name .. "]|r ")

@@ -36,6 +36,8 @@ local function SlashHandler(msg)
         if NS.ToggleBagList then NS.ToggleBagList() end
     elseif msg == "city" then
         if NS.ShowCityList then NS.ShowCityList() end
+    elseif msg == "dungeon" or msg == "dungeons" then
+        if NS.ToggleDungeonList then NS.ToggleDungeonList() end
     elseif msg == "cityreset" then
         if NS.ResetCityIgnore then NS.ResetCityIgnore() end
     elseif msg == "chat" then

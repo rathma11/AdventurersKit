@@ -5,6 +5,18 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.5.0", date = "2026-11-17", items = {
+        "Start dungeon: skull button on the panel (and /qf dungeon) lists the dungeons for your level with their quests. "
+            .. "With the Dungeon Journal addon it uses its data (Forever's own dungeons too) and opens the quest there; "
+            .. "without it, a similar list from Questie and a click puts a marker on the quest giver.",
+        "Dungeon quests in the city list and the pickup popup get a small skull button (Start dungeon); "
+            .. "the city list has a 'Start dungeon' button when it shows dungeon quests.",
+        "Panel: a small icon row on top (options, dungeons, close); the quest name is one line lower, "
+            .. "with the clear-focus button at its end.",
+        "Quest chains show the Dungeon Journal's chain icon (when it's installed).",
+        "Summary of 0.4.x: buff tracking reworked (groups, weapon type aware stones / oils, setup popup, per-row X), "
+            .. "usable quest items on objective rows, bag highlight fix, dungeon quest highlight, 'Disable city list everywhere'.",
+    } },
     { version = "0.4.10", date = "2026-11-17", items = {
         "Dungeon and raid quests are highlighted in the city list (tinted row) and the pickup popup, with the dungeon's full name "
             .. "in front of the quest, e.g. [Dungeon: Wailing Caverns]; the tooltip says it needs a group.",

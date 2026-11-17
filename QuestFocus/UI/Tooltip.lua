@@ -121,7 +121,7 @@ function TT.Pickup(owner, anchor, d, extraNote)
     TT.Sub(tt, (L["Quest giver: %s"]):format(d.point and d.point.name or "?"))
     TT.Info(tt, TT.Where(d.point))
     -- dungeon / raid quest: kiemelve
-    local dAbbr, dRaid = NS.QuestDungeon and NS.QuestDungeon(d.quest)
+    local dAbbr, dRaid = NS.QuestDungeon and NS.QuestDungeon(d.quest, d.qid)
     if dAbbr then
         TT.Info(tt, dRaid and ("|cffc070ff" .. (L["Raid quest (%s) - needs a raid group"]):format(dAbbr) .. "|r")
             or ("|cffff7040" .. (L["Dungeon quest (%s) - needs a group"]):format(dAbbr) .. "|r"))

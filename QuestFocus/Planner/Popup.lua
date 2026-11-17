@@ -48,6 +48,9 @@ local qClose = CreateFrame("Button", nil, qpop, "UIPanelCloseButton")
 qClose:SetSize(20, 20)
 qClose:SetPoint("TOPRIGHT", -2, -2)
 qClose:SetScript("OnClick", function() qpop:Hide() end)
+-- dungeon quest: Start dungeon gomb a sor vegen
+qpop.dBtn = NS.MakeDungeonButton(qpop, 16)
+qpop.dBtn:SetPoint("BOTTOMRIGHT", -9, 8)
 local qhl = qpop:CreateTexture(nil, "HIGHLIGHT")
 qhl:SetAllPoints()
 qhl:SetColorTexture(1, 1, 1, 0.06)
@@ -86,11 +89,15 @@ local function ShowQuestPopup(d)
     local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
     local est = EstimateQuestTime(d.quest)
     qpop.data = d
-    -- dungeon quest: a teljes dungeon nev is kifer
-    qpop:SetWidth(NS.QuestDungeon(d.quest) and 400 or 270)
+    -- dungeon quest: a teljes dungeon nev is kifer, es Start dungeon gomb
+    local dName = NS.QuestDungeon(d.quest, d.qid)
+    qpop:SetWidth(dName and 400 or 270)
+    qpop.dBtn.qid, qpop.dBtn.dungeon = d.qid, dName
+    qpop.dBtn:SetShown(dName ~= nil)
+    qpop.text:SetPoint("RIGHT", dName and -30 or -9, 0)
     qpop.right:SetText(("|cff99ccff%d yd|r"):format(d.dist + 0.5))
     qpop.text:SetText(("%s[%s]|r %s%s%s|r  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
-        NS.DungeonTag(d.quest), hex, d.name or "?", est and (FormatTime(est) .. " " .. L["est."]) or L["length unknown"]))
+        NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", est and (FormatTime(est) .. " " .. L["est."]) or L["length unknown"]))
     qpop:ClearAllPoints()
     -- kozepen felul, a jatek sajat kiirasai alatt
     if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
