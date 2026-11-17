@@ -796,7 +796,7 @@ NS.buffDismissed = dismissed
 local alertRows = {}
 local ROW_H = 26
 -- sorok: a beepitett tipusok + MAX_CUSTOM sajat item (a slot futas kozben valtozik: b.slot)
-for i = 1, #SLOTS + MAX_CUSTOM do
+for i = 1, #SLOTS + MAX_CUSTOM + 2 do -- +2: kinti figyelmeztetesek (taska, javitas)
     local slot = SLOTS[i]
     local b = CreateFrame("Button", "QuestFocusBuffAlertBtn" .. i, alert, "SecureActionButtonTemplate")
     b:SetSize(22, 22)
@@ -842,6 +842,11 @@ for i = 1, #SLOTS + MAX_CUSTOM do
     b.off:SetScript("OnClick", function()
         local s = b.slot
         if not s then return end
+        if s.warnRow then -- kinti figyelmeztetes: elrejtve, amig rendbe nem jon (vagy varosba nem ersz)
+            dismissed[s.key] = true
+            if refreshAlert then refreshAlert() end
+            return
+        end
         if s.custom then
             RemoveCustomBuff(s.key) -- sajat item / buff: torlodik a listabol (Add buff-fal visszaveheto)
             NS.Loud(Print, L["%s: removed from the watched buffs."], s.label)
@@ -853,6 +858,13 @@ for i = 1, #SLOTS + MAX_CUSTOM do
         if NS.RefreshBuffOptions then pcall(NS.RefreshBuffOptions) end
     end)
     b.off:SetScript("OnEnter", function(self)
+        if b.slot and b.slot.warnRow then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(L["Hide until fixed"], 1, 1, 1)
+            GameTooltip:AddLine(L["Turn these warnings off: Options > Buffs."], 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+            return
+        end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(L["Don't watch this"], 1, 1, 1)
         GameTooltip:AddLine(L["You can tick it again on the Buffs tab of the options."], 0.7, 0.7, 0.7, true)
@@ -881,6 +893,16 @@ for i = 1, #SLOTS + MAX_CUSTOM do
         if self.itemId or self.spellName or InCombatLockdown() then return end
         local s = self.slot
         if not s then return end
+        if s.warnRow then -- kinti figyelmeztetes: marker a legkozelebbi arusra / javitora
+            local ok, p, d = pcall(NS.NearestTownsfolk, s.kind)
+            if ok and p then
+                NS.SetWaypoint(p, p.name)
+                NS.Loud(Print, L["Marker: |cffffff00%s|r (%d yd)"], p.name or "?", d or 0)
+            else
+                NS.Loud(Print, L["No known NPC for this nearby (Questie hasn't loaded its town data yet, or none on this continent)."])
+            end
+            return
+        end
         if GetCursorInfo() then
             local h = self:GetScript("OnReceiveDrag")
             if h then h(self) end
@@ -892,6 +914,15 @@ for i = 1, #SLOTS + MAX_CUSTOM do
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         local s = self.slot or slot
+        if s and s.warnRow then
+            GameTooltip:SetText(s.label, 1, 1, 1)
+            GameTooltip:AddLine(self.info or "", 1, 0.82, 0, true)
+            local ok, p, d = pcall(NS.NearestTownsfolk, s.kind)
+            if ok and p then GameTooltip:AddLine((L["Nearest: %s (%d yd)"]):format(p.name or "?", d or 0), 0.8, 0.8, 0.8) end
+            GameTooltip:AddLine(L["Click: marker on the nearest one"], 0.5, 0.5, 0.5)
+            GameTooltip:Show()
+            return
+        end
         if self.info then
             GameTooltip:SetText(s.label, 1, 1, 1)
             GameTooltip:AddLine(self.info, 1, 0.82, 0, true)
@@ -953,6 +984,45 @@ local lastAlertKey
 -- slot kulcs -> true: errol a hianyrol mar villantunk. Csak az elso megjeleneskor villan;
 -- ha ignoralod (X / harc) es ujra feljon ugyanazzal, mar nem. Ha megjavitod a buffot, torlodik.
 local flashed = {}
+
+-- Kinti figyelmeztetesek (nem buffok): tele taska / kopott felszereles, csak varoson es
+-- fogadon kivul (bent a city list teendoi mutatjak). Kuszobok: Options > City list > City to-do.
+-- Kattintas: marker a legkozelebbi arusra / javitora; X: elrejtve, amig rendbe nem jon.
+local WARN_BAGS = { key = "w_bags", label = L["Bags"], names = {}, warnRow = true, kind = "Sell",
+    icon = "Interface\\Icons\\INV_Misc_Bag_10" }
+local WARN_REPAIR = { key = "w_repair", label = L["Gear"], names = {}, warnRow = true, kind = "Repair",
+    icon = "Interface\\Icons\\Trade_BlackSmithing" }
+local function OutsideWarnings()
+    local out = {}
+    if QuestFocusDB.noOutWarn or not NS.CityLimit or (IsResting and IsResting()) then
+        dismissed.w_bags, dismissed.w_repair = nil, nil -- varosban: kint legkozelebb ujra szolhat
+        return out
+    end
+    local free, total = 0, 0
+    if NS.CityBagSlots then free, total = NS.CityBagSlots() end
+    local pctLimit, freeLimit = NS.CityLimit("bagPct"), NS.CityLimit("bagFree")
+    local used = total > 0 and math.floor((total - free) / total * 100 + 0.5) or 0
+    if total > 0 and ((pctLimit > 0 and used >= pctLimit) or (freeLimit > 0 and free < freeLimit)) then
+        out[#out + 1] = { slot = WARN_BAGS, status = free == 0 and L["full"] or L["filling up"],
+            info = (L["%d%% used, %d free - sell or bank"]):format(used, free) }
+    else
+        dismissed.w_bags = nil
+    end
+    local worst
+    for s = 1, 18 do
+        local cur, max = GetInventoryItemDurability(s)
+        if cur and max and max > 0 and (not worst or cur / max < worst) then worst = cur / max end
+    end
+    local at = NS.CityLimit("repair") / 100
+    if worst and at > 0 and worst < at then
+        out[#out + 1] = { slot = WARN_REPAIR, status = worst == 0 and L["broken"] or L["worn"],
+            info = (L["most worn item at %d%% - repair"]):format(math.floor(worst * 100 + 0.5)) }
+    else
+        dismissed.w_repair = nil
+    end
+    return out
+end
+
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end
     if QuestFocusDB.noBuffAlert or not On() or hiddenUntilCombat or UnitIsDeadOrGhost("player") then
@@ -994,6 +1064,12 @@ local function UpdateAlert(auras)
             end
             need[#need + 1] = { slot = slot, left = nil, info = info }
             key = key .. slot.key .. ":none;"
+        end
+    end
+    for _, w in ipairs(OutsideWarnings()) do
+        if not dismissed[w.slot.key] then
+            need[#need + 1] = w
+            key = key .. w.slot.key .. ";"
         end
     end
     if #need == 0 then
@@ -1039,7 +1115,7 @@ local function UpdateAlert(auras)
                     b.alts = NS.BuffAlternatives and NS.BuffAlternatives(s) or {}
                     b.arrow:Show()
                 end
-                b.icon:SetTexture((s.customSpell and s.buffName and SpellIconOf(s.buffName))
+                b.icon:SetTexture(s.icon or (s.customSpell and s.buffName and SpellIconOf(s.buffName))
                     or (s.custom and s.itemId and GetItemIcon(s.itemId))
                     or (s.hand and "Interface\\Icons\\INV_Stone_SharpeningStone_01")
                     or (s.key == "rest" and "Interface\\Icons\\INV_Misc_Bag_08")
@@ -1047,7 +1123,7 @@ local function UpdateAlert(auras)
                     or "Interface\\Icons\\INV_Misc_QuestionMark")
             end
             b.info = n.info
-            b.icon:SetDesaturated(n.info ~= nil)
+            b.icon:SetDesaturated(n.info ~= nil and not n.slot.warnRow)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
             b:Show()
@@ -1093,7 +1169,7 @@ local function UpdateAlert(auras)
         alertRows[i].count:SetText(cnt and cnt > 0 and cnt or "")
         if n.info then
             alertRows[i].text:SetText(("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(
-                n.slot.label, L["missing"], n.info))
+                n.slot.label, n.status or L["missing"], n.info))
         else
             local name = ActionName(n.action, n.slot)
             local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
@@ -1571,6 +1647,11 @@ fl:Check(L["Ask to set up missing buffs"],
     .. L["it asks whether to choose the items. What can be found (XP food, stones / oils / poisons, class spells) is set automatically."],
     function() return not QuestFocusDB.noFoodPrompt end,
     function(v) QuestFocusDB.noFoodPrompt = not v end)
+fl:Check(L["Bags full / gear worn warning out in the world"],
+    L["Outside cities and inns the reminder also shows when your bags are filling up or your gear needs repair; "]
+    .. L["click the icon for a marker on the nearest vendor / repairer. Thresholds: Options > City list > City to-do."],
+    function() return not QuestFocusDB.noOutWarn end,
+    function(v) QuestFocusDB.noOutWarn = not v; lastAlertKey = nil end)
 
 ---------------------------------------------------------------------------
 -- Figyelt buffok listaja: sorok [ikon] nev / item  [perc] min  [X]

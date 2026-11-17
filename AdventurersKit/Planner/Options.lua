@@ -142,7 +142,7 @@ end, 28)
 cl:OnRefresh(RebuildIgnore)
 
 cl:Header(L["City to-do (above the quests)"])
-cl:Text(L["Shown at the top of the city list with the nearest NPC for it (click: marker). 0 turns a line off."], 2)
+cl:Text(L["Shown at the top of the city list with the nearest NPC for it (click: marker). Bags and repair also warn out in the world, in the buff reminder (Buffs tab). 0 turns a line off."], 2)
 cl:Number(L["Bags full: warn at"],
     L["Percent of your bag slots in use. Default 70. The nearest vendor to sell to is shown (or use the Bank button)."],
     function() return NS.CityLimit("bagPct") end,

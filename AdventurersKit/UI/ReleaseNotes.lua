@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.16", date = "2026-11-17", items = {
+        "Buff reminder, out in the world (not in cities / inns): 'Bags filling up / full' and 'Gear worn / broken' rows, "
+            .. "using the City to-do thresholds. Click the icon for a marker on the nearest vendor / repairer; X hides it until fixed. "
+            .. "Switch: Options > Buffs.",
+    } },
     { version = "0.6.15", date = "2026-11-17", items = {
         "Fix: the city list's resize corner was invisible (broken texture path); now it shows like the panel's.",
     } },

@@ -317,6 +317,8 @@ local function BagSlots()
     return free, total
 end
 
+NS.CityBagSlots = BagSlots
+
 local function CityNeeds()
     local out = {}
     -- tele taska: szazalek VAGY kevés szabad hely (barmelyik)
