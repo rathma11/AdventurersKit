@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.28", date = "2026-11-17", items = {
+        "Buff reminder warning rows (vendor nearby, bags, repair): the whole row is clickable (marker), and the text "
+            .. "scrolls when it doesn't fit. 'Vendor nearby' shows a vendor icon, or the repair icon for a repairer, "
+            .. "and only mentions your gear when a repairer is near.",
+    } },
     { version = "0.6.27", date = "2026-11-17", items = {
         "Switching to another quest (also by tracking it) removes the old quest's marker and puts the arrow on the new quest's "
             .. "target; if the new quest has no known location, no old arrow is left pointing the wrong way.",

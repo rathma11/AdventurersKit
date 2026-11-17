@@ -836,6 +836,48 @@ for i = 1, #SLOTS + MAX_CUSTOM + 3 do -- +3: kinti figyelmeztetesek (taska, javi
     b.text:SetPoint("RIGHT", alert, "RIGHT", -28, 0)
     b.text:SetJustifyH("LEFT")
     b.text:SetWordWrap(false)
+    -- kinti figyelmeztetes sor (arus a kozelben, taska, javitas): az egesz sor kattinthato
+    -- (sima, nem secure gomb), a szoveg fut, ha nem fer ki
+    b.click = CreateFrame("Button", nil, alert)
+    b.click:SetPoint("LEFT", b.arrow, "RIGHT", 4, 0)
+    b.click:SetPoint("RIGHT", alert, "RIGHT", -28, 0)
+    b.click:SetHeight(20)
+    if b.click.SetClipsChildren then b.click:SetClipsChildren(true) end
+    b.click.text = b.click:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.click.text:SetPoint("LEFT", b.click, "LEFT", 0, 0)
+    b.click.text:SetJustifyH("LEFT")
+    b.click.text:SetWordWrap(false)
+    local chl = b.click:CreateTexture(nil, "HIGHLIGHT")
+    chl:SetAllPoints()
+    chl:SetColorTexture(1, 1, 1, 0.06)
+    b.click:Hide()
+    -- futo szoveg: ha hosszabb, mint a hely, lassan balra csuszik, a vegen megall, majd elolrol
+    b.click.off, b.click.wait = 0, 1.5
+    b.click:SetScript("OnUpdate", function(self, dt)
+        local over = (self.text:GetStringWidth() or 0) - (self:GetWidth() or 0)
+        if over <= 2 then
+            if self.off ~= 0 then self.off = 0; self.text:SetPoint("LEFT", self, "LEFT", 0, 0) end
+            return
+        end
+        if self.wait > 0 then self.wait = self.wait - dt return end
+        if self.atEnd then
+            -- a vegen allt: vissza az elejere, ott is all egy kicsit
+            self.atEnd, self.off, self.wait = nil, 0, 1.5
+        else
+            self.off = self.off + dt * 25
+            if self.off >= over then self.off, self.atEnd, self.wait = over, true, 1.5 end
+        end
+        self.text:SetPoint("LEFT", self, "LEFT", -self.off, 0)
+    end)
+    b.click:SetScript("OnClick", function()
+        local h = b:GetScript("PostClick")
+        if h then h(b) end
+    end)
+    b.click:SetScript("OnEnter", function(self)
+        local h = b:GetScript("OnEnter")
+        if h then h(b) end
+    end)
+    b.click:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- a sor vegen: ezt a tipust ne figyelje tobbet (Options > Buffs: visszapipalhato)
     b.off = CreateFrame("Button", nil, alert)
     b.off:SetSize(14, 14)
@@ -1048,11 +1090,17 @@ local function OutsideWarnings()
     local wantRep = worst and worst < VENDOR_REPAIR and v.rep
     if wantSell or wantRep then
         local p, d = wantRep and v.rep or v.sell, wantRep and v.repD or v.sellD
+        -- javito-e, akihez kuldunk (a "Sell" a kozelebbi a javitok es a kaja arusok kozul)
+        local isRep = wantRep or (v.rep and p.name == v.rep.name)
         local parts = {}
         if total > 0 then parts[#parts + 1] = (L["bags %d/%d"]):format(total - free, total) end
-        if worst and worst < 1 then parts[#parts + 1] = (L["gear %d%%"]):format(math.floor(worst * 100 + 0.5)) end
+        -- tartossag csak ha itt javithatsz is
+        if v.rep and worst and worst < 1 then
+            parts[#parts + 1] = (L["gear %d%%"]):format(math.floor(worst * 100 + 0.5))
+        end
         -- a kattintas a javitora visz, ha javitani kell, kulonben barmelyik arusra
         WARN_VENDOR.kind = wantRep and "Repair" or "Sell"
+        WARN_VENDOR.icon = isRep and "Interface\\Minimap\\Tracking\\Repair" or "Interface\\GossipFrame\\VendorGossipIcon"
         out[#out + 1] = { slot = WARN_VENDOR, status = ("|cff99ccff%d yd|r"):format(math.floor(d + 0.5)),
             info = table.concat(parts, ", ") .. " - " .. (p.name or "?") }
     else
@@ -1107,7 +1155,7 @@ local function UpdateAlert(auras)
     for _, w in ipairs(OutsideWarnings()) do
         if not dismissed[w.slot.key] then
             need[#need + 1] = w
-            key = key .. w.slot.key .. ";"
+            key = key .. w.slot.key .. (w.slot.icon or "") .. ";" -- ikon valtas (arus / javito) is ujrarajzol
         end
     end
     if #need == 0 then
@@ -1131,7 +1179,7 @@ local function UpdateAlert(auras)
     -- Szovegek mindig frissulnek, a secure resz csak ha valtozott a lista
     if key ~= lastAlertKey then
         lastAlertKey = key
-        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide(); b.arrow:Hide(); b.off:Hide() end
+        for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide(); b.click:Hide(); b.arrow:Hide(); b.off:Hide() end
         if NS.HideBuffFlyout then NS.HideBuffFlyout() end
         for i, n in ipairs(need) do
             local b = alertRows[i]
@@ -1165,7 +1213,10 @@ local function UpdateAlert(auras)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", alert, "TOPLEFT", 12, -22 - (i - 1) * ROW_H)
             b:Show()
-            b.text:Show()
+            -- kinti figyelmeztetes: kattinthato, futo szoveges sor; mas: sima szoveg
+            b.text:SetShown(not n.slot.warnRow)
+            b.click:SetShown(n.slot.warnRow and true or false)
+            if n.slot.warnRow then b.click.off, b.click.wait, b.click.atEnd = 0, 1.5, nil end
             b.off:ClearAllPoints()
             b.off:SetPoint("TOPRIGHT", alert, "TOPRIGHT", -8, -26 - (i - 1) * ROW_H)
             b.off:Show()
@@ -1206,8 +1257,8 @@ local function UpdateAlert(auras)
         local cnt = n.action and n.action.kind == "item" and GetItemCount(n.action.id) or nil
         alertRows[i].count:SetText(cnt and cnt > 0 and cnt or "")
         if n.info then
-            alertRows[i].text:SetText(("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(
-                n.slot.label, n.status or L["missing"], n.info))
+            local t = ("|cffffd100%s|r  |cffff4444%s|r  |cff999999%s|r"):format(n.slot.label, n.status or L["missing"], n.info)
+            if n.slot.warnRow then alertRows[i].click.text:SetText(t) else alertRows[i].text:SetText(t) end
         else
             local name = ActionName(n.action, n.slot)
             local state = (n.left and ((L["%s left"]):format(FmtLeft(n.left, n.slot))) or ("|cffff4444" .. L["missing"] .. "|r"))
