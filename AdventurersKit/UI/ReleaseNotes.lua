@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.41", date = "2026-11-17", items = {
+        "Buff reminder: buffs someone else puts on you (e.g. a paladin's blessing or aura) no longer count for your own "
+            .. "rows: they don't clear 'missing' for an item buff (XP food, elixir, sleeping bag...), aren't learned as an "
+            .. "item's buff, and for a paladin another paladin's blessing isn't yours.",
+    } },
     { version = "0.6.40", date = "2026-11-17", items = {
         "Pace / time left in a group: the kill pace is learned separately per group size (your party's kills count, "
             .. "and quest items drop for each of you). Until there's enough data in a group, it uses your solo pace "

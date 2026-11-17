@@ -363,24 +363,27 @@ local auraCache, auraById = {}, {}
 local function ReadAuras()
     local out, byId = {}, {}
     for i = 1, 40 do
-        local ok, name, count, duration, expires, spellId, _
+        local ok, name, count, duration, expires, spellId, src, _
         if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
             local a
             ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
             if not ok then return nil end
             if not a then break end
             ok = pcall(function()
-                name, count, duration, expires, spellId = a.name, a.applications, a.duration, a.expirationTime, a.spellId
+                name, count, duration, expires, spellId, src = a.name, a.applications, a.duration, a.expirationTime, a.spellId, a.sourceUnit
             end)
             if not ok then return nil end
         else
-            ok, name, _, count, _, duration, expires, _, _, _, spellId = pcall(UnitAura, "player", i, "HELPFUL")
+            ok, name, _, count, _, duration, expires, src, _, _, spellId = pcall(UnitAura, "player", i, "HELPFUL")
             if not ok then return nil end
             if not name then break end
         end
         if type(name) == "string" then
+            -- mine: te tetted fel (vagy itembol jon); mas buffja (pl. paladin blessing / aura) nem
+            -- szamit az itemes sorokhoz es nem "tanulodik meg" item buffkent
+            local mine = src == nil or src == "player" or src == "pet" or src == "vehicle"
             local a = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0, count = tonumber(count) or 0,
-                        index = i, spellId = tonumber(spellId), name = name }
+                        index = i, spellId = tonumber(spellId), name = name, mine = mine }
             out[name] = a
             if tonumber(spellId) then byId[tonumber(spellId)] = a end
         end
@@ -453,6 +456,8 @@ local function Remaining(slot, itemId, auras)
     if slot.isClass then
         for _, name in ipairs(slot.spells) do
             local a = auras[name]
+            -- blessing: egy masik paladin blessingje nem a tied (a sajatodat kulon felteheted)
+            if a and slot.key == "c_blessing" and a.mine == false then a = nil end
             if a then
                 -- megjegyezzuk, melyiket hasznalod (ezt tesszuk fel legkozelebb)
                 QuestFocusDB.classSeen = QuestFocusDB.classSeen or {}
@@ -486,7 +491,7 @@ local function Remaining(slot, itemId, auras)
     -- aminek a leirasaban experience/XP van
     if slot.key == "food" then
         for _, a in pairs(auras) do
-            if a.duration > 60 and IsXPAura(a) then
+            if a.duration > 60 and a.mine ~= false and IsXPAura(a) then
                 if not learned and itemId then DB().buffLearn[itemId] = a.name end
                 if a.expires == 0 then return math.huge end
                 return a.expires - GetTime()
@@ -496,8 +501,8 @@ local function Remaining(slot, itemId, auras)
     for _, n in ipairs(names) do
         if slot.key == "food" and n == L["Well Fed"] then n = nil end
         local a = auras[n]
-        -- a 30 mp-es "Food" evo aura nem az igazi buff
-        if a and not (slot.key == "food" and a.duration > 0 and a.duration <= 60) then
+        -- a 30 mp-es "Food" evo aura nem az igazi buff; mas altal rad tett buff sem (itemes sor)
+        if a and a.mine ~= false and not (slot.key == "food" and a.duration > 0 and a.duration <= 60) then
             if a.expires == 0 then return math.huge end
             return a.expires - GetTime()
         end
@@ -681,8 +686,10 @@ local function CheckLearning()
         for _, n in ipairs(s.spells or {}) do skip[n] = true end
     end
     for id, n in pairs(DB().buffLearn) do if id ~= learning.itemId then skip[n] = true end end
+    -- barmelyik class buff (minden classe, pl. paladin blessing), es csak sajat buff tanulhato meg
+    for n in pairs(CLASS_SPELL_SET) do skip[n] = true end
     for name, a in pairs(HelpfulAuras()) do
-        if not learning.before[name] and not skip[name] and a.duration >= 300 then
+        if not learning.before[name] and not skip[name] and a.mine ~= false and a.duration >= 300 then
             DB().buffLearn[learning.itemId] = name
             learning = nil
             return
