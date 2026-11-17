@@ -169,7 +169,7 @@ NS.DungeonBosses = {
         { "Deathless Marrow", nil },
         { "Gill", 264177, rare = true },
         { "Umbra", 264172, rare = true },
-        { "\", 260468, rare = true },
+        { "\"Pyromancer\" Braxton", 260468, rare = true },
         { "Min'loth the Serpent", 260274 },
     },
     ["Krol'dok Stronghold"] = {

@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.1", date = "2026-11-17", items = {
+        "Fix: a syntax error in the dungeon boss table (since 0.6.67) kept boss order inside dungeons from working "
+            .. "(the panel fell back to quest log order).",
+        "/qf selftest: a quick self check on your live data (Questie, quest objectives, QFocus macro length, settings, "
+            .. "dungeon entrances, boat / zeppelin table). One summary line; details only if something fails.",
+    } },
     { version = "0.7.0", date = "2026-11-17", items = {
         "Dungeon prep: click a dungeon to get a checklist of its quests to pick up, then the entrance; inside the "
             .. "dungeon the panel lists every quest objective in boss order, and in a group you can share the dungeon "

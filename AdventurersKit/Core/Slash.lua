@@ -121,6 +121,9 @@ local function SlashHandler(msg)
     elseif msg == "clear" then
         ClearQuest()
         Print(L["Selection cleared."])
+    elseif msg == "selftest" then
+        -- Core\SelfTest.lua: tiszta logikai ellenorzesek az elo adatokon
+        if NS.SelfTest then NS.SelfTest() end
     else
         Print(L["Commands:"])
         Print(L["  /qf - toggle panel"])
@@ -142,6 +145,7 @@ local function SlashHandler(msg)
         Print(L["  /qf city - city list here; /qf cityreset - clear ignored places"])
         Print(L["  /qf dungeon - dungeon list; /qf dungeon <name> - dungeon prep (quests, then the entrance); /qf dungeon off - end it"])
         Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])
+        Print(L["  /qf selftest - quick self test (Questie data, macro, settings, tables)"])
     end
 end
 -- a parancsok valasza mindig kikerul a chatre (akkor is, ha a chat uzenetek ki vannak kapcsolva)

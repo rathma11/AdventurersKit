@@ -1224,6 +1224,7 @@ local function OutsideWarnings()
     end
     return out
 end
+NS.BuffsOutsideWarnings = OutsideWarnings -- tests\run.lua (taska lepcsok)
 
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end

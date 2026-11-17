@@ -228,6 +228,23 @@ local function TransportRoute(from, to, speed, useHearth)
 end
 NS.TransportRoute = TransportRoute
 
+-- /qf selftest (Core\SelfTest.lua): a beepitett jaratok ellenorzese. Visszaad: darabszam, hibak
+NS.TransportCheck = function()
+    local bad = {}
+    local function name(s) return type(s) == "table" and tostring(s[4]) or "?" end
+    for i, t in ipairs(TRANSPORTS) do
+        local a, b = Station(t.a), Station(t.b)
+        if not a then bad[#bad + 1] = ("#%d %s: start %s has no world position"):format(i, tostring(t.kind), name(t.a)) end
+        if not b then bad[#bad + 1] = ("#%d %s: end %s has no world position"):format(i, tostring(t.kind), name(t.b)) end
+        if not KIND_NAME[t.kind] then bad[#bad + 1] = ("#%d: unknown kind %s"):format(i, tostring(t.kind)) end
+        if not (tonumber(t.time) and t.time > 0) then bad[#bad + 1] = ("#%d %s: bad time"):format(i, name(t.a)) end
+        if a and b and a.wc == b.wc and a.wx == b.wx and a.wy == b.wy then
+            bad[#bad + 1] = ("#%d %s: start and end are the same point"):format(i, name(t.a))
+        end
+    end
+    return #TRANSPORTS, bad
+end
+
 -- Lepesek szovegben: "Boat: Menethil Harbor -> Theramore"
 local function StepsText(steps)
     local t = {}
