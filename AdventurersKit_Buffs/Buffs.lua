@@ -1155,54 +1155,64 @@ local function OutsideWarnings()
     local v = NearVendors()
     local free, total = 0, 0
     if NS.CityBagSlots then free, total = NS.CityBagSlots() end
-    local pctLimit, freeLimit = NS.CityLimit("bagPct"), NS.CityLimit("bagFree")
+    local freeLimit = NS.CityLimit("bagFree")
     local used = total > 0 and math.floor((total - free) / total * 100 + 0.5) or 0
-    -- Kint csak akkor szolunk, ha tenyleg fogy a hely (kevesebb szabad hely, mint a kuszob, vagy
-    -- tele): a szazalek magaban meg nem ok egy hosszu utra. Ha arus van a kozelben, a
-    -- "Vendor nearby" sor ugyis szol (mar felig tele taskanal).
-    -- Lepcsozetes: minel telibb a taska, annal messzebbi arusert is megeri elmenni.
-    --   70%+: arus 100 yd-on belul, 80%+: 300 yd, 90%+: 600 yd, 95%+ (vagy kevesebb szabad
-    --   hely a kuszobnel / tele): mindig, a legkozelebbit mutatja
-    local reach
-    if free == 0 or used >= 95 or (freeLimit > 0 and free < freeLimit) then reach = math.huge
-    elseif used >= 90 then reach = 600
-    elseif used >= 80 then reach = 300
-    elseif pctLimit > 0 and used >= pctLimit then reach = 100 end
-    local urgent = reach and (reach == math.huge or (v.anyD and v.anyD <= reach))
-    local bagsShown = false
-    if total > 0 and urgent then
-        bagsShown = true
-        local far = v.anyD and (" - " .. (L["nearest vendor %d yd"]):format(math.floor(v.anyD + 0.5))) or ""
-        out[#out + 1] = { slot = WARN_BAGS, status = free == 0 and L["full"] or L["filling up"],
-            info = (L["%d%% used, %d free"]):format(used, free) .. far }
-    else
-        dismissed.w_bags = nil
+    -- Kint a szabad helyek szama szamit (nem a szazalek): minel kevesebb, annal messzebbi
+    -- arusert is megeri elmenni (lepcsok: lasd BAG_TIER2 / BAG_URGENT fent).
+    local tier, reach = 0, nil
+    if total > 0 then
+        if free <= BAG_URGENT then tier, reach = 3, math.huge
+        elseif free <= BAG_TIER2 then tier, reach = 2, 600
+        elseif freeLimit > 0 and free <= freeLimit then tier, reach = 1, 300 end
     end
+    local bagWarn = reach and (reach == math.huge or (v.anyD and v.anyD <= reach))
+    -- szin a lepcso szerint: enyhe sarga, kozepes narancs, surgos elenk piros
+    local TIER_COL = { "|cffffcc33", "|cffff8833", "|cffff2020" }
+    local bagText = (L["%d/%d used, %d free"]):format(total - free, total, free)
+    if tier > 0 then bagText = TIER_COL[tier] .. bagText .. "|cff999999" end -- vissza az info szurkejere
     local worst
     for s = 1, 18 do
         local cur, max = GetInventoryItemDurability(s)
         if cur and max and max > 0 and (not worst or cur / max < worst) then worst = cur / max end
     end
     local at = NS.CityLimit("repair") / 100
-    if worst and at > 0 and worst < at then
+    local gearWarn = worst and at > 0 and worst < at
+    -- Arus a kozelben (VENDOR_R): ha a taska legalabb felig tele / fogy a hely, vagy javitani
+    -- kellene (es itt lehet). Ilyenkor ez az egy sor viszi a taska (es a javitas) infot is.
+    -- (Egy javito is vesz targyat, tehat eladasra is jo.)
+    local canSell = v.sell or v.rep
+    local wantSell = total > 0 and canSell and (used >= VENDOR_BAG_PCT or tier > 0)
+    local wantRep = worst and v.rep and (worst < VENDOR_REPAIR or gearWarn)
+    local vendorRow = wantSell or wantRep
+    -- Bags sor: csak arustol tavol (a kozeli arusnal a "Vendor nearby" sor mutatja)
+    if bagWarn and not (vendorRow and canSell) then
+        local far = v.anyD and (" - " .. (L["nearest vendor %d yd"]):format(math.floor(v.anyD + 0.5))) or ""
+        local status = (free == 0 and L["full"]) or (tier == 3 and L["almost full"]) or L["filling up"]
+        out[#out + 1] = { slot = WARN_BAGS, status = TIER_COL[tier] .. status .. "|r", info = bagText .. far }
+    elseif not bagWarn then
+        dismissed.w_bags = nil
+    end
+    -- Gear sor: csak ha nincs javito a kozelben (kulonben a "Vendor nearby" sor mutatja)
+    if gearWarn and not (vendorRow and v.rep) then
         out[#out + 1] = { slot = WARN_REPAIR, status = worst == 0 and L["broken"] or L["worn"],
             info = (L["most worn item at %d%% - repair"]):format(math.floor(worst * 100 + 0.5)) }
-    else
+    elseif not gearWarn then
         dismissed.w_repair = nil
     end
-    -- arus a kozelben: ha a taska legalabb felig tele, vagy javitani kellene (es itt lehet)
-    -- (ha a Bags sor mar kint van, az mutatja az arust: itt csak a javitas miatt szolunk)
-    local wantSell = total > 0 and used >= VENDOR_BAG_PCT and v.sell and not bagsShown
-    local wantRep = worst and worst < VENDOR_REPAIR and v.rep
-    if wantSell or wantRep then
-        local p, d = wantRep and v.rep or v.sell, wantRep and v.repD or v.sellD
+    if vendorRow then
+        local p, d
+        if wantRep then p, d = v.rep, v.repD
+        elseif v.sell then p, d = v.sell, v.sellD
+        else p, d = v.rep, v.repD end
         -- javito-e, akihez kuldunk (a "Sell" a kozelebbi a javitok es a kaja arusok kozul)
-        local isRep = wantRep or (v.rep and p.name == v.rep.name)
+        local isRep = (v.rep and p.name == v.rep.name) and true or false
         local parts = {}
-        if total > 0 then parts[#parts + 1] = (L["bags %d/%d"]):format(total - free, total) end
+        if total > 0 then parts[#parts + 1] = L["bags"] .. " " .. bagText end
         -- tartossag csak ha itt javithatsz is
         if v.rep and worst and worst < 1 then
-            parts[#parts + 1] = (L["gear %d%%"]):format(math.floor(worst * 100 + 0.5))
+            local g = (L["gear %d%%"]):format(math.floor(worst * 100 + 0.5))
+            if gearWarn then g = "|cffff8833" .. g .. "|cff999999" end
+            parts[#parts + 1] = g
         end
         -- a kattintas a javitora visz, ha javitani kell, kulonben barmelyik arusra
         WARN_VENDOR.kind = wantRep and "Repair" or "Sell"

@@ -410,7 +410,7 @@ local function CityNeeds()
     local pctLimit, freeLimit = NS.CityLimit("bagPct"), NS.CityLimit("bagFree")
     if total > 0 then
         local used = math.floor((total - free) / total * 100 + 0.5)
-        if (pctLimit > 0 and used >= pctLimit) or (freeLimit > 0 and free < freeLimit) then
+        if (pctLimit > 0 and used >= pctLimit) or (freeLimit > 0 and free <= freeLimit) then
             out[#out + 1] = { kind = "Sell", icon = "Interface\\Icons\\INV_Misc_Bag_10",
                 text = (L["Bags: %d%% full, %d free slots - sell or bank"]):format(used, free) }
         end

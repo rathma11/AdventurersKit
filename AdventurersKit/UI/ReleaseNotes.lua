@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.57", date = "2026-11-17", items = {
+        "Buff reminder, out in the world: at a vendor you get one \"Vendor nearby\" row instead of a separate Bags "
+            .. "(and Gear) row. It shows your bags (used / free) and, if a repairer is near, your gear %.",
+        "The Bags row now goes by free slots, not percent: at 10 free (your limit in Options) when a vendor is within "
+            .. "300 yd, at 5 free within 600 yd, and at 2 or full always, with the nearest vendor, in a stronger color.",
+    } },
     { version = "0.6.56", date = "2026-11-17", items = {
         "The quest panel has a fixed size now: its width and height follow the text size (Options), so the bottom never "
             .. "moves. The resize handle only shows in the \"What next?\" list.",

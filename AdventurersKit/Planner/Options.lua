@@ -153,11 +153,12 @@ cl:OnRefresh(RebuildIgnore)
 cl:Header(L["City to-do (above the quests)"])
 cl:Text(L["Shown at the top of the city list with the nearest NPC for it (click: marker). Bags and repair also warn out in the world, in the buff reminder (Buffs tab). 0 turns a line off."], 2)
 cl:Number(L["Bags full: warn at"],
-    L["Percent of your bag slots in use. Default 70. The nearest vendor to sell to is shown (or Directions > Bank)."],
+    L["Percent of your bag slots in use, in cities only. Default 70. The nearest vendor to sell to is shown (or Directions > Bank)."],
     function() return NS.CityLimit("bagPct") end,
     function(v) QuestFocusDB.cityBagPct = math.max(0, math.min(100, v)) end, "%")
-cl:Number(L["Bags: or fewer free slots than"],
-    L["Also warns when this few slots are left, whatever the percent. Default 10."],
+cl:Number(L["Bags: or at this many free slots"],
+    L["Also warns when this many slots or fewer are left, whatever the percent. Default 10. "]
+    .. L["Out in the world only free slots count: at this many, when a vendor is within 300 yd; at 5, within 600 yd; at 2 or full, always."],
     function() return NS.CityLimit("bagFree") end,
     function(v) QuestFocusDB.cityBagFree = v end)
 cl:Number(L["Repair: warn when an item is below"],
