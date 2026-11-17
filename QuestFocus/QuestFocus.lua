@@ -1356,34 +1356,59 @@ local function AddQuestTooltip(tooltip, questId, isComplete)
     if not quest then return end
     local objs = CollectTargets(quest, isComplete)
     if #objs == 0 then return end
-    tooltip:AddLine(" ")
-    tooltip:AddLine("QuestFocus", 0.2, 1, 0.6)
+    local here = C_Map.GetBestMapForUnit("player")
+    -- Fejlec: QuestFocus + haladas + hatralevo ido
+    local done, total = 0, 0
     for _, o in ipairs(objs) do
+        if not o.turnIn then total = total + 1; if o.completed then done = done + 1 end end
+    end
+    local eta = not isComplete and NS.QuestEta and NS.QuestEta(objs)
+    local right = isComplete and ("|cff33ff99" .. L["ready to turn in"] .. "|r")
+        or (("%d/%d"):format(done, total) .. (eta and ("  ·  " .. eta) or ""))
+    tooltip:AddLine(" ")
+    tooltip:AddDoubleLine("|cff33ff99QuestFocus|r", right, 1, 1, 1, 0.8, 0.8, 0.8)
+
+    for _, o in ipairs(objs) do
+        local p, dist = FindNearest(o.sources)
+        local distTxt = dist and ("%d yd"):format(dist) or ""
         if o.completed then
-            tooltip:AddLine(o.desc, 0.5, 0.5, 0.5, true)
+            tooltip:AddLine("|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t " .. o.desc, 0.5, 0.5, 0.5)
         else
-            tooltip:AddLine(o.desc, 1, 0.82, 0, true)
-            local names = {}
-            for n, s in ipairs(o.sources) do
-                if n > 3 then names[#names + 1] = "..." break end
-                names[#names + 1] = s.name or "?"
-            end
-            local p, dist = FindNearest(o.sources)
-            local where = p and (("%s %.0f,%.0f"):format(ZoneName(p.map), p.x, p.y)
-                .. (dist and (" (%d yd)"):format(dist) or "")) or ""
+            local icon = o.turnIn and "|TInterface\\GossipFrame\\ActiveQuestIcon:12:12|t "
+                or "|TInterface\\COMMON\\Indicator-Yellow:12:12|t "
+            tooltip:AddDoubleLine(icon .. o.desc, distTxt, 1, 0.82, 0, 0.6, 0.8, 1)
+            -- Forrasok (behuzva, kisebb hangsulyal, ismetles nelkul)
+            local seen = {}
             if o.itemId then
                 for _, l in ipairs(ItemSourceLines(o, 3)) do
-                    tooltip:AddLine("  " .. l[1], l[2], l[3], l[4])
+                    local t = l[1]:gsub("%s*%(on the ground / in an object%)", "")
+                    if not seen[t] then
+                        seen[t] = true
+                        tooltip:AddLine("     " .. t, l[2] * 0.85, l[3] * 0.85, l[4] * 0.85)
+                    end
                 end
-                if where ~= "" then tooltip:AddLine(L["  Nearest: "] .. where, 0.6, 0.8, 1) end
-            else
-                tooltip:AddDoubleLine("  " .. table.concat(names, ", "), where, 1, 1, 1, 0.6, 0.8, 1)
+            elseif not o.turnIn then
+                local names = {}
+                for _, s in ipairs(o.sources) do
+                    if s.name and not seen[s.name] then
+                        seen[s.name] = true
+                        if #names >= 3 then names[#names + 1] = "..." break end
+                        names[#names + 1] = s.name
+                    end
+                end
+                if #names > 0 then tooltip:AddLine("     " .. table.concat(names, ", "), 0.85, 0.85, 0.85) end
             end
-            local etaLine = NS.EtaLine and NS.EtaLine(o)
-            if etaLine then tooltip:AddLine("  " .. etaLine, 0.8, 0.8, 0.8, true) end
+            -- Hol (a zona nevet csak akkor irjuk, ha nem ott vagy) + hatralevo ido
+            local info = {}
+            if p then
+                info[#info + 1] = (p.map ~= here and (ZoneName(p.map) .. " ") or "") .. ("%.0f, %.0f"):format(p.x, p.y)
+            end
+            local short = NS.EtaShort and NS.EtaShort(o)
+            if short then info[#info + 1] = short .. " " .. L["left"] end
+            if #info > 0 then tooltip:AddLine("     " .. table.concat(info, "   ·   "), 0.55, 0.7, 0.9) end
         end
     end
-    tooltip:AddLine(L["Click: marker + QFocus macro"], 0.5, 0.5, 0.5)
+    tooltip:AddLine(L["Click: marker + QFocus macro"], 0.45, 0.45, 0.45)
     tooltip:Show()
 end
 

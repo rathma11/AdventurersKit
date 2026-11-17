@@ -1006,8 +1006,7 @@ local function Row(i)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         if d.kind == "route" then
             GameTooltip:SetText(d.title or "?", 1, 1, 1)
-            NS.AddQuestTooltip(GameTooltip, d.qid, d.done)
-            GameTooltip:AddLine(L["Click: select this quest (marker + QFocus macro)"], 0.5, 0.5, 0.5)
+            NS.AddQuestTooltip(GameTooltip, d.qid, d.done) -- a "Click: ..." sort ez mar hozzaadja
         else
             GameTooltip:SetText(("[%s] %s"):format(tostring(d.level or "?"), d.name or "?"), 1, 1, 1)
             GameTooltip:AddLine((L["Quest giver: %s"]):format(d.point.name or "?"), 1, 0.82, 0)
