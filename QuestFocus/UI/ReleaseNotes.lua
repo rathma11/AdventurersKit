@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.4.9", date = "2026-11-17", items = {
+        "Weapon enchant rows only for a hand that holds a melee weapon: with a two-hander the off-hand row is gone "
+            .. "(Buffs tab, setup popup, reminder); it comes back when you equip an off-hand weapon.",
+    } },
     { version = "0.4.8", date = "2026-11-17", items = {
         "Buffs tab: three groups - items (sleeping bag, XP food, weapon enchants), class buffs, and your own additions.",
         "Weapon swap (out of combat): stones / oils / poisons are picked to fit the new weapon (sharpening stone for edged, weightstone for blunt); "

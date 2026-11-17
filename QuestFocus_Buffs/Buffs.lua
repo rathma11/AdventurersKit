@@ -205,6 +205,14 @@ local function WeaponKind(hand)
 end
 NS.WeaponKind = WeaponKind
 
+-- Van-e kozelharci fegyver ebben a kezben (ketkezesnel az off hand ures, ranged-nel nincs
+-- ideiglenes enchant): ha nincs, a sor nem latszik se az Optionsben, se az emlekeztetoben.
+local function HandHasWeapon(hand)
+    local k = WeaponKind(hand)
+    return k ~= nil and k ~= "ranged"
+end
+NS.HandHasWeapon = HandHasWeapon
+
 -- Rafer-e ez az item a fegyverre (nev alapjan): Sharpening Stone = eles, Weightstone = tompa,
 -- olaj / poison / ismeretlen = barmelyik kozelharci fegyver
 local function ItemFitsWeapon(itemId, hand)
@@ -1033,6 +1041,8 @@ local function CheckWeapons()
     -- az uj fegyvernel ujra szolhat (ha a regi miatt X-szel elrejtetted)
     for _, s in ipairs(SLOTS) do if s.hand then dismissed[s.key] = nil end end
     Rebuild()
+    -- az Options lista is (off-hand sor eltunik / megjelenik)
+    if NS.RefreshBuffList then NS.RefreshBuffList() end
 end
 local function Soon()
     if pending then return end
@@ -1378,13 +1388,8 @@ local function MissingSetup()
     local out = {}
     for _, s in ipairs(SLOTS) do
         if not s.isClass and not s.custom and not NS.BuffSlotOff(s) and not Action(s) then
-            local relevant = true
-            if s.hand == 17 then
-                -- off hand: csak ha ott fegyver van
-                local id = GetInventoryItemID("player", 17)
-                relevant = id and select(6, GetItemInfoInstant(id)) == 2 or false
-            end
-            if relevant then out[#out + 1] = s.label end
+            -- fegyver enchant: csak ha abban a kezben kozelharci fegyver van
+            if not s.hand or HandHasWeapon(s.hand) then out[#out + 1] = s.label end
         end
     end
     return out
@@ -1750,7 +1755,7 @@ RefreshList = function()
             h:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 2, y - (gi > 1 and 6 or 0))
             y = y - (gi > 1 and 6 or 0) - 16
             for _, slot in ipairs(SLOTS) do
-                if g.test(slot) then
+                if g.test(slot) and (not slot.hand or HandHasWeapon(slot.hand)) then
                     n = n + 1
                     local r = GetRow(n)
                     r.slot = slot
@@ -1793,6 +1798,7 @@ RefreshList = function()
 end
 NS.RefreshBuffOptions = RefreshList
 fl:OnRefresh(RefreshList)
+NS.RefreshBuffList = function() if page:IsVisible() then RefreshList() end end
 
 ---------------------------------------------------------------------------
 -- Add item: egyeb, specialis buffok (elixir, scroll...): ide huzott item + perc
