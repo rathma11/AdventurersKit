@@ -938,6 +938,8 @@ qpopTicker:SetScript("OnUpdate", function(_, dt)
     -- varosban nincs egyenkenti popup (ott a lista van)
     if InCity() and not QuestFocusDB.noCityMode then return end
     if QuestFocusDB.noQuestPopup or InCombatLockdown() or qpop:IsShown() or not NS.QuestieAvailable() then return end
+    -- taxi repules kozben ne (ott ugysem tudsz leszallni a questert)
+    if UnitOnTaxi and UnitOnTaxi("player") then return end
     -- optimalizalas: ha 25 yd-nal kevesebbet mentel es a quest log se valtozott, ugyanaz jonne ki
     local moved = NS.Moved and NS.Moved("qpop", 25)
     if NS.Moved and not moved and qpopGen == NS.questLogGen then return end

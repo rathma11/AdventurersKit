@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.21", date = "2026-11-17", items = {
+        "What next: 'Next zone' line on top. 'Go to <zone>' when another zone has 5+ quests from your log (more than here); "
+            .. "otherwise the nearest zone with 5+ quests to pick up for your level. 'Hearth back to <zone>' when the "
+            .. "Hearthstone is the fastest way. Hover: the quests and the way; click: marker. Switch: Route & progress tab.",
+        "Travel: boats, zeppelins and the Deeprun Tram count in travel times and advice (also to the other continent); "
+            .. "the Hearthstone (with its cooldown) is part of the route search.",
+        "The nearby quest popup no longer shows while you are on a flight path.",
+    } },
     { version = "0.6.20", date = "2026-11-17", items = {
         "Directions > Profession Trainer: every profession has its icon.",
     } },

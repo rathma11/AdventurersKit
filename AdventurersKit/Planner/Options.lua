@@ -18,6 +18,15 @@ rt:Check(L["Suggest quests when none is selected"],
         QuestFocusDB.noSuggest = not v
         NS.Panel_Update()
     end)
+rt:Check(L["Suggest the next zone"],
+    L["On top of the suggestions: 'Go to <zone>' when another zone has at least 5 quests from your log (and more than here), "]
+    .. L["otherwise the nearest zone with at least 5 quests to pick up for your level. Travel time counts walking, "]
+    .. L["boats, zeppelins, the tram and your Hearthstone (with its cooldown); hover the line for the way."],
+    function() return not QuestFocusDB.noZoneSuggest end,
+    function(v)
+        QuestFocusDB.noZoneSuggest = not v
+        NS.Panel_Update()
+    end)
 rt:Header(L["Progress and time left"])
 rt:Check(L["Progress popup"],
     L["A small popup above the panel for a few seconds when an objective progresses, with the estimated time left."],

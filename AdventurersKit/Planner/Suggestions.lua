@@ -31,6 +31,12 @@ local function Row(i)
             NS.SetWaypoint(d.point, d.point.name or d.name)
             if state.waypoint then state.waypoint.giver = d.qid end
             NS.Print(L["Marker: quest giver |cffffff00%s|r for %s"], d.point.name or "?", d.name or "?")
+        elseif d.kind == "zone" then
+            local z = d.zone
+            NS.SetWaypoint(z.point, z.point.name or z.zone)
+            local how = z.steps and #z.steps > 0 and NS.TransportStepsText(z.steps) or L["walk"]
+            NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%s) - %s, ~%s"], z.zone or "?", z.point.name or "?", how,
+                P.FormatTime(z.time or 0))
         end
     end)
     r:SetScript("OnEnter", function(self)
@@ -46,6 +52,20 @@ local function Row(i)
             local tt = TT.Begin(self, "ANCHOR_LEFT", d.title or "?", TT.Progress(objs, d.done))
             TT.Objectives(tt, objs)
             TT.Finish(tt, L["Click: focus this quest (marker + QFocus macro)"])
+        elseif d.kind == "zone" then
+            local z = d.zone
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+            GameTooltip:SetText(z.zone or "?", 1, 0.82, 0)
+            GameTooltip:AddLine(z.kind == "log" and (L["%d quests from your log are here"]):format(z.count)
+                or (L["%d quests to pick up here for your level"]):format(z.count), 1, 1, 1)
+            for i, q in ipairs(z.quests) do
+                if i > 8 then GameTooltip:AddLine("...", 0.6, 0.6, 0.6) break end
+                GameTooltip:AddLine("  " .. (q.level and ("[" .. q.level .. "] ") or "") .. (q.title or "?"), 0.8, 0.8, 0.8)
+            end
+            local how = z.steps and #z.steps > 0 and NS.TransportStepsText(z.steps) or L["walk"]
+            GameTooltip:AddLine((L["Way: %s, ~%s"]):format(how, P.FormatTime(z.time or 0)), 0.4, 0.8, 1, true)
+            GameTooltip:AddLine(L["Click: marker there"], 0.5, 0.5, 0.5)
+            GameTooltip:Show()
         else
             TT.Pickup(self, "ANCHOR_LEFT", d)
         end
@@ -115,6 +135,28 @@ NS.ShowSuggestions = function()
         fs:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
         fs:Show()
         y = y - 15
+    end
+
+    -- zona ajanlas (masik zona sok questtel / kovetkezo zona felveheto questekkel)
+    local zs = pc and NS.ZoneSuggestion and NS.ZoneSuggestion()
+    if zs then
+        place(Header(L["Next zone:"]))
+        n = n + 1
+        local r = Row(n)
+        r.data = { kind = "zone", zone = zs }
+        local hs = zs.steps and zs.steps[1] and zs.steps[1].kind == "hs"
+        local via = ""
+        if zs.steps and #zs.steps > 0 then
+            via = hs and ("  |cff33ff99" .. L["Hearth"] .. "|r") or ("  |cff33ff99" .. NS.TransportStepsText({ zs.steps[1] }):match("^[^:]+") .. "|r")
+        end
+        local what = zs.kind == "log" and (L["%d in your log"]):format(zs.count) or (L["%d to pick up"]):format(zs.count)
+        r.text:SetText(("|cffffd100%s %s|r  |cffcccccc%s|r  |cff999999~%s|r%s"):format(
+            hs and L["Hearth back to"] or L["Go to"], zs.zone or "?", what, P.FormatTime(zs.time or 0), via))
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        r:Show()
+        r:SetSize(NS.PW() - 24, NS.RowH())
+        y = y - NS.RowH() - 4
     end
 
     if #route > 0 then

@@ -188,6 +188,30 @@ NS.NearestTownsfolk = function(kind)
 end
 
 local starterCache = {} -- qid -> quest giver forrasok
+local function QuestStarters(qid, q)
+    local sources = starterCache[qid]
+    if sources then return sources end
+    sources = {}
+    starterCache[qid] = sources
+    for _, id in ipairs(type(q.Starts.NPC) == "table" and q.Starts.NPC or {}) do
+        local npc = NS.GetNPC(id)
+        if npc then sources[#sources + 1] = { id = id, name = npc.name, spawns = npc.spawns, isNpc = true } end
+    end
+    for _, id in ipairs(type(q.Starts.GameObject) == "table" and q.Starts.GameObject or {}) do
+        local obj = NS.GetObject(id)
+        if obj then sources[#sources + 1] = { id = id, name = obj.name, spawns = obj.spawns, isNpc = false } end
+    end
+    return sources
+end
+
+-- Felveheto-e most (nincs a logban, nincs kesz, szintsavban); a zona ajanlo is ezt hasznalja
+local function PickupOk(qid, q, inLog, level, below, above)
+    if not q or inLog[qid] or IsDone(qid) then return false end
+    local ql = tonumber(q.level) or 0
+    return type(q.Starts) == "table" and not q.isHidden
+        and (q.requiredLevel or 0) <= level
+        and (ql <= 0 or (ql >= level - below and ql <= level + above))
+end
 
 local function BuildPickups(pc, px, py, maxN)
     local AQ = NS.Module("AvailableQuests")
@@ -201,28 +225,10 @@ local function BuildPickups(pc, px, py, maxN)
     local above = tonumber(QuestFocusDB.pickupAbove) or 10
     local list = {}
     for qid in pairs(avail) do
-        if not inLog[qid] and not IsDone(qid) then
-            local q = NS.GetQuestieQuest(qid)
-            local ql = q and tonumber(q.level) or 0
-            if q and type(q.Starts) == "table" and not q.isHidden
-                and (q.requiredLevel or 0) <= level
-                and (ql <= 0 or (ql >= level - below and ql <= level + above)) then
-                local sources = starterCache[qid]
-                if not sources then
-                sources = {}
-                starterCache[qid] = sources
-                for _, id in ipairs(type(q.Starts.NPC) == "table" and q.Starts.NPC or {}) do
-                    local npc = NS.GetNPC(id)
-                    if npc then sources[#sources + 1] = { id = id, name = npc.name, spawns = npc.spawns, isNpc = true } end
-                end
-                for _, id in ipairs(type(q.Starts.GameObject) == "table" and q.Starts.GameObject or {}) do
-                    local obj = NS.GetObject(id)
-                    if obj then sources[#sources + 1] = { id = id, name = obj.name, spawns = obj.spawns, isNpc = false } end
-                end
-                end
-                local p, d = Nearest(sources, pc, px, py)
-                if p then list[#list + 1] = { qid = qid, name = q.name, level = q.level, point = p, dist = d, quest = q } end
-            end
+        local q = NS.GetQuestieQuest(qid)
+        if PickupOk(qid, q, inLog, level, below, above) then
+            local p, d = Nearest(QuestStarters(qid, q), pc, px, py)
+            if p then list[#list + 1] = { qid = qid, name = q.name, level = q.level, point = p, dist = d, quest = q } end
         end
     end
     table.sort(list, function(a, b) return a.dist < b.dist end)
@@ -321,3 +327,4 @@ NS.EstimateQuestTime = EstimateQuestTime
 
 -- belso exportok a tobbi core fajlnak
 NS.P.BuildPickups, NS.P.BuildRoute, NS.P.EstimateQuestTime, NS.P.Nearest = BuildPickups, BuildRoute, EstimateQuestTime, Nearest
+NS.P.SourcePoints, NS.P.QuestStarters, NS.P.PickupOk = SourcePoints, QuestStarters, PickupOk
