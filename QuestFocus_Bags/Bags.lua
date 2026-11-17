@@ -453,15 +453,29 @@ RefreshBagList = function()
     list.title:SetText((L["Quest items (%d)"]):format(#rows))
     UpdateCollapseIcon()
     list:ClearAllPoints()
-    list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
-    list:Show()
+    list.title:ClearAllPoints()
+    collapseBtn:ClearAllPoints()
 
     if QuestFocusDB.bagListCollapsed then
+        -- Osszecsukva: keskeny ful a taska tetejen (nem log a taska mellett)
+        list:SetPoint("BOTTOMLEFT", anchorFrame, "TOPLEFT", 0, 1)
+        list:SetSize(170, 22)
+        list.title:SetFontObject("GameFontNormalSmall")
+        list.title:SetPoint("LEFT", 8, 0)
+        collapseBtn:SetSize(14, 14)
+        collapseBtn:SetPoint("RIGHT", -4, 0)
         scroll:Hide()
         junkBtn:Hide()
-        list:SetHeight(28)
+        list:Show()
         return
     end
+    list:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -4, 0)
+    list:SetWidth(260)
+    list.title:SetFontObject("GameFontNormal")
+    list.title:SetPoint("TOPLEFT", 10, -8)
+    collapseBtn:SetSize(18, 18)
+    collapseBtn:SetPoint("TOPRIGHT", -6, -5)
+    list:Show()
     scroll:Show()
 
     local y = 0
