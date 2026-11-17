@@ -124,7 +124,7 @@ NS.ShowSuggestions = function()
             local r = Row(n)
             r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
             local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
-            local leg = (i == 1 and "" or "+") .. YdText(s.leg and math.floor(s.leg + 0.5))
+            local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
             local eta = not s.done and NS.QuestEta(s.objs)
             r.text:SetText(("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or ""))
             r:ClearAllPoints()
@@ -182,7 +182,7 @@ local function TurnInRoute()
 end
 local function TurnInKey(list)
     local t = {}
-    for i, s in ipairs(list) do t[i] = s.qid .. ":" .. math.floor((s.leg or 0) / 25) end
+    for i, s in ipairs(list) do t[i] = s.qid .. ":" .. math.floor((s.dist or 0) / 25) end
     return table.concat(t, ",")
 end
 NS.ShowTurnInPickups = function(y)
@@ -200,7 +200,7 @@ NS.ShowTurnInPickups = function(y)
         local r = Row(i)
         r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
         local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
-        local leg = (i == 1 and "" or "+") .. YdText(s.leg and math.floor(s.leg + 0.5))
+        local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
         local eta = not s.done and NS.QuestEta(s.objs)
         r.text:SetText(("%d. %s  %s%s"):format(i, name, leg, eta and ("  |cff999999" .. eta .. "|r") or ""))
         r:ClearAllPoints()

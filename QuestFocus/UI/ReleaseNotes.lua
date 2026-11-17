@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.3.9", date = "2026-11-17", items = {
+        "Route list: every stop shows its straight-line distance from you (no more '+N yd' from the previous stop). The order is still nearest-next.",
+    } },
     { version = "0.3.8", date = "2026-11-17", items = {
         "Buff reminder: item buffs show how many you still have in your bags (on the icon and as xN).",
     } },

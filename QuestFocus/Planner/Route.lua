@@ -81,7 +81,9 @@ local function BuildRoute(pc, px, py, maxN)
         end
         if not bi then break end
         local s = table.remove(stops, bi)
+        -- leg: az elozo allomastol (a sorrendhez); dist: tolad legvonalban (ezt mutatjuk)
         s.point, s.leg = bp, bd
+        s.dist = math.sqrt((bp.wx - px) ^ 2 + (bp.wy - py) ^ 2)
         route[#route + 1] = s
         cx, cy = bp.wx, bp.wy
     end
