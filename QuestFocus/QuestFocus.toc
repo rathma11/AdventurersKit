@@ -1,41 +1,5 @@
 ## Interface: 16001
-## Title: Adventurer's Kit
-## Notes: Questing kit: QFocus target macro, markers, route and pickup planner, city list, tooltips (Questie data)
-## Version: 0.5.5
-## OptionalDeps: Questie, TomTom, Bagnon, ForeverDungeonJournal
+## Title: Adventurer's Kit - old settings (QuestFocus)
+## Notes: Only carries your old QuestFocus / Adventurer's Kit settings over to the renamed AdventurersKit addon. No code. You can delete this folder after one login with the new version.
+## Version: 1.0
 ## SavedVariables: QuestFocusDB
-
-# Alap (core)
-Core\Locales.lua
-Core\Init.lua
-Core\Questie.lua
-Core\Map.lua
-Core\Targeting.lua
-UI\Tooltip.lua
-UI\Panel.lua
-Core\Selection.lua
-Core\Events.lua
-Core\ZoneFocus.lua
-Core\Debug.lua
-UI\Options.lua
-Core\Slash.lua
-
-# Tervezo: tempo, ETA, javaslatok, utazas, varos mod
-Planner\Pace.lua
-Planner\Toast.lua
-Planner\Route.lua
-Planner\Dungeons.lua
-Planner\Popup.lua
-Planner\Travel.lua
-Planner\City.lua
-Planner\Suggestions.lua
-Planner\Events.lua
-Planner\Options.lua
-
-# Beallitasok export / import (Options ful)
-UI\Profile.lua
-
-# Release notes (Options ful + bejelentkezo sor)
-UI\ReleaseNotes.lua
-
-# Kiegeszitok kulon addonokban: QuestFocus_Bags, QuestFocus_Buffs

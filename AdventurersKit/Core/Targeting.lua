@@ -63,7 +63,11 @@ end
 local pickElapsed = 0
 pickTicker:SetScript("OnUpdate", function(_, dt)
     pickElapsed = pickElapsed + dt
-    if pickElapsed > 0.2 then pickElapsed = 0; PickNameplate() end
+    if pickElapsed < 0.25 then return end
+    pickElapsed = 0
+    -- csak ha van fokuszalt quest (kulonben nincs mit targetelni), harcban a macro ugysem irhato
+    if not state.questId or InCombatLockdown() then return end
+    PickNameplate()
 end)
 
 local function BuildMacroBody(objectives, onlyIndex)

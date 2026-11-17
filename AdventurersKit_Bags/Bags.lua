@@ -575,16 +575,23 @@ local function RowText(e)
 end
 
 RefreshBagList = function()
-    Scan()
-    MaybeRefreshBagnon()
+    -- Optimalizalas: csak nyitott taskanal es kinyitott quest item listanal szkennelunk;
+    -- osszecsukva a ful a legutobbi szamot mutatja.
     if not (anchorFrame and anchorFrame:IsShown()) or QuestFocusDB.noBagList or not On() then list:Hide() return end
+    if not QuestFocusDB.bagListCollapsed then
+        Scan()
+        scan.done = true
+        MaybeRefreshBagnon()
+    end
 
     local rows = {}
     for _, e in ipairs(scan.items) do rows[#rows + 1] = e end
     for _, e in ipairs(scan.bankOnly) do rows[#rows + 1] = e end
-    if #rows == 0 then list:Hide() return end
+    -- osszecsukva, meg szkenneles nelkul: a ful latszik (kinyitni ezzel lehet), szam nelkul
+    local unknown = QuestFocusDB.bagListCollapsed and not scan.done
+    if #rows == 0 and not unknown then list:Hide() return end
 
-    list.title:SetText((L["Quest items (%d)"]):format(#rows))
+    list.title:SetText(unknown and L["Quest items"] or (L["Quest items (%d)"]):format(#rows))
     UpdateCollapseIcon()
     list:ClearAllPoints()
     list.title:ClearAllPoints()
@@ -724,8 +731,20 @@ junkBtn:SetScript("OnClick", DiscardLeftovers)
 local USE_MAX = 6
 NS.panelUseShown = {}
 
+-- Optimalizalas: az eredmeny csak taska / quest log valtozaskor (useGen) szamolodik ujra,
+-- nem minden 0.4 mp-es tick-ben (a Questie lekerdezes draga).
+local useGen, useCache = 0, {}
+local ObjectiveUseItemRaw
 local function ObjectiveUseItem(qid, o, questLevel)
     if not On() or QuestFocusDB.noUseButton or not o or o.completed or o.turnIn then return end
+    local key = tostring(qid) .. "|" .. tostring(o.desc) .. "|" .. tostring(questLevel and true or false)
+    local c = useCache[key]
+    if c and c.gen == useGen then return c.id end
+    local id = ObjectiveUseItemRaw(qid, o, questLevel)
+    useCache[key] = { gen = useGen, id = id }
+    return id
+end
+ObjectiveUseItemRaw = function(qid, o, questLevel)
     if o.itemId and GetItemCount(o.itemId) > 0 and ItemHasUse(o.itemId)
         and select(6, GetItemInfoInstant(o.itemId)) == QUEST_CLASS then
         return o.itemId
@@ -924,10 +943,13 @@ local pending
 ev:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
         HookBags()
-        C_Timer.After(3, function() Scan(); MaybeRefreshBagnon(); UpdateUseButton() end)
+        C_Timer.After(3, function() RefreshBagList(); UpdateUseButton() end)
         return
     end
     if event == "PLAYER_REGEN_ENABLED" or event == "UPDATE_BINDINGS" then UpdateUseButton() return end
+    -- taska / quest log valtozott: a hasznalhato item cache ujraszamolodik
+    useGen = useGen + 1
+    if useGen % 50 == 0 then wipe(useCache) end
     if pending then return end
     pending = true
     C_Timer.After(0.3, function()

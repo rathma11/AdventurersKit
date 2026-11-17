@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.0", date = "2026-11-17", items = {
+        "Folders renamed to AdventurersKit, AdventurersKit_Bags, AdventurersKit_Buffs (the CPU / addon lists now say Adventurer's Kit). "
+            .. "A small code-free 'QuestFocus' folder carries your old settings over; delete it after one login.",
+        "Less CPU: nearby-quest, pickup-popup and city-list scans only run again after you move (or the quest log changes); "
+            .. "nameplate picking only with a focused quest; usable quest items and buff items are cached until your bags change; "
+            .. "item-info events from other addons no longer rebuild the buff reminder; "
+            .. "the bag quest item scan only runs while the bag is open and the quest item list is expanded.",
+        "Summary of 0.5.x: Start dungeon (Dungeon Journal), panel icon row, settings export / import, map buttons, vendor markers.",
+    } },
     { version = "0.5.5", date = "2026-11-17", items = {
         "Map button: the focused quest's zone header is expanded and the quest is selected in the quest log "
             .. "(the quest list next to the map follows it); other collapsed headers stay collapsed.",

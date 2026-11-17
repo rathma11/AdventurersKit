@@ -228,7 +228,22 @@ NS.ItemFitsWeapon = ItemFitsWeapon
 
 -- Beallitott item, vagy nev alapjan az elso talalat a taskakban. Fegyvernel csak olyan,
 -- ami a mostani fegyverre rafer (fegyvercserenel igy magatol valt kore / olajra).
+-- Optimalizalas: a talalat cache-elve, amig nem valtozik a taska / felszereles (itemGen),
+-- vagy a beallitott item; a taska bejarasa slotonkent masodpercenkent draga volt.
+local itemGen, findCache = 0, {}
+-- volt-e meg nem betoltott (nev nelkuli) item a keresesben: csak ekkor erdekel a GET_ITEM_INFO_RECEIVED
+local awaitingInfo = false
+NS.BumpBuffItems = function() itemGen = itemGen + 1 end
+local FindItemRaw
 local function FindItem(slot)
+    local set = DB().buffItems[slot.key]
+    local c = findCache[slot.key]
+    if c and c.gen == itemGen and c.set == set then return c.id end
+    local id = FindItemRaw(slot)
+    findCache[slot.key] = { gen = itemGen, set = set, id = id }
+    return id
+end
+FindItemRaw = function(slot)
     local id = DB().buffItems[slot.key]
     if id and (not slot.hand or ItemFitsWeapon(id, slot.hand)) then return id end
     if #slot.names == 0 then return slot.hand and nil or id end
@@ -236,6 +251,7 @@ local function FindItem(slot)
         for s = 1, (GetSlots(bag) or 0) do
             local iid = GetItemID(bag, s)
             local name = iid and GetItemInfo(iid)
+            if iid and not name then awaitingInfo = true end -- meg nincs betoltve: GET_ITEM_INFO_RECEIVED-re ujra
             if name and (not slot.hand or ItemFitsWeapon(iid, slot.hand)) then
                 for _, pat in ipairs(slot.names) do
                     if name:find(pat, 1, true) then return iid end
@@ -1014,7 +1030,7 @@ local alertElapsed = 0
 local alertTicker = CreateFrame("Frame")
 alertTicker:SetScript("OnUpdate", function(_, dt)
     alertElapsed = alertElapsed + dt
-    if alertElapsed < 1 then return end
+    if alertElapsed < 1.5 then return end
     alertElapsed = 0
     local auras = HelpfulAuras()
     CheckWarnings(auras)
@@ -1073,11 +1089,19 @@ ev:SetScript("OnEvent", function(_, event, unit)
         if weaponCheckPending then C_Timer.After(1, CheckWeapons) end
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
         if unit == 16 or unit == 17 then
+            itemGen = itemGen + 1
             Soon()
             C_Timer.After(1, CheckWeapons)
         end
     elseif event == "BAG_UPDATE_DELAYED" then
+        itemGen = itemGen + 1
         if NS.ClearFoodCache then NS.ClearFoodCache() end
+        Soon()
+    elseif event == "GET_ITEM_INFO_RECEIVED" then
+        -- mas addonok (pl. AllTheThings) miatt folyamatosan johet: csak ha mi varunk itemre
+        if not awaitingInfo then return end
+        awaitingInfo = false
+        itemGen = itemGen + 1
         Soon()
     elseif event == "PLAYER_LOGIN" then
         NS.EnsureCustomBuffs()

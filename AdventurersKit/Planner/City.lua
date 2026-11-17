@@ -330,12 +330,16 @@ cityEv:SetScript("OnEvent", function()
 end)
 
 -- Frissites, amig kint van (mozgas kozben valtozik a tavolsag, kozben felvett quest kikerul)
-local cityElapsed = 0
+local cityElapsed, cityGen = 0, nil
 city:SetScript("OnUpdate", function(_, dt)
     cityElapsed = cityElapsed + dt
     if cityElapsed < 5 then return end
     cityElapsed = 0
     if not InCity() and not city.forced then city:Hide() return end
+    -- optimalizalas: csak ha mozogtal (15 yd) vagy valtozott a quest log
+    local moved = NS.Moved and NS.Moved("city", 15)
+    if NS.Moved and not moved and cityGen == NS.questLogGen then return end
+    cityGen = NS.questLogGen
     if not city:IsMouseOver() then RefreshCityList() end
 end)
 city:HookScript("OnHide", function() city.forced = nil end)
@@ -365,7 +369,7 @@ cityRetry:SetScript("OnUpdate", function(_, dt)
 end)
 
 local qpopTicker = CreateFrame("Frame")
-local qpopElapsed = 0
+local qpopElapsed, qpopGen = 0, nil
 qpopTicker:SetScript("OnUpdate", function(_, dt)
     qpopElapsed = qpopElapsed + dt
     if qpopElapsed < 5 then return end
@@ -373,6 +377,10 @@ qpopTicker:SetScript("OnUpdate", function(_, dt)
     -- varosban nincs egyenkenti popup (ott a lista van)
     if InCity() and not QuestFocusDB.noCityMode then return end
     if QuestFocusDB.noQuestPopup or InCombatLockdown() or qpop:IsShown() or not NS.QuestieAvailable() then return end
+    -- optimalizalas: ha 25 yd-nal kevesebbet mentel es a quest log se valtozott, ugyanaz jonne ki
+    local moved = NS.Moved and NS.Moved("qpop", 25)
+    if NS.Moved and not moved and qpopGen == NS.questLogGen then return end
+    qpopGen = NS.questLogGen
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
     local ok, list = pcall(BuildPickups, pc, px, py, 10)
@@ -382,6 +390,7 @@ qpopTicker:SetScript("OnUpdate", function(_, dt)
         if not announced[d.qid] then
             announced[d.qid] = true
             ShowQuestPopup(d)
+            qpopGen = nil -- utana a kovetkezo kozeli quest mozgas nelkul is johet
             return
         end
     end

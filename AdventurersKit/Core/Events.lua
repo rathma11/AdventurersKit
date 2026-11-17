@@ -112,6 +112,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
         if state.pendingBody then ApplyMacro(state.pendingBody) end
         PickNameplate()
     elseif event == "QUEST_LOG_UPDATE" then
+        NS.questLogGen = (NS.questLogGen or 0) + 1 -- a tickerek ebbol latjak, hogy ujra kell szamolni
         ScheduleRefresh()
     end
 end)

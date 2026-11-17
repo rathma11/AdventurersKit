@@ -1,17 +1,20 @@
 # Adventurer's Kit (WoW: Forever)
 
-Formerly **QuestFocus**. Since 0.4.0 the addon is shown as *Adventurer's Kit* in the game; the folders, slash commands (`/qf`), SavedVariables and the `QFocus` macro keep their old names, so settings and keybinds carry over.
+Formerly **QuestFocus**. Since 0.6.0 the folders are `AdventurersKit*` too. The slash command (`/qf`), the `QuestFocusDB` SavedVariables and the `QFocus` macro keep their old names, so keybinds carry over.
+
+**Upgrading from QuestFocus (before 0.6.0):** remove the old `QuestFocus_Bags` and `QuestFocus_Buffs` folders and replace the old `QuestFocus` folder with the small one in the release (no code, it only loads your old settings). Restart the game, log in once, then that `QuestFocus` folder can be deleted. Safety net: `/qf export` before upgrading.
 
 Requires **Questie**. TomTom is optional: if it is installed, its arrow is used. Bagnon is optional: if it is installed, the quest item features hook into its bag window.
 
 ## Addons (modules)
-QuestFocus ships as three folders. Copy all of them to `Interface\AddOns`; the two modules are optional and can be disabled one by one in the AddOns list.
+Adventurer's Kit ships as three folders (plus the `QuestFocus` settings bridge for upgrades). Copy them to `Interface\AddOns`; the two modules are optional and can be switched off in Options or disabled in the AddOns list.
 
 | Folder | What it does |
 |---|---|
-| `QuestFocus` | Core (required): QFocus macro, marker, panel, tooltips, pace/ETA, suggestions, travel, city mode |
-| `QuestFocus_Bags` | Quest item list, Bagnon highlight, use-item button and keybind |
-| `QuestFocus_Buffs` | Buff reminder: sleeping bag, XP food, weapon enchant, class buffs, tracking switch keybind |
+| `AdventurersKit` | Core (required): QFocus macro, marker, panel, tooltips, pace/ETA, suggestions, travel, city mode, dungeons |
+| `AdventurersKit_Bags` | Quest item list, Bagnon highlight, use-item button and keybind |
+| `AdventurersKit_Buffs` | Buff reminder: sleeping bag, XP food, weapon enchant, class buffs, tracking switch keybind |
+| `QuestFocus` | Only for upgrades: loads the old settings once (no code), delete it afterwards |
 
 Core layout: `Core\` (logic), `UI\` (panel, options, shared tooltip builder `UI\Tooltip.lua`), `Planner\` (pace, routes, popups, travel). All modules share the `QuestFocusDB` settings.
 

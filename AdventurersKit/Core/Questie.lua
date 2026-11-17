@@ -62,6 +62,24 @@ local function SortedValues(t)
     return out
 end
 
+-- Item -> vendor NPC-k (statikus adat: itemenkent egyszer kerdezzuk le)
+local vendorCache = {}
+local function VendorsOf(itemId)
+    local v = vendorCache[itemId]
+    if v then return v end
+    v = {}
+    local DB = Module("QuestieDB")
+    local ok, item = false, nil
+    if DB and type(DB.GetItem) == "function" then ok, item = pcall(DB.GetItem, DB, itemId) end
+    if ok and type(item) == "table" and type(item.Sources) == "table" then
+        for _, src in ipairs(item.Sources) do
+            if src.Vendor and src.Id then v[src.Id] = true end
+        end
+    end
+    vendorCache[itemId] = v
+    return v
+end
+
 -- Egy quest objective-jei, mindegyikhez a forrasok (mob / object) spawnokkal.
 local function CollectTargets(quest, isComplete)
     local result = {}
@@ -131,17 +149,9 @@ local function CollectTargets(quest, isComplete)
             -- Vendorok (a spawnList-ben mobkent szerepelnek): ezeket meg kell talalni, nem
             -- "a teruleten vagy" - a marker mindig kell (static = egy konkret NPC)
             if entry.itemId and #entry.sources > 0 then
-                local DB = Module("QuestieDB")
-                local ok, item = false, nil
-                if DB and type(DB.GetItem) == "function" then ok, item = pcall(DB.GetItem, DB, entry.itemId) end
-                if ok and type(item) == "table" and type(item.Sources) == "table" then
-                    local vend = {}
-                    for _, src in ipairs(item.Sources) do
-                        if src.Vendor and src.Id then vend[src.Id] = true end
-                    end
-                    for _, s in ipairs(entry.sources) do
-                        if s.isNpc and vend[s.id] then s.static = true end
-                    end
+                local vend = VendorsOf(entry.itemId)
+                for _, s in ipairs(entry.sources) do
+                    if s.isNpc and vend[s.id] then s.static = true end
                 end
             end
 

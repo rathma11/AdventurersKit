@@ -51,13 +51,30 @@ end
 NS.SelectQuest, NS.SelectObjective = SelectQuest, SelectObjective
 
 -- Kozeli tobbi quest figyelese (3 mp-enkent, harcon kivul): a macro es a panel frissul
+-- Optimalizalas: ha nem mozdultal (15 yd) es a quest log se valtozott, nem szamolunk ujra
+-- (legalabb 15 mp-enkent azert igen).
+NS.questLogGen = NS.questLogGen or 0
+-- Mozgas-figyelo: Moved(tag, yd) true, ha az utolso true ota legalabb ennyit mentel (vagy mas kontinens)
+local movedAt = {}
+NS.Moved = function(tag, yd)
+    local pc, px, py = NS.C.PlayerWorldPos()
+    if not pc then return true end
+    local m = movedAt[tag]
+    if m and m.c == pc and (m.x - px) ^ 2 + (m.y - py) ^ 2 < yd * yd then return false end
+    movedAt[tag] = { c = pc, x = px, y = py }
+    return true
+end
 local extraTicker = CreateFrame("Frame")
-local extraElapsed, lastExtraKey = 0, nil
+local extraElapsed, lastExtraKey, sinceFull, lastGen, lastQid = 0, nil, 0, -1, nil
 extraTicker:SetScript("OnUpdate", function(_, dt)
     extraElapsed = extraElapsed + dt
     if extraElapsed < 3 then return end
+    sinceFull = sinceFull + extraElapsed
     extraElapsed = 0
     if not state.questId or InCombatLockdown() then return end
+    local moved = NS.Moved("extra", 15)
+    if not moved and lastGen == NS.questLogGen and lastQid == state.questId and sinceFull < 15 then return end
+    sinceFull, lastGen, lastQid = 0, NS.questLogGen, state.questId
     local list = {}
     if not QuestFocusDB.noNearbyQuests and NS.NearbyQuestTargets then
         local ok, r = pcall(NS.NearbyQuestTargets, state.questId, tonumber(QuestFocusDB.nearbyRadius) or 200)

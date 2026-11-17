@@ -5,7 +5,7 @@
 --       L["Settings"] = "Einstellungen"
 --   end
 
-local _, NS = ...
+local ADDON_NAME, NS = ...
 local L = setmetatable({}, { __index = function(_, k) return k end })
 NS.L = L
 NS.locale = GetLocale and GetLocale() or "enUS"
@@ -18,9 +18,9 @@ local blockWatch = CreateFrame("Frame")
 blockWatch:RegisterEvent("ADDON_ACTION_BLOCKED")
 blockWatch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 blockWatch:SetScript("OnEvent", function(_, event, addon, func)
-    if type(addon) ~= "string" or not addon:find("^QuestFocus") then return end
+    if type(addon) ~= "string" or not (addon:find("^AdventurersKit") or addon:find("^QuestFocus")) then return end
     local msg = ("%s: %s%s"):format(event == "ADDON_ACTION_FORBIDDEN" and "FORBIDDEN" or "BLOCKED", tostring(func),
-        addon ~= "QuestFocus" and (" [" .. addon .. "]") or "")
+        addon ~= ADDON_NAME and (" [" .. addon .. "]") or "")
     for _, x in ipairs(NS.errors) do
         if x.msg == msg then x.count, x.time = x.count + 1, date("%H:%M:%S") return end
     end
@@ -34,7 +34,8 @@ NS.errors = {}
 local prevHandler = geterrorhandler and geterrorhandler()
 if seterrorhandler and prevHandler then
     seterrorhandler(function(msg, ...)
-        local ours = type(msg) == "string" and msg:find("QuestFocus", 1, true)
+        -- a hibauzenetben a fajl utvonala: Interface/AddOns/AdventurersKit... (regen QuestFocus)
+        local ours = type(msg) == "string" and (msg:find("AdventurersKit", 1, true) or msg:find("QuestFocus", 1, true))
         if ours then
             local e
             for _, x in ipairs(NS.errors) do if x.msg == msg then e = x end end
