@@ -1325,6 +1325,11 @@ local function Panel_Update()
     elseif panel.hsRow then
         panel.hsRow:Hide()
     end
+    -- Leadas modban alul a kozeli felveheto questek (QuestFocusPlanner.lua)
+    if state.isComplete and NS.ShowTurnInPickups then
+        local ok, ny = pcall(NS.ShowTurnInPickups, y)
+        if ok and ny then y = ny end
+    end
     if #objs == 0 then
         panel.footer:SetText(QuestieAvailable() and L["No objective data for this quest."] or L["Questie is not loaded."])
     else

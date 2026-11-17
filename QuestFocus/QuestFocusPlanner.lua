@@ -1128,14 +1128,62 @@ NS.ShowSuggestions = function()
     return true
 end
 
+-- Leadas modban a panel aljan: a kozeli felveheto questek (max 5), ugyanugy mint a javaslatoknal.
+-- y-tol rajzol, visszaadja az uj y-t. A Panel_Update hivja (QuestFocus.lua).
+local TURNIN_PICKUPS = 5
+local tiPickups, tiKey = {}, ""
+local function TurnInPickupKey(list)
+    local t = {}
+    for i, p in ipairs(list) do t[i] = p.qid .. ":" .. math.floor((p.dist or 0) / 25) end
+    return table.concat(t, ",")
+end
+NS.ShowTurnInPickups = function(y)
+    if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then return y end
+    local pc, px, py = NS.PlayerWorldPos()
+    if not pc then return y end
+    local ok, list = pcall(BuildPickups, pc, px, py, TURNIN_PICKUPS)
+    tiPickups = ok and list or {}
+    tiKey = TurnInPickupKey(tiPickups)
+    if #tiPickups == 0 then return y end
+    y = y - 4
+    local h = Header(L["Pick up nearby:"])
+    h:ClearAllPoints()
+    h:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, y)
+    h:Show()
+    y = y - 15
+    for i, p in ipairs(tiPickups) do
+        local r = Row(i)
+        r.data = { kind = "pickup", qid = p.qid, name = p.name, level = p.level, point = p.point }
+        local col = GetQuestDifficultyColor and p.level and GetQuestDifficultyColor(p.level)
+        local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
+        r.text:SetText(("%s[%s] %s|r  %s"):format(hex, tostring(p.level or "?"), p.name or "?",
+            YdText(p.dist and math.floor(p.dist + 0.5))))
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        r:SetSize(NS.PW() - 24, NS.RowH())
+        r:Show()
+        y = y - NS.RowH()
+    end
+    return y
+end
+
 -- Javaslatok frissitese, amig latszanak (mozgas kozben valtozik a sorrend)
 local sugElapsed = 0
 panel:HookScript("OnUpdate", function(_, dt)
-    if state.questId or QuestFocusDB.noSuggest then return end
+    if QuestFocusDB.noSuggest then return end
     sugElapsed = sugElapsed + dt
     if sugElapsed < 3 then return end
     sugElapsed = 0
-    if not panel:IsMouseOver() then NS.ShowSuggestions() end
+    if panel:IsMouseOver() then return end
+    if not state.questId then
+        NS.ShowSuggestions()
+    elseif state.isComplete and NS.QuestieAvailable() then
+        -- leadas mod: csak akkor rajzoljuk ujra, ha a kozeli lista (vagy ~25 yd-os tavolsag) valtozott
+        local pc, px, py = NS.PlayerWorldPos()
+        if not pc then return end
+        local ok, list = pcall(BuildPickups, pc, px, py, TURNIN_PICKUPS)
+        if ok and TurnInPickupKey(list) ~= tiKey and NS.Panel_Update then NS.Panel_Update() end
+    end
 end)
 
 ---------------------------------------------------------------------------
