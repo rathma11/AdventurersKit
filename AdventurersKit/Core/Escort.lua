@@ -93,6 +93,19 @@ local function EscortInfo(qid)
     end
     scan(quest.ObjectiveData, "Text")
     scan(quest.Objectives, "Description")
+    -- Nincs event objective (pl. Forever sajat questek, Zimmix's Great Escape): a quest celja
+    -- szovegebol ("Escort X away from ..."), csak ha escort igevel kezdodik
+    if not LooksEscort(evText) then
+        local ot = quest.objectivesText or quest.Description
+        if type(ot) == "string" then ot = { ot } end
+        for _, t in ipairs(type(ot) == "table" and ot or {}) do
+            if type(t) == "string" and (t:find("^%s*[Ee]scort ") or t:find("^%s*[Pp]rotect ")
+                or t:find("^%s*[Hh]elp ") or t:find("^%s*[Ll]ead ") or t:find("^%s*[Gg]uide ")) then
+                evText = t
+                break
+            end
+        end
+    end
     local tagged = QuestTag(qid) == ESCORT_TAG
     if not (tagged or LooksEscort(evText)) then
         infoCache[qid] = false
@@ -286,7 +299,8 @@ local function Decorate(objectives)
     end
     if not found then
         table.insert(objectives, 1, {
-            desc = info.text or ((L["Escort %s"]):format(info.name)), completed = false, escort = true,
+            desc = (info.text and #info.text <= 60) and info.text or ((L["Escort %s"]):format(info.name)),
+            completed = false, escort = true,
             qid = info.qid, sources = info.dest or {},
         })
     end

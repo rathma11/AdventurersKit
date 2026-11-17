@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.51", date = "2026-11-17", items = {
+        "Escort quests without an event objective in Questie (e.g. Zimmix's Great Escape in Stranglethorn) are "
+            .. "recognised from the quest's objective text (\"Escort X ...\"). The marker then points to the turn-in NPC.",
+    } },
     { version = "0.6.50", date = "2026-11-17", items = {
         "Escort quests: the panel shows who you escort, their health (warning with a sound below 35%) and where to. "
             .. "The QFocus macro targets whatever is attacking the escort, otherwise the escort itself. The marker goes "
