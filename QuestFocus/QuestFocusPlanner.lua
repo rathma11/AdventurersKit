@@ -370,7 +370,7 @@ end
 ---------------------------------------------------------------------------
 -- Quest log: minden questnek egy "kovetkezo allomasa" van (hatralevo objective-ek vagy leadas).
 -- Mohó utvonal: mindig a legkozelebbi allomas az elozotol.
-local function BuildRoute(pc, px, py)
+local function BuildRoute(pc, px, py, maxN)
     local stops = {}
     for i = 1, NS.NumLogEntries() do
         local title, isHeader, qid, done = NS.GetLogEntry(i)
@@ -391,7 +391,7 @@ local function BuildRoute(pc, px, py)
         end
     end
     local route, cx, cy = {}, px, py
-    while #route < ROUTE_LEN and #stops > 0 do
+    while #route < (maxN or ROUTE_LEN) and #stops > 0 do
         local bi, bp, bd
         for i, s in ipairs(stops) do
             local p, d = Nearest(s.sources, pc, cx, cy)
@@ -982,7 +982,7 @@ local function Row(i)
     if r then return r end
     r = CreateFrame("Button", nil, panel)
     r:SetSize(276, 16)
-    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
     r.text:SetAllPoints()
     r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
@@ -1033,6 +1033,18 @@ local function Header(text)
     return h
 end
 
+-- Hany sor fer ki a javaslatokbol: a panel huzott magassagabol (QuestFocusDB.panelH)
+-- szamoljuk; alapbol 5 utvonal + 3 felveheto. A tobbletnek kb. 60%-a utvonal.
+local function ListCounts()
+    local h = tonumber(QuestFocusDB.panelH)
+    if not h then return ROUTE_LEN, PICKUP_LEN end
+    local rowH = NS.RowH()
+    local avail = h - 56 - 2 * 15 - 8 - (rowH + 22)
+    local n = math.max(ROUTE_LEN + PICKUP_LEN, math.floor(avail / rowH))
+    local route = math.max(ROUTE_LEN, math.ceil(n * 0.6))
+    return route, math.max(PICKUP_LEN, n - route)
+end
+
 NS.HideSuggestions = function()
     for _, r in ipairs(rows) do r:Hide() end
     for _, h in pairs(panel.sugHeaders or {}) do h:Hide() end
@@ -1050,14 +1062,15 @@ NS.ShowSuggestions = function()
     if not NS.QuestieAvailable() then
         panel.sub:SetText("")
         panel.footer:SetText(L["Questie is not loaded."])
-        NS.PanelFinish(y)
+        NS.PanelFinish(y, true)
         return true
     end
     local pc, px, py = NS.PlayerWorldPos()
     local route, pickups = {}, {}
     if pc then
-        route = BuildRoute(pc, px, py)
-        pickups = BuildPickups(pc, px, py)
+        local nRoute, nPick = ListCounts()
+        route = BuildRoute(pc, px, py, nRoute)
+        pickups = BuildPickups(pc, px, py, nPick)
     end
     panel.sub:SetText((L["%d on the route, %d to pick up"]):format(#route, #pickups))
 
@@ -1082,7 +1095,8 @@ NS.ShowSuggestions = function()
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
             r:Show()
-            y = y - 16
+            r:SetSize(NS.PW() - 24, NS.RowH())
+            y = y - NS.RowH()
         end
         y = y - 4
     end
@@ -1099,7 +1113,8 @@ NS.ShowSuggestions = function()
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
             r:Show()
-            y = y - 16
+            r:SetSize(NS.PW() - 24, NS.RowH())
+            y = y - NS.RowH()
         end
     end
 
@@ -1109,7 +1124,7 @@ NS.ShowSuggestions = function()
     else
         panel.footer:SetText(L["Click a row. Pick a quest in the log (L) to focus it."])
     end
-    NS.PanelFinish(y)
+    NS.PanelFinish(y, true)
     return true
 end
 
@@ -1236,8 +1251,27 @@ local cbCity = NS.OptCheck(L["City mode"],
     end, pagePanel)
 cbCity:SetPoint("TOPLEFT", lvlLabel, "BOTTOMLEFT", -32, -8)
 
+-- Betumeret (a panel atmeretezese nem valtoztatja)
+local fontLabel = pagePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+fontLabel:SetPoint("TOPLEFT", cbCity, "BOTTOMLEFT", 32, -8)
+fontLabel:SetText(L["Panel font size (8-20, default 10):"])
+local fontBox = CreateFrame("EditBox", nil, pagePanel, "InputBoxTemplate")
+fontBox:SetSize(32, 18)
+fontBox:SetAutoFocus(false)
+fontBox:SetNumeric(true)
+fontBox:SetPoint("LEFT", fontLabel, "RIGHT", 8, 0)
+fontBox:SetScript("OnEnterPressed", function(self)
+    local v = tonumber(self:GetText())
+    if v then QuestFocusDB.fontSize = math.max(8, math.min(20, v)) end
+    self:SetText(NS.FontSize())
+    self:ClearFocus()
+    NS.ApplyFontSize()
+    NS.Panel_Update()
+end)
+fontBox:SetScript("OnEscapePressed", function(self) self:SetText(NS.FontSize()); self:ClearFocus() end)
+
 local etaNote = pagePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-etaNote:SetPoint("TOPLEFT", cbCity, "BOTTOMLEFT", 2, -12)
+etaNote:SetPoint("TOPLEFT", fontLabel, "BOTTOMLEFT", -30, -14)
 etaNote:SetWidth(520)
 etaNote:SetJustifyH("LEFT")
 etaNote:SetText(L["Time left is learned from your own pace: how fast each objective counter grew, otherwise "]
@@ -1256,4 +1290,5 @@ end)
 NS.opt:HookScript("OnShow", function()
     cbSuggest.refresh(); cbToast.refresh(); cbNearby.refresh(); cbQPop.refresh(); cbCity.refresh()
     belowBox.refresh(); aboveBox.refresh()
+    fontBox:SetText(NS.FontSize())
 end)

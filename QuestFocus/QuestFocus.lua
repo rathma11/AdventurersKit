@@ -714,7 +714,27 @@ end
 -- Panel
 ---------------------------------------------------------------------------
 local panel = CreateFrame("Frame", "QuestFocusPanel", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-local PANEL_W = 300
+local PANEL_W = 300 -- alap szelesseg; a fogantyuval allithato (QuestFocusDB.panelW / panelH)
+
+-- Szelesseg, sormagassag es betumeret (a betumeret kulon beallitas: QuestFocusDB.fontSize)
+local function PW() return math.max(240, math.min(600, tonumber(QuestFocusDB and QuestFocusDB.panelW) or PANEL_W)) end
+local function FontSize() return math.max(8, math.min(20, tonumber(QuestFocusDB and QuestFocusDB.fontSize) or 10)) end
+local function RowH() return math.max(16, FontSize() + 6) end
+NS.PW, NS.RowH, NS.FontSize = PW, RowH, FontSize
+
+-- Sajat font objektumok: a meretuk atallitasa minden ezt hasznalo szoveget frissit
+local fontSmall = CreateFont("QuestFocusFontSmall")
+fontSmall:CopyFontObject(GameFontHighlightSmall)
+local fontTitle = CreateFont("QuestFocusFontTitle")
+fontTitle:CopyFontObject(GameFontNormal)
+local function ApplyFontSize()
+    local size = FontSize()
+    local p, _, f = GameFontHighlightSmall:GetFont()
+    if p then fontSmall:SetFont(p, size, f or "") end
+    local tp, _, tf = GameFontNormal:GetFont()
+    if tp then fontTitle:SetFont(tp, size + 2, tf or "") end
+end
+NS.ApplyFontSize = ApplyFontSize
 local GOLD = { 0.95, 0.78, 0.40 }
 panel:SetSize(PANEL_W, 60)
 panel:SetPoint("RIGHT", UIParent, "RIGHT", -260, 80)
@@ -750,7 +770,7 @@ panel.icon:SetPoint("BOTTOMRIGHT", -3, 3)
 panel.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
 
-panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+panel.title = panel:CreateFontString(nil, "OVERLAY", "QuestFocusFontTitle")
 panel.title:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 8, -1)
 panel.title:SetWidth(PANEL_W - 80)
 panel.title:SetJustifyH("LEFT")
@@ -833,27 +853,38 @@ panel.footDivider = panel:CreateTexture(nil, "ARTWORK")
 panel.footDivider:SetHeight(1)
 panel.footDivider:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
 
-panel.footer = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+panel.footer = panel:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
 panel.footer:SetJustifyH("LEFT")
 panel.footer:SetWidth(PANEL_W - 44) -- a jobb also sarokban az atmeretezo fogantyu
 panel.footer:SetWordWrap(false) -- egy sor: a panel magassaga ne valtozzon harc kozben
 
 panel.lines = {}
 
--- Atmeretezes: jobb also sarok fogantyu, a panel meretaranyat (scale) allitja, a bal felso
--- sarok helyben marad. Jobb klikk: vissza 100%-ra. Mentve: QuestFocusDB.panelScale
-local function SetPanelScale(s)
-    s = math.max(0.6, math.min(1.6, s))
-    local old = panel:GetScale()
-    local l, t = panel:GetLeft(), panel:GetTop()
-    panel:SetScale(s)
-    if l and t then
-        panel:ClearAllPoints()
-        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l * old / s, t * old / s)
+-- Szelesseg alkalmazasa minden panel elemre (a fogantyu es a betoltes hivja)
+local function ApplyPanelWidth()
+    local w = PW()
+    panel:SetWidth(w)
+    panel.title:SetWidth(w - 80)
+    panel.sub:SetWidth(w - 80)
+    panel.footer:SetWidth(w - 44)
+    local bw = (w - 24 - 8) / 3
+    for i, b in ipairs(panel.statBoxes) do
+        b:SetWidth(bw)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", (i - 1) * (bw + 4), 0)
     end
-    if QuestFocusDB then QuestFocusDB.panelScale = s end
 end
-NS.SetPanelScale = SetPanelScale
+NS.ApplyPanelWidth = ApplyPanelWidth
+
+-- A bal felso sarok maradjon a helyen (atmeretezes / tartalomvaltas eseten)
+local function AnchorTopLeft()
+    local p1 = panel:GetPoint(1)
+    local l, t = panel:GetLeft(), panel:GetTop()
+    if p1 ~= "TOPLEFT" and l and t then
+        panel:ClearAllPoints()
+        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+    end
+end
 
 -- A panel egy pontja UIParent koordinatakban (a panel scale-je miatt atszamolva) -
 -- a panelhez nem horgonyzott (secure) ablakok elhelyezesehez
@@ -870,23 +901,35 @@ grip:SetPoint("BOTTOMRIGHT", -4, 4)
 grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
 grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+-- Atmeretezes: a panel szelesseget es (javaslat modban) magassagat allitja, a betumeret
+-- NEM valtozik (az kulon beallitas). Nagyobb panel = tobb sor a javaslatokban.
+-- Jobb klikk: alapmeret. Mentve: QuestFocusDB.panelW / panelH
 grip:RegisterForClicks("RightButtonUp")
-grip:SetScript("OnClick", function() SetPanelScale(1) end)
+grip:SetScript("OnClick", function()
+    QuestFocusDB.panelW, QuestFocusDB.panelH = nil, nil
+    ApplyPanelWidth()
+    if NS.Panel_Update then NS.Panel_Update() end
+end)
 grip:SetScript("OnMouseDown", function(self, button)
     if button ~= "LeftButton" then return end
+    AnchorTopLeft()
     local x, y = GetCursorPosition()
-    self.drag = { x = x, y = y, scale = panel:GetScale() }
+    self.drag = { x = x, y = y, w = panel:GetWidth(), h = panel:GetHeight() }
     self:SetScript("OnUpdate", function()
         local cx, cy = GetCursorPosition()
-        local ui = UIParent:GetEffectiveScale()
-        -- jobbra-lefele huzas nagyit, balra-felfele kicsinyit
-        local d = ((cx - self.drag.x) - (cy - self.drag.y)) / 2 / ui
-        SetPanelScale(self.drag.scale * (1 + d / (PANEL_W * self.drag.scale)))
+        local es = panel:GetEffectiveScale()
+        local w = self.drag.w + (cx - self.drag.x) / es
+        local h = self.drag.h + (self.drag.y - cy) / es
+        QuestFocusDB.panelW = math.floor(math.max(240, math.min(600, w)))
+        QuestFocusDB.panelH = math.floor(math.max(120, math.min(900, h)))
+        ApplyPanelWidth()
+        panel:SetHeight(QuestFocusDB.panelH)
     end)
 end)
 grip:SetScript("OnMouseUp", function(self)
     self:SetScript("OnUpdate", nil)
     self.drag = nil
+    if NS.Panel_Update then NS.Panel_Update() end -- tartalom ujrarendezese (tobb/kevesebb sor)
 end)
 grip:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -917,21 +960,20 @@ local function PanelChrome(mode, sectionText)
 end
 
 -- Tartalom utan: elvalaszto + lablec, panel magassag
-local function PanelFinish(y)
-    -- A panel teteje maradjon a helyen (ne a kozepe korul nojon/zsugorodjon), hogy az alatta
-    -- levo buff gombok ne csusszanak ra
-    local p1 = panel:GetPoint(1)
-    local l, t = panel:GetLeft(), panel:GetTop()
-    if p1 ~= "TOPLEFT" and l and t then
-        panel:ClearAllPoints()
-        panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
-    end
-    panel.footDivider:ClearAllPoints()
-    panel.footDivider:SetPoint("TOPLEFT", 12, y - 5)
-    panel.footDivider:SetPoint("TOPRIGHT", -12, y - 5)
+-- isList: javaslat mod, ott a felhasznalo altal huzott magassag is szamit (tobb sor fer ki)
+local function PanelFinish(y, isList)
+    -- A panel teteje maradjon a helyen (ne a kozepe korul nojon/zsugorodjon)
+    AnchorTopLeft()
+    local fh = RowH()
+    local h = -y + 8 + fh + 12
+    if isList and tonumber(QuestFocusDB.panelH) then h = math.max(h, QuestFocusDB.panelH) end
+    panel:SetHeight(h)
+    -- a lablec mindig a panel aljan
     panel.footer:ClearAllPoints()
-    panel.footer:SetPoint("TOPLEFT", panel, "TOPLEFT", 13, y - 11)
-    panel:SetHeight(-y + 11 + 14 + 12)
+    panel.footer:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 13, 12)
+    panel.footDivider:ClearAllPoints()
+    panel.footDivider:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 12, 12 + fh + 2)
+    panel.footDivider:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -12, 12 + fh + 2)
 end
 NS.PanelChrome, NS.PanelFinish = PanelChrome, PanelFinish
 
@@ -998,7 +1040,7 @@ local function GetLine(i)
     line = CreateFrame("Button", nil, panel)
     line:SetSize(PANEL_W - 24, 16)
     line:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    line.text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    line.text = line:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
     line.text:SetAllPoints()
     line.text:SetJustifyH("LEFT")
     line.text:SetWordWrap(false)
@@ -1118,7 +1160,7 @@ local function GetExtraRow(i)
     if r then return r end
     r = CreateFrame("Button", nil, panel)
     r:SetSize(PANEL_W - 24, 16)
-    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
     r.text:SetAllPoints()
     r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
@@ -1171,6 +1213,7 @@ local function Panel_Update()
     for i, o in ipairs(objs) do
         local line = GetLine(i)
         line.index = i
+        line:SetSize(PW() - 24, RowH())
         local icon = o.completed and ICON_DONE or (o.turnIn and ICON_TI)
             or (state.objIndex == i and ICON_SEL) or ICON_TODO
         local color = o.completed and "|cff808080" or (o.turnIn and "|cffffff00")
@@ -1180,7 +1223,7 @@ local function Panel_Update()
         line:ClearAllPoints()
         line:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
         line:Show()
-        y = y - 17
+        y = y - RowH() - 1
     end
     for i = #objs + 1, #panel.lines do panel.lines[i]:Hide() end
     -- A kozelben levo tobbi quest (ha nem egy objective-re szukitettel es nem leadas van)
@@ -1195,13 +1238,14 @@ local function Panel_Update()
         for i, e in ipairs(extras) do
             local r = GetExtraRow(i)
             r.extra = e
+            r:SetSize(PW() - 24, RowH())
             local eta = NS.EtaShort and NS.EtaShort(e.obj)
             r.text:SetText(("|TInterface\\COMMON\\Indicator-Yellow:12:12|t |cffd8c8a0%s:|r %s%s"):format(
                 e.title or "?", e.desc or "?", eta and ("  |cff999999" .. eta .. "|r") or ""))
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
             r:Show()
-            y = y - 17
+            y = y - RowH() - 1
             nExtra = i
         end
     else
@@ -1220,7 +1264,7 @@ local function Panel_Update()
         if not r then
             r = CreateFrame("Button", nil, panel)
             r:SetSize(PANEL_W - 24, 16)
-            r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
             r.text:SetAllPoints()
             r.text:SetJustifyH("LEFT")
             r.text:SetWordWrap(false)
@@ -1235,6 +1279,7 @@ local function Panel_Update()
             panel.hsRow = r
         end
         r.hsList, r.hsName = hsList, hsName
+        r:SetSize(PW() - 24, RowH())
         local cdTxt = (hsCd and hsCd > 0) and ("  |cff999999" .. L["HS cooldown"] .. " " .. math.ceil(hsCd / 60) .. "m|r") or ""
         r.text:SetText(("|TInterface\\Icons\\INV_Misc_Rune_01:12:12|t |cff33ff99" .. L["Hearth home: %d quests to turn in at %s"] .. "|r%s")
             :format(#hsList, hsName or "?", cdTxt))
@@ -1242,7 +1287,7 @@ local function Panel_Update()
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
         r:Show()
-        y = y - 17
+        y = y - RowH() - 1
     elseif panel.hsRow then
         panel.hsRow:Hide()
     end
@@ -1556,7 +1601,10 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         QuestFocusDB = QuestFocusDB or {}
     elseif event == "PLAYER_LOGIN" then
-        if tonumber(QuestFocusDB.panelScale) then panel:SetScale(QuestFocusDB.panelScale) end
+        -- a regi (scale alapu) meretezes helyett szelesseg + betumeret
+        if QuestFocusDB.panelScale then QuestFocusDB.panelScale = nil; panel:SetScale(1) end
+        ApplyFontSize()
+        ApplyPanelWidth()
         InstallHooks()
         if not _G.QuestieLoader then
             Print(L["|cffff5555Questie not found.|r Install it, QuestFocus does not work without it."])
