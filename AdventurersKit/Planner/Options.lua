@@ -79,4 +79,22 @@ pk:OnRefresh(function()
 end)
 pk:Button(L["Open the list now"], 160, L["Same as /qf city: opens the list here, even outside a city or in an ignored place."],
     function() if NS.ShowCityList then NS.ShowCityList() end end, 28)
+pk:Header(L["City to-do (above the quests)"])
+pk:Text(L["Shown at the top of the city list with the nearest NPC for it (click: marker). 0 turns a line off."], 2)
+pk:Number(L["Bags full: warn at"],
+    L["Percent of your bag slots in use. Default 70. The nearest vendor to sell to is shown (or use the Bank button)."],
+    function() return NS.CityLimit("bagPct") end,
+    function(v) QuestFocusDB.cityBagPct = math.max(0, math.min(100, v)) end, "%")
+pk:Number(L["Bags: or fewer free slots than"],
+    L["Also warns when this few slots are left, whatever the percent. Default 10."],
+    function() return NS.CityLimit("bagFree") end,
+    function(v) QuestFocusDB.cityBagFree = v end)
+pk:Number(L["Repair: warn when an item is below"],
+    L["Durability of your most worn item. Default 60."],
+    function() return NS.CityLimit("repair") end,
+    function(v) QuestFocusDB.cityRepairPct = math.max(0, math.min(100, v)) end, "%")
+pk:Number(L["Ammo (hunters): warn below"],
+    L["Arrows / bullets in the ammo slot. Default 400."],
+    function() return NS.CityLimit("ammo") end,
+    function(v) QuestFocusDB.cityAmmo = v end)
 pagePick:HookScript("OnShow", function() pk:Refresh() end)

@@ -248,9 +248,45 @@ end
 -- Teendok a varosban (a questek folott): javitas, hunter ammo, XP kaja. Kattintasra marker
 -- a legkozelebbi javitora / ammo arusra / kaja arusra. Plusz Bank gomb a fejlecben.
 ---------------------------------------------------------------------------
-local REPAIR_AT, AMMO_AT = 0.6, 400 -- javitas: a leggyengebb targy 60% alatt; ammo: 400 alatt
+-- Kuszobok (Options > Quest pickup > City to-do); 0 = az a sor ki van kapcsolva
+local LIMIT_DEFAULTS = { bagPct = 70, bagFree = 10, repair = 60, ammo = 400 }
+local LIMIT_KEYS = { bagPct = "cityBagPct", bagFree = "cityBagFree", repair = "cityRepairPct", ammo = "cityAmmo" }
+NS.CityLimit = function(which)
+    local v = tonumber(QuestFocusDB[LIMIT_KEYS[which]])
+    if v == nil then v = LIMIT_DEFAULTS[which] end
+    return v
+end
+
+local function BagSlots()
+    local free, total = 0, 0
+    local numSlots = C_Container and C_Container.GetContainerNumSlots or GetContainerNumSlots
+    local numFree = C_Container and C_Container.GetContainerNumFreeSlots or GetContainerNumFreeSlots
+    for bag = 0, (NUM_BAG_SLOTS or 4) do
+        local n = numSlots and numSlots(bag) or 0
+        local f, bagType = 0, 0
+        if numFree then f, bagType = numFree(bag) end
+        -- csak altalanos taskak (lőszer / soul / szakmai taska nem szamit)
+        if n > 0 and (bagType == nil or bagType == 0) then
+            total = total + n
+            free = free + (f or 0)
+        end
+    end
+    return free, total
+end
+
 local function CityNeeds()
     local out = {}
+    -- tele taska: szazalek VAGY kevés szabad hely (barmelyik)
+    local free, total = BagSlots()
+    local pctLimit, freeLimit = NS.CityLimit("bagPct"), NS.CityLimit("bagFree")
+    if total > 0 then
+        local used = math.floor((total - free) / total * 100 + 0.5)
+        if (pctLimit > 0 and used >= pctLimit) or (freeLimit > 0 and free < freeLimit) then
+            out[#out + 1] = { kind = "Sell", icon = "Interface\\Icons\\INV_Misc_Bag_10",
+                text = (L["Bags: %d%% full, %d free slots - sell or bank"]):format(used, free) }
+        end
+    end
+    local REPAIR_AT, AMMO_AT = NS.CityLimit("repair") / 100, NS.CityLimit("ammo")
     -- tartossag: a legrosszabb targy aranya
     local worst
     for slot = 1, 18 do
@@ -260,12 +296,12 @@ local function CityNeeds()
             if not worst or r < worst then worst = r end
         end
     end
-    if worst and worst < REPAIR_AT then
+    if worst and REPAIR_AT > 0 and worst < REPAIR_AT then
         out[#out + 1] = { kind = "Repair", icon = "Interface\\Icons\\Trade_BlackSmithing",
             text = (L["Repair: your most worn item is at %d%%"]):format(math.floor(worst * 100 + 0.5)) }
     end
     -- hunter: ammo (az ammo slot darabszama)
-    if select(2, UnitClass("player")) == "HUNTER" then
+    if select(2, UnitClass("player")) == "HUNTER" and AMMO_AT > 0 then
         local id = GetInventoryItemID("player", 0)
         local n = id and GetInventoryItemCount("player", 0) or 0
         if n < AMMO_AT then

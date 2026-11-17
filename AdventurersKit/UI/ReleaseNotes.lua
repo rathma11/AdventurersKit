@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.5", date = "2026-11-17", items = {
+        "City to-do: bags full warning (default 70% used, or fewer than 10 free slots) with the nearest vendor to sell to; "
+            .. "the quest list stays below it.",
+        "Quest pickup tab: 'City to-do' thresholds for bags (% and free slots), repair % and hunter ammo; 0 turns a line off.",
+    } },
     { version = "0.6.4", date = "2026-11-17", items = {
         "City list: a to-do section above the quests - repair (most worn item under 60%), hunter ammo (under 400), "
             .. "no XP food in your bags - each with the nearest repairer / ammo vendor / food vendor; click for a marker.",

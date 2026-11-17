@@ -145,6 +145,13 @@ local function FolkIds(kind)
     return T and type(T.townsfolk) == "table" and T.townsfolk[kind]
 end
 NS.NearestTownsfolk = function(kind)
+    -- eladas (tele taska): a kozelebbi a javitok (armorer) es a kaja arusok kozul
+    if kind == "Sell" then
+        local p1, d1 = NS.NearestTownsfolk("Repair")
+        local p2, d2 = NS.NearestTownsfolk("Food")
+        if p1 and (not p2 or (d1 or 1e9) <= (d2 or 1e9)) then return p1, d1 end
+        return p2, d2
+    end
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
     local src = folkCache[kind]
