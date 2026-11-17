@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.18", date = "2026-11-17", items = {
+        "City list: 'Start dungeon' is now 'Dungeon quests'; a thin line separates the bottom buttons; "
+            .. "XP and distance sit closer to the quest name.",
+        "Directions menu opens beside the city list and is narrower; the distance shows when you hover a line.",
+    } },
     { version = "0.6.17", date = "2026-11-17", items = {
         "City list: the Bank / AH / Trainer buttons are replaced by one 'Directions' drop-down, like asking a guard: "
             .. "Auction House, Bank, Flight Master, Inn, Class Trainer, Profession Trainer (sub-menu, your professions first), "

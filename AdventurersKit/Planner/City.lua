@@ -111,6 +111,10 @@ cClose:SetPoint("TOPRIGHT", -4, -4)
 cClose:SetScript("OnClick", function() city.closedHere = true; city:Hide() end)
 city.foot = city:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 city.foot:SetText(L["Click: marker on the quest giver. Wheel: scroll. Drag to move."])
+-- valaszto vonal az also gombsor folott
+city.sep = city:CreateTexture(nil, "ARTWORK")
+city.sep:SetHeight(1)
+city.sep:SetColorTexture(1, 0.82, 0, 0.3)
 
 ---------------------------------------------------------------------------
 -- Ignoralt helyek: QuestFocusDB.cityIgnore = { {c, x, y, name} }. Vilag koordinatan
@@ -220,11 +224,11 @@ city.disableBtn:SetScript("OnEnter", function(self)
     NS.TT.Finish(tt)
 end)
 city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-city.dungeonBtn = FlatBtn(L["Start dungeon"], NS.DUNGEON_ICON)
+city.dungeonBtn = FlatBtn(L["Dungeon quests"], NS.DUNGEON_ICON)
 city.dungeonBtn:SetPoint("BOTTOMRIGHT", city, "BOTTOMRIGHT", -22, 12)
 city.dungeonBtn:SetScript("OnClick", function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
 city.dungeonBtn:SetScript("OnEnter", function(self)
-    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Start dungeon"])
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Dungeon quests"])
     NS.TT.Note(tt, NS.HasDungeonJournal() and L["Dungeons for your level and their quests; click one to open it in Dungeon Journal."]
         or L["Dungeons for your level and their quests (click: marker on the quest giver)."])
     NS.TT.Finish(tt)
@@ -254,16 +258,16 @@ local function CityRow(i)
     r:SetSize(CITY_W - 48, CITY_ROW_H - 1)
     r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.text:SetPoint("LEFT")
-    r.text:SetPoint("RIGHT", -128, 0)
+    r.text:SetPoint("RIGHT", -96, 0)
     r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
     r.right = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.right:SetPoint("RIGHT")
-    r.right:SetWidth(126)
+    r.right:SetWidth(94)
     r.right:SetJustifyH("RIGHT")
     -- dungeon quest: kis "Start dungeon" gomb a sor jobb oldalan (az XP / tavolsag elott)
     r.dBtn = NS.MakeDungeonButton(r, 14)
-    r.dBtn:SetPoint("RIGHT", r, "RIGHT", -128, 0)
+    r.dBtn:SetPoint("RIGHT", r, "RIGHT", -96, 0)
     r.bg = r:CreateTexture(nil, "BACKGROUND")
     r.bg:SetAllPoints()
     r.bg:Hide()
@@ -448,7 +452,7 @@ local PROFS = {
     { 762, L["Riding"] },
 }
 
-local MENU_W, MENU_ROW = 230, 18
+local MENU_W, MENU_ROW = 170, 18
 local function MakeMenu(name)
     local m = CreateFrame("Frame", name, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     m:SetFrameStrata("DIALOG")
@@ -511,10 +515,8 @@ local function FillMenu(m, entries, onSub)
         r.text:SetText(col .. e.label .. "|r")
         if e.sub then
             r.right:SetText("|cffffd100>|r")
-        elseif e.point then
-            r.right:SetText(("|cff99ccff%d yd|r"):format(e.dist or 0))
         else
-            r.right:SetText("|cff606060-|r")
+            r.right:SetText("") -- tavolsag: a tooltipben (folevive)
         end
         r:SetScript("OnClick", function(self)
             if e.sub then onSub(self, e) else GoTo(e) end
@@ -577,7 +579,7 @@ local function ShowGuideMenu(anchor)
     end
     FillMenu(menu, list, function(row) ShowProfMenu(row) end)
     menu:ClearAllPoints()
-    menu:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
+    menu:SetPoint("TOPLEFT", city, "TOPRIGHT", 4, 0) -- a lista mellett, oldalt
     subMenu:Hide()
     menu:Show()
 end
@@ -650,7 +652,7 @@ grip:SetScript("OnMouseUp", function()
     if not city.sizing then return end
     city:StopMovingOrSizing()
     city.sizing = nil
-    local fixed = -(city.lastTop or -38) + 52
+    local fixed = -(city.lastTop or -38) + 59
     local rows = math.floor((city:GetHeight() - fixed) / CITY_ROW_H + 0.5)
     QuestFocusDB.citySize = {
         w = math.floor(math.max(CITY_MIN_W, math.min(CITY_MAX_W, city:GetWidth())) + 0.5),
@@ -703,7 +705,7 @@ local function RefreshCityList()
         local tags = ""
         -- dungeon / raid quest: halvany voros (raid: lila) hatter a soron + Start dungeon gomb
         local dAbbr, dRaid = NS.QuestDungeon(d.quest, d.qid)
-        r.text:SetPoint("RIGHT", dAbbr and -146 or -128, 0)
+        r.text:SetPoint("RIGHT", dAbbr and -114 or -96, 0)
         if dAbbr then
             r.bg:SetColorTexture(dRaid and 0.55 or 0.75, 0.2, dRaid and 0.85 or 0.1, 0.18)
             r.bg:Show()
@@ -718,7 +720,7 @@ local function RefreshCityList()
         if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
         r.text:SetText(("%s[%s]|r %s%s%s|r%s"):format(hex, tostring(d.level or "?"),
             NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", tags))
-        r.right:SetText(("|cffd8c070%s|r  |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
+        r.right:SetText(("|cffd8c070%s|r |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", cContent, "TOPLEFT", 0, y)
         r:Show()
@@ -756,13 +758,16 @@ local function RefreshCityList()
     if not needBar then cScroll:SetVerticalScroll(0) end
     city.foot:ClearAllPoints()
     city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, top - visH - 4)
+    city.sep:ClearAllPoints()
+    city.sep:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 20)
+    city.sep:SetPoint("TOPRIGHT", city, "TOPRIGHT", -12, top - visH - 20)
     city.ignoreBtn:ClearAllPoints()
-    city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 20)
+    city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 27)
     city.disableBtn:ClearAllPoints()
     city.disableBtn:SetPoint("LEFT", city.ignoreBtn, "RIGHT", 6, 0)
     -- van dungeon quest a listaban: Start dungeon gomb is
     city.dungeonBtn:SetShown(anyDungeon)
-    city:SetHeight(-top + visH + 52)
+    city:SetHeight(-top + visH + 59)
     if not city:IsShown() and not city.closedHere then city:Show() end
 end
 
