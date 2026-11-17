@@ -65,7 +65,32 @@ qpop:SetScript("OnUpdate", function(self, dt)
         self:SetAlpha(1 - (self.t - QPOP_HOLD) / QPOP_FADE)
     end
 end)
-qpop:SetScript("OnClick", function(self)
+-- Mozgathato: huzd el (a hely megmarad, QuestFocusDB.qpopPos = felso kozepe); jobb klikk: alap hely
+qpop:SetMovable(true)
+qpop:SetClampedToScreen(true)
+qpop:RegisterForDrag("LeftButton")
+qpop:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+qpop:SetScript("OnDragStart", function(self)
+    self.dragged = true
+    self:StartMoving()
+end)
+qpop:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local l, r, t = self:GetLeft(), self:GetRight(), self:GetTop()
+    if l and r and t then
+        QuestFocusDB.qpopPos = { x = (l + r) / 2, y = t }
+        self:ClearAllPoints()
+        self:SetPoint("TOP", UIParent, "BOTTOMLEFT", QuestFocusDB.qpopPos.x, QuestFocusDB.qpopPos.y)
+    end
+end)
+qpop:SetScript("OnClick", function(self, btn)
+    if self.dragged then self.dragged = nil return end -- huzas vege, nem kattintas
+    if btn == "RightButton" then
+        QuestFocusDB.qpopPos = nil
+        NS.Loud(NS.Print, L["Quest popup: back to its default place."])
+        self:Hide()
+        return
+    end
     local d = self.data
     if not d then return end
     NS.SetWaypoint(d.point, d.point.name or d.name)
@@ -78,7 +103,8 @@ qpop:SetScript("OnEnter", function(self)
     if not d then return end
     NS.TT.Pickup(self, "ANCHOR_BOTTOM", d,
         L["Length is a rough estimate (objective types, drop rate, your kill pace). "]
-        .. L["'?' / unknown: can't be estimated (battleground, item from an unknown source)."])
+        .. L["'?' / unknown: can't be estimated (battleground, item from an unknown source)."]
+        .. "\n" .. L["Drag to move; right click: default place."])
 end)
 qpop:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
@@ -99,8 +125,12 @@ local function ShowQuestPopup(d)
     qpop.text:SetText(("%s[%s]|r %s%s%s|r  |cff999999%s|r"):format(hex, tostring(d.level or "?"),
         NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", est and (FormatTime(est) .. " " .. L["est."]) or L["length unknown"]))
     qpop:ClearAllPoints()
+    local pos = QuestFocusDB.qpopPos
+    if pos and pos.x and pos.y then
+        -- ahova elhuztad
+        qpop:SetPoint("TOP", UIParent, "BOTTOMLEFT", pos.x, pos.y)
     -- kozepen felul, a jatek sajat kiirasai alatt
-    if UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
+    elseif UIErrorsFrame and UIErrorsFrame:IsShown() and UIErrorsFrame:GetBottom() then
         qpop:SetPoint("TOP", UIErrorsFrame, "BOTTOM", 0, -6)
     else
         qpop:SetPoint("TOP", UIParent, "TOP", 0, -190)

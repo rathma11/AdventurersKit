@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.35", date = "2026-11-17", items = {
+        "Quest nearby popup can be dragged anywhere (the place is kept); right click puts it back to the default place.",
+    } },
     { version = "0.6.34", date = "2026-11-17", items = {
         "Options: the version number is shown small after the name.",
     } },
