@@ -29,22 +29,25 @@ local function ChainOf(qid)
         return ok and v or nil
     end
     local before, seen, cur = 0, { [qid] = true }, qid
+    local ids = { qid } -- a lanc osszes questje (a questlogban levo kereseshez)
     for _ = 1, 30 do
         local pre = q(cur, "preQuestSingle")
         local p = type(pre) == "table" and pre[1] or nil
         if not p or seen[p] then break end
         seen[p] = true
+        ids[#ids + 1] = p
         before, cur = before + 1, p
     end
     local after, nxt = 0, q(qid, "nextQuestInChain")
     for _ = 1, 30 do
         if not nxt or nxt == 0 or seen[nxt] then break end
         seen[nxt] = true
+        ids[#ids + 1] = nxt
         after = after + 1
         nxt = q(nxt, "nextQuestInChain")
     end
     if before + after == 0 then return end
-    return before + 1, before + 1 + after
+    return before + 1, before + 1 + after, ids
 end
 
 local function QuestExtraInfo(qid, quest)
@@ -58,7 +61,7 @@ local function QuestExtraInfo(qid, quest)
         local ok, xp = pcall(XP.GetQuestLogRewardXP, XP, qid)
         if ok and tonumber(xp) and xp > 0 then c.xp = xp end
     end
-    c.chainPos, c.chainLen = ChainOf(qid)
+    c.chainPos, c.chainLen, c.chainIds = ChainOf(qid)
     quest = quest or NS.GetQuestieQuest(qid)
     c.byItem = quest and type(quest.Starts) == "table" and type(quest.Starts.Item) == "table"
         and #quest.Starts.Item > 0 or nil
@@ -66,6 +69,53 @@ local function QuestExtraInfo(qid, quest)
     return c
 end
 NS.QuestExtraInfo = QuestExtraInfo
+
+-- A lanc questlogban levo questje (amit mar csinalsz): ezt nyitja meg a quest logban.
+local function ChainQuestInLog(info)
+    if not (info and info.chainIds) then return end
+    local QP = NS.Module("QuestiePlayer")
+    local inLog = QP and QP.currentQuestlog or {}
+    for _, id in ipairs(info.chainIds) do
+        if inLog[id] then return id end
+    end
+    if GetQuestLogIndexByID then
+        for _, id in ipairs(info.chainIds) do
+            local ok, idx = pcall(GetQuestLogIndexByID, id)
+            if ok and idx and idx > 0 then return id end
+        end
+    end
+end
+
+local function OpenQuestInLog(qid)
+    if InCombatLockdown() then return end
+    local idx = NS.FocusInQuestLog and NS.FocusInQuestLog(qid)
+    local qlf = _G.QuestLogFrame
+    if qlf then
+        if not qlf:IsShown() then
+            if ToggleQuestLog then ToggleQuestLog() else ShowUIPanel(qlf) end
+        end
+        if idx and QuestLog_SetSelection then pcall(QuestLog_SetSelection, idx) end
+        if QuestLog_Update then pcall(QuestLog_Update) end
+        return true
+    end
+    -- terkep melletti quest panel (ujabb kliens)
+    local wm = WorldMapFrame
+    if wm and not wm:IsShown() then
+        if ToggleWorldMap then ToggleWorldMap() else ShowUIPanel(wm) end
+    end
+    if _G.QuestMapFrame_OpenToQuestDetails then pcall(_G.QuestMapFrame_OpenToQuestDetails, qid) end
+    return true
+end
+
+local function OpenChainInLog(info)
+    local qid = ChainQuestInLog(info)
+    if not qid then
+        NS.Loud(NS.Print, L["None of this chain's quests is in your quest log yet."])
+        return
+    end
+    OpenQuestInLog(qid)
+end
+NS.ChainQuestInLog, NS.OpenChainInLog = ChainQuestInLog, OpenChainInLog
 
 local function XpText(xp)
     if not xp then return "" end
@@ -268,6 +318,36 @@ local function CityRow(i)
     -- dungeon quest: kis "Start dungeon" gomb a sor jobb oldalan (az XP / tavolsag elott)
     r.dBtn = NS.MakeDungeonButton(r, 14)
     r.dBtn:SetPoint("RIGHT", r, "RIGHT", -96, 0)
+    -- quest lanc (lanc ikon + 2/5): kattintasra a quest log a lanc nalad levo questjenel
+    r.chain = CreateFrame("Button", nil, r)
+    r.chain:SetHeight(CITY_ROW_H - 3)
+    r.chain.label = r.chain:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.chain.label:SetPoint("LEFT")
+    local chl = r.chain:CreateTexture(nil, "HIGHLIGHT")
+    chl:SetAllPoints()
+    chl:SetColorTexture(0.7, 0.55, 1, 0.2)
+    r.chain:SetScript("OnClick", function(self)
+        local d = self:GetParent().data
+        if d then OpenChainInLog(QuestExtraInfo(d.qid, d.quest)) end
+    end)
+    r.chain:SetScript("OnEnter", function(self)
+        local d = self:GetParent().data
+        if not d then return end
+        local info = QuestExtraInfo(d.qid, d.quest)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText((L["Quest chain: part %d of %d"]):format(info.chainPos or 0, info.chainLen or 0), 0.7, 0.55, 1)
+        local cur = ChainQuestInLog(info)
+        local q = cur and NS.GetQuestieQuest(cur)
+        if cur then
+            GameTooltip:AddLine((L["In your log: %s"]):format(q and q.name or ("#" .. cur)), 1, 1, 1)
+            GameTooltip:AddLine(L["Click: open it in the quest log"], 0.5, 0.5, 0.5)
+        else
+            GameTooltip:AddLine(L["None of this chain's quests is in your quest log yet."], 0.6, 0.6, 0.6, true)
+        end
+        GameTooltip:Show()
+    end)
+    r.chain:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r.chain:Hide()
     r.bg = r:CreateTexture(nil, "BACKGROUND")
     r.bg:SetAllPoints()
     r.bg:Hide()
@@ -716,10 +796,27 @@ local function RefreshCityList()
             r.bg:Hide()
             r.dBtn:Hide()
         end
-        if info.chainPos then tags = tags .. ("   %s|cffb48cff%d/%d|r"):format(NS.ChainMarkup(), info.chainPos, info.chainLen) end
         if info.byItem then tags = tags .. " |cffff9933" .. L["item"] .. "|r" end
+        -- lanc: kulon kattinthato gomb a nev utan (helyet hagyunk neki a szoveg vegen)
+        local chainW = 0
+        if info.chainPos then
+            r.chain.label:SetText(("%s|cffb48cff%d/%d|r"):format(NS.ChainMarkup(), info.chainPos, info.chainLen))
+            chainW = math.ceil(r.chain.label:GetStringWidth()) + 4
+            r.chain:SetWidth(chainW)
+        end
+        r.text:SetPoint("RIGHT", (dAbbr and -114 or -96) - (chainW > 0 and chainW + 8 or 0), 0)
         r.text:SetText(("%s[%s]|r %s%s%s|r%s"):format(hex, tostring(d.level or "?"),
             NS.DungeonTag(d.quest, d.qid), hex, d.name or "?", tags))
+        if chainW > 0 then
+            local maxW = r.text:GetWidth()
+            local w = r.text:GetStringWidth()
+            if maxW and maxW > 0 then w = math.min(w, maxW) end
+            r.chain:ClearAllPoints()
+            r.chain:SetPoint("LEFT", r.text, "LEFT", math.ceil(w) + 8, 0)
+            r.chain:Show()
+        else
+            r.chain:Hide()
+        end
         r.right:SetText(("|cffd8c070%s|r |cff99ccff%d yd|r"):format(XpText(info.xp), d.dist))
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", cContent, "TOPLEFT", 0, y)

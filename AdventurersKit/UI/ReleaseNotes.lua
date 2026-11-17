@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.19", date = "2026-11-17", items = {
+        "City list: the quest chain tag (chain icon + 2/5) is clickable: it opens your quest log at the quest of that "
+            .. "chain you already have; hover shows which one.",
+    } },
     { version = "0.6.18", date = "2026-11-17", items = {
         "City list: 'Start dungeon' is now 'Dungeon quests'; a thin line separates the bottom buttons; "
             .. "XP and distance sit closer to the quest name.",
