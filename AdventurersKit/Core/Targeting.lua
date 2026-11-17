@@ -94,12 +94,20 @@ local function BuildMacroBody(objectives, onlyIndex)
         end
     end
     local useNP = NameplatesUsable() and not turnIn and not InCombatLockdown()
-    local CLEAR, DEADCLR = "/cleartarget", "/cleartarget [dead]"
+    -- A mar kijelolt elo, ellenseges celpontot megtartjuk ([noharm][dead]): a kezzel kattintott
+    -- quest mob maradjon (harcban a macro nem irhato, ott ez vedi a kattintott mobot).
+    -- Csak ha harcon kivul epul es a mostani target elo, ellenseges, de NEM jo quest mob
+    -- (mas mob vagy tapolt), akkor valtunk el rola feltetel nelkul. Leadasnal (baratsagos
+    -- NPC) mindig ujratargetelunk. Target valtaskor a macro ujraepul (Events.lua).
+    local dropTarget = turnIn or (UnitExists("target") and UnitCanAttack("player", "target")
+        and not UnitIsDead("target") and not GoodQuestUnit("target"))
+    local CLEAR = dropTarget and "/cleartarget" or "/cleartarget [noharm][dead]"
+    local DEADCLR = "/cleartarget [dead]"
     local pick = useNP and state.pick or nil
     if pick == "busy" then
         CLEAR = '/run UIErrorsFrame:AddMessage("QFocus: nearby quest mobs are taken",1,.6,.2)'
     elseif pick then
-        CLEAR = "/target " .. pick
+        CLEAR = (dropTarget and "/target " or "/target [noharm][dead] ") .. pick
     end
     -- Opcionalis tap: spell es/vagy autoattack a celpontra (csak ellenseges, elo celra)
     local tail = {}

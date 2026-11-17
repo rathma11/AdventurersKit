@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.58", date = "2026-11-17", items = {
+        "The QFocus macro keeps the quest mob you clicked: if your target is a living enemy, pressing the macro no "
+            .. "longer clears it or switches to another mob (in nameplate mode too). A dead or friendly target is still "
+            .. "replaced. Out of combat, a living enemy that is not a quest mob (or is tapped by someone else) is still "
+            .. "swapped for the nearest quest mob.",
+    } },
     { version = "0.6.57", date = "2026-11-17", items = {
         "Buff reminder, out in the world: at a vendor you get one \"Vendor nearby\" row instead of a separate Bags "
             .. "(and Gear) row. It shows your bags (used / free) and, if a repairer is near, your gear %.",
