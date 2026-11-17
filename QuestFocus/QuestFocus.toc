@@ -11,6 +11,7 @@ Core\Init.lua
 Core\Questie.lua
 Core\Map.lua
 Core\Targeting.lua
+UI\Tooltip.lua
 UI\Panel.lua
 Core\Selection.lua
 Core\Events.lua
@@ -18,9 +19,6 @@ Core\ZoneFocus.lua
 Core\Debug.lua
 UI\Options.lua
 Core\Slash.lua
-
-# Kiegeszitok (a 2. lepesben kulon addonok lesznek)
-QuestFocusBags.lua
 
 # Tervezo: tempo, ETA, javaslatok, utazas, varos mod
 Planner\Pace.lua
@@ -33,4 +31,4 @@ Planner\Suggestions.lua
 Planner\Events.lua
 Planner\Options.lua
 
-QuestFocusBuffs.lua
+# Kiegeszitok kulon addonokban: QuestFocus_Bags, QuestFocus_Buffs

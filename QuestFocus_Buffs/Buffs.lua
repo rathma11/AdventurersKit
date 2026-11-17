@@ -3,7 +3,8 @@
 -- van hatra, a gomb pirosan pulzal, es egyszer szol. Kattintasra hasznalja az itemet
 -- (fegyver enchantnal ra is teszi a main hand fegyverre).
 
-local _, NS = ...
+local NS = _G.QuestFocusNS -- a QuestFocus (alap) addon kozos nevtere
+if not NS then return end
 local L = NS.L
 local Print = NS.Print
 
@@ -1049,6 +1050,7 @@ NS.ShowFoodPicker = ShowFoodPicker
 -- Kovetes valto billentyu: /castsequence Find Minerals, Find Herbs - minden nyomasra a masikra
 -- valt (harcban is mukodik, mert a sorrendet a jatek viszi, nem az addon)
 ---------------------------------------------------------------------------
+BINDING_HEADER_QUESTFOCUSBUFFS = "QuestFocus - Buffs"
 _G["BINDING_NAME_CLICK QuestFocusTrackToggle:LeftButton"] = L["Switch tracking (Find Minerals / Find Herbs)"]
 local trackBtn = CreateFrame("Button", "QuestFocusTrackToggle", UIParent, "SecureActionButtonTemplate")
 trackBtn:RegisterForClicks("AnyUp", "AnyDown")

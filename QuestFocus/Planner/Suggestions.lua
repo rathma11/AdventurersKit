@@ -36,17 +36,19 @@ local function Row(i)
     r:SetScript("OnEnter", function(self)
         local d = self.data
         if not d then return end
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        local TT = NS.TT
         if d.kind == "route" then
-            GameTooltip:SetText(d.title or "?", 1, 1, 1)
-            NS.AddQuestTooltip(GameTooltip, d.qid, d.done) -- a "Click: ..." sort ez mar hozzaadja
+            local objs = d.objs
+            if not objs then
+                local q = NS.GetQuestieQuest(d.qid)
+                objs = q and NS.CollectTargets(q, d.done) or {}
+            end
+            local tt = TT.Begin(self, "ANCHOR_LEFT", d.title or "?", TT.Progress(objs, d.done))
+            TT.Objectives(tt, objs)
+            TT.Finish(tt, L["Click: focus this quest (marker + QFocus macro)"])
         else
-            GameTooltip:SetText(("[%s] %s"):format(tostring(d.level or "?"), d.name or "?"), 1, 1, 1)
-            GameTooltip:AddLine((L["Quest giver: %s"]):format(d.point.name or "?"), 1, 0.82, 0)
-            GameTooltip:AddLine(("%s %.1f, %.1f"):format(NS.ZoneName(d.point.map), d.point.x, d.point.y), 0.6, 0.8, 1)
-            GameTooltip:AddLine(L["Click: marker on the quest giver"], 0.5, 0.5, 0.5)
+            TT.Pickup(self, "ANCHOR_LEFT", d)
         end
-        GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     rows[i] = r
@@ -120,7 +122,7 @@ NS.ShowSuggestions = function()
         for i, s in ipairs(route) do
             n = n + 1
             local r = Row(n)
-            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done }
+            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
             local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
             local leg = (i == 1 and "" or "+") .. YdText(s.leg and math.floor(s.leg + 0.5))
             local eta = not s.done and NS.QuestEta(s.objs)
@@ -138,7 +140,8 @@ NS.ShowSuggestions = function()
         for _, p in ipairs(pickups) do
             n = n + 1
             local r = Row(n)
-            r.data = { kind = "pickup", qid = p.qid, name = p.name, level = p.level, point = p.point }
+            r.data = { kind = "pickup", qid = p.qid, name = p.name, level = p.level, point = p.point,
+                dist = p.dist and math.floor(p.dist + 0.5) }
             local col = GetQuestDifficultyColor and p.level and GetQuestDifficultyColor(p.level)
             local hex = col and ("|cff%02x%02x%02x"):format(col.r * 255, col.g * 255, col.b * 255) or "|cffffffff"
             r.text:SetText(("%s[%s] %s|r  %s"):format(hex, tostring(p.level or "?"), p.name or "?",
@@ -195,7 +198,7 @@ NS.ShowTurnInPickups = function(y)
     y = y - 15
     for i, s in ipairs(tiRoute) do
         local r = Row(i)
-        r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done }
+        r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs }
         local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
         local leg = (i == 1 and "" or "+") .. YdText(s.leg and math.floor(s.leg + 0.5))
         local eta = not s.done and NS.QuestEta(s.objs)

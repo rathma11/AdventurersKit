@@ -4,7 +4,8 @@
 --  * hasznalhato quest item gomb a QuestFocus panel mellett (+ billentyu)
 --  * nem eladhato, felesleges quest itemek eldobasa (egyenkent rakerdez)
 
-local _, NS = ...
+local NS = _G.QuestFocusNS -- a QuestFocus (alap) addon kozos nevtere
+if not NS then return end
 local L = NS.L
 local Print, state = NS.Print, NS.state
 

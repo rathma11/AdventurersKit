@@ -71,12 +71,7 @@ local function CityRow(i)
     r:SetScript("OnEnter", function(self)
         local d = self.data
         if not d then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(("[%s] %s"):format(tostring(d.level or "?"), d.name or "?"), 1, 1, 1)
-        GameTooltip:AddLine((L["Quest giver: %s"]):format(d.point.name or "?"), 1, 0.82, 0)
-        GameTooltip:AddLine(("%s %.1f, %.1f"):format(NS.ZoneName(d.point.map), d.point.x, d.point.y), 0.6, 0.8, 1)
-        GameTooltip:AddLine(L["Click: marker (TomTom arrow) on the quest giver"], 0.5, 0.5, 0.5)
-        GameTooltip:Show()
+        NS.TT.Pickup(self, "ANCHOR_RIGHT", d)
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     cityRows[i] = r

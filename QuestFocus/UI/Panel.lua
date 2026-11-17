@@ -382,26 +382,11 @@ local function GetLine(i)
     line:SetScript("OnEnter", function(self)
         local o = state.objectives and state.objectives[self.index]
         if not o then return end
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText(o.desc, 1, 0.82, 0, 1, true)
-        if o.itemId then
-            for _, l in ipairs(ItemSourceLines(o, 8)) do GameTooltip:AddLine(l[1], l[2], l[3], l[4]) end
-        else
-            for n, s in ipairs(o.sources) do
-                if n > 8 then GameTooltip:AddLine("...", 0.7, 0.7, 0.7) break end
-                GameTooltip:AddLine((s.isNpc and "Mob: " or "Object: ") .. (s.name or "?"), 1, 1, 1)
-            end
-        end
-        local p, dist = FindNearest(o.sources)
-        if p then
-            GameTooltip:AddLine((L["Nearest: %s %.1f, %.1f%s"]):format(ZoneName(p.map), p.x, p.y,
-                dist and (" (%d yd)"):format(dist) or ""), 0.6, 0.8, 1)
-        end
-        local etaLine = not o.completed and NS.EtaLine and NS.EtaLine(o)
-        if etaLine then GameTooltip:AddLine(etaLine, 0.8, 0.8, 0.8, true) end
-        GameTooltip:AddLine(L["Left click: marker + macro for this only"], 0.5, 0.5, 0.5)
-        GameTooltip:AddLine(L["Right click: macro for all remaining"], 0.5, 0.5, 0.5)
-        GameTooltip:Show()
+        local TT = NS.TT
+        local tt = TT.Begin(self, "ANCHOR_LEFT", state.title or "?", TT.Progress(state.objectives, state.isComplete))
+        TT.Objective(tt, o, { sources = 6, highlight = state.objIndex == self.index })
+        TT.Note(tt, not o.completed and NS.EtaLine and NS.EtaLine(o) or nil)
+        TT.Finish(tt, L["Left click: marker + macro for this only"], L["Right click: macro for all remaining"])
     end)
     line:SetScript("OnLeave", function() GameTooltip:Hide() end)
     panel.lines[i] = line
@@ -503,16 +488,12 @@ local function GetExtraRow(i)
     r:SetScript("OnEnter", function(self)
         local e = self.extra
         if not e then return end
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText(e.title or "?", 1, 1, 1)
-        GameTooltip:AddLine(e.desc, 1, 0.82, 0, true)
-        GameTooltip:AddLine(table.concat(e.names, ", "), 0.9, 0.9, 0.9, true)
-        GameTooltip:AddLine((L["Nearest: %d yd"]):format(e.dist), 0.6, 0.8, 1)
-        local eta = NS.EtaLine and NS.EtaLine(e.obj)
-        if eta then GameTooltip:AddLine(eta, 0.8, 0.8, 0.8, true) end
-        GameTooltip:AddLine(L["The QFocus macro targets these mobs too."], 0.5, 0.5, 0.5)
-        GameTooltip:AddLine(L["Click: focus this quest"], 0.5, 0.5, 0.5)
-        GameTooltip:Show()
+        local TT = NS.TT
+        local tt = TT.Begin(self, "ANCHOR_LEFT", e.title or "?", L["also nearby"])
+        TT.Objective(tt, e.obj)
+        TT.Note(tt, NS.EtaLine and NS.EtaLine(e.obj) or nil)
+        TT.Note(tt, L["The QFocus macro targets these mobs too."])
+        TT.Finish(tt, L["Click: focus this quest"])
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     panel.extraRows[i] = r
@@ -598,11 +579,13 @@ local function Panel_Update()
             r.text:SetJustifyH("LEFT")
             r.text:SetWordWrap(false)
             r:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-                GameTooltip:SetText((L["Hearthstone: %s"]):format(self.hsName or "?"), 1, 1, 1)
-                GameTooltip:AddLine(L["Quests you could turn in there:"], 1, 0.82, 0)
-                for _, t in ipairs(self.hsList or {}) do GameTooltip:AddLine("  " .. t, 1, 1, 1) end
-                GameTooltip:Show()
+                local TT = NS.TT
+                local tt = TT.Begin(self, "ANCHOR_LEFT", (L["Hearthstone: %s"]):format(self.hsName or "?"))
+                TT.Sub(tt, L["Quests you could turn in there:"])
+                for _, t in ipairs(self.hsList or {}) do
+                    tt:AddLine("|TInterface\\GossipFrame\\ActiveQuestIcon:12:12|t " .. t, 1, 1, 1)
+                end
+                TT.Finish(tt)
             end)
             r:SetScript("OnLeave", function() GameTooltip:Hide() end)
             panel.hsRow = r

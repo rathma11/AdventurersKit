@@ -1,4 +1,3 @@
 <Bindings>
 	<Binding name="CLICK QuestFocusUseItem:LeftButton" header="QUESTFOCUS" category="ADDONS"/>
-	<Binding name="CLICK QuestFocusTrackToggle:LeftButton" category="ADDONS"/>
 </Bindings>

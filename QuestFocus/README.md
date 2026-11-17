@@ -2,6 +2,17 @@
 
 Requires **Questie**. TomTom is optional: if it is installed, its arrow is used. Bagnon is optional: if it is installed, the quest item features hook into its bag window.
 
+## Addons (modules)
+QuestFocus ships as three folders. Copy all of them to `Interface\AddOns`; the two modules are optional and can be disabled one by one in the AddOns list.
+
+| Folder | What it does |
+|---|---|
+| `QuestFocus` | Core (required): QFocus macro, marker, panel, tooltips, pace/ETA, suggestions, travel, city mode |
+| `QuestFocus_Bags` | Quest item list, Bagnon highlight, use-item button and keybind |
+| `QuestFocus_Buffs` | Buff reminder: sleeping bag, XP food, weapon enchant, class buffs, tracking switch keybind |
+
+Core layout: `Core\` (logic), `UI\` (panel, options, shared tooltip builder `UI\Tooltip.lua`), `Planner\` (pace, routes, popups, travel). All modules share the `QuestFocusDB` settings.
+
 ## First start
 1. Start the game. On the character select screen click **AddOns** and enable QuestFocus. If it shows "out of date", also tick **Load out of date AddOns**.
 2. Open the quest log (L) and click a quest. This creates the **QFocus** macro.

@@ -9,6 +9,8 @@ local _, NS = ...
 local L = setmetatable({}, { __index = function(_, k) return k end })
 NS.L = L
 NS.locale = GetLocale and GetLocale() or "enUS"
+-- Kozos nevter a kiegeszito addonoknak (QuestFocus_Bags, QuestFocus_Buffs)
+_G.QuestFocusNS = NS
 
 -- Tiltott / blokkolt muveletek (a "has been blocked from an action" ablak) naplozasa a Debug fulre,
 -- hogy lassuk, melyik fuggvenyrol van szo.
@@ -16,8 +18,9 @@ local blockWatch = CreateFrame("Frame")
 blockWatch:RegisterEvent("ADDON_ACTION_BLOCKED")
 blockWatch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 blockWatch:SetScript("OnEvent", function(_, event, addon, func)
-    if addon ~= "QuestFocus" then return end
-    local msg = ("%s: %s"):format(event == "ADDON_ACTION_FORBIDDEN" and "FORBIDDEN" or "BLOCKED", tostring(func))
+    if type(addon) ~= "string" or not addon:find("^QuestFocus") then return end
+    local msg = ("%s: %s%s"):format(event == "ADDON_ACTION_FORBIDDEN" and "FORBIDDEN" or "BLOCKED", tostring(func),
+        addon ~= "QuestFocus" and (" [" .. addon .. "]") or "")
     for _, x in ipairs(NS.errors) do
         if x.msg == msg then x.count, x.time = x.count + 1, date("%H:%M:%S") return end
     end

@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: QuestFocus - Buffs
+## Notes: QuestFocus module: buff reminder (sleeping bag, XP food, weapon enchant, class buffs, tracking)
+## Version: 0.2.0
+## Dependencies: QuestFocus
+
+Buffs.lua
