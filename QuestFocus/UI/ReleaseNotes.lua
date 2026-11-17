@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.5.4", date = "2026-11-17", items = {
+        "Map button also opens the focused quest in the map's quest panel, when the client has one.",
+    } },
     { version = "0.5.3", date = "2026-11-17", items = {
         "Vendors (e.g. a trade supplies NPC selling a quest item) always get a marker; it no longer says "
             .. "'you are in the spawn area' when the vendor is nearby but hidden in a building.",

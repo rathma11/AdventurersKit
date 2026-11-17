@@ -383,9 +383,16 @@ local function ShowObjectiveOnMap(i)
     SetWaypoint(p, p.name or state.title)
     local wm = WorldMapFrame
     if not wm then return end
+    -- ha a kliensnek van terkep melletti quest panelje: azon a fokuszalt quest reszletei
+    -- nyiljanak meg (kulonben csak a sima terkep)
+    local qd = _G.QuestMapFrame_OpenToQuestDetails
+    if qd and state.questId then
+        pcall(qd, state.questId)
+    end
     if not wm:IsShown() then
         if ToggleWorldMap then ToggleWorldMap() else ShowUIPanel(wm) end
     end
+    -- a quest reszletei sajat zonat valaszthatnak (itt nincs quest POI): a celunk zonaja
     if wm.SetMapID then pcall(wm.SetMapID, wm, p.map) end
 end
 NS.ShowObjectiveOnMap = ShowObjectiveOnMap
