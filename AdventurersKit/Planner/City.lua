@@ -486,9 +486,10 @@ end
 local grip = CreateFrame("Button", nil, city)
 grip:SetSize(16, 16)
 grip:SetPoint("BOTTOMRIGHT", -5, 5)
-grip:SetNormalTexture("Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up")
-grip:SetHighlightTexture("Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight")
-grip:SetPushedTexture("Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down")
+grip:SetFrameLevel(city:GetFrameLevel() + 5)
+grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
 grip:SetScript("OnMouseDown", function(_, btn)
     if btn ~= "LeftButton" then return end
     city.sizing = true
