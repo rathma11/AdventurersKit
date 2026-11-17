@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.4", date = "2026-11-17", items = {
+        "City list: a to-do section above the quests - repair (most worn item under 60%), hunter ammo (under 400), "
+            .. "no XP food in your bags - each with the nearest repairer / ammo vendor / food vendor; click for a marker.",
+        "City list: Bank button in the title row (marker on the nearest banker). NPCs come from Questie's town data, your faction only.",
+    } },
     { version = "0.6.3", date = "2026-11-17", items = {
         "Buffs tab: choosing an item / spell for a row (icon click or drag) also ticks that row on.",
     } },

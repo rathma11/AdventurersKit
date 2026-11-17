@@ -244,6 +244,126 @@ local function CityRow(i)
     return r
 end
 
+---------------------------------------------------------------------------
+-- Teendok a varosban (a questek folott): javitas, hunter ammo, XP kaja. Kattintasra marker
+-- a legkozelebbi javitora / ammo arusra / kaja arusra. Plusz Bank gomb a fejlecben.
+---------------------------------------------------------------------------
+local REPAIR_AT, AMMO_AT = 0.6, 400 -- javitas: a leggyengebb targy 60% alatt; ammo: 400 alatt
+local function CityNeeds()
+    local out = {}
+    -- tartossag: a legrosszabb targy aranya
+    local worst
+    for slot = 1, 18 do
+        local cur, max = GetInventoryItemDurability(slot)
+        if cur and max and max > 0 then
+            local r = cur / max
+            if not worst or r < worst then worst = r end
+        end
+    end
+    if worst and worst < REPAIR_AT then
+        out[#out + 1] = { kind = "Repair", icon = "Interface\\Icons\\Trade_BlackSmithing",
+            text = (L["Repair: your most worn item is at %d%%"]):format(math.floor(worst * 100 + 0.5)) }
+    end
+    -- hunter: ammo (az ammo slot darabszama)
+    if select(2, UnitClass("player")) == "HUNTER" then
+        local id = GetInventoryItemID("player", 0)
+        local n = id and GetInventoryItemCount("player", 0) or 0
+        if n < AMMO_AT then
+            out[#out + 1] = { kind = "Ammo", icon = "Interface\\Icons\\INV_Ammo_Arrow_02",
+                text = n > 0 and (L["Ammo: only %d left"]):format(n) or L["Ammo: none equipped"] }
+        end
+    end
+    -- XP kaja (Buffs modul): figyeled, de nincs a taskadban
+    if NS.FoodCandidates and NS.BuffSlotOff and not NS.BuffSlotOff("food")
+        and not (NS.ModuleOn and not NS.ModuleOn("QuestFocus_Buffs")) then
+        local ok, xp = pcall(NS.FoodCandidates)
+        if ok and type(xp) == "table" and #xp == 0 then
+            out[#out + 1] = { kind = "Food", icon = "Interface\\Icons\\INV_Misc_Food_15",
+                text = L["XP food: none in your bags"] }
+        end
+    end
+    for _, e in ipairs(out) do
+        local ok, p, d = pcall(NS.NearestTownsfolk, e.kind)
+        if ok and p then e.point, e.dist = p, d end
+    end
+    return out
+end
+
+local NEED_ROW_H = 18
+local needRows = {}
+local function NeedRow(i)
+    local r = needRows[i]
+    if r then return r end
+    r = CreateFrame("Button", nil, city)
+    r:SetSize(CITY_W - 28, NEED_ROW_H - 1)
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(14, 14)
+    r.icon:SetPoint("LEFT", 2, 0)
+    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.text:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+    r.text:SetPoint("RIGHT", -180, 0)
+    r.text:SetJustifyH("LEFT")
+    r.text:SetWordWrap(false)
+    r.right = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.right:SetPoint("RIGHT", -2, 0)
+    r.right:SetWidth(176)
+    r.right:SetJustifyH("RIGHT")
+    r.right:SetWordWrap(false)
+    local bg = r:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(1, 0.6, 0.2, 0.10)
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    r:SetScript("OnClick", function(self)
+        local e = self.data
+        if not e then return end
+        local ok, p, d = pcall(NS.NearestTownsfolk, e.kind)
+        if not (ok and p) then
+            NS.Loud(NS.Print, L["No known NPC for this nearby (Questie hasn't loaded its town data yet, or none on this continent)."])
+            return
+        end
+        NS.SetWaypoint(p, p.name)
+        NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%d yd)"], p.name or "?", d or 0)
+    end)
+    r:SetScript("OnEnter", function(self)
+        local e = self.data
+        if not e then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(e.text, 1, 1, 1)
+        if e.point then GameTooltip:AddLine((L["Nearest: %s (%d yd)"]):format(e.point.name or "?", e.dist or 0), 0.8, 0.8, 0.8) end
+        GameTooltip:AddLine(L["Click: marker on the nearest one"], 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    needRows[i] = r
+    return r
+end
+
+-- Bank gomb a fejlecben (a bezaras mellett)
+city.bankBtn = CreateFrame("Button", nil, city, "UIPanelButtonTemplate")
+city.bankBtn:SetSize(60, 20)
+city.bankBtn:SetPoint("RIGHT", cClose, "LEFT", -4, 0)
+city.bankBtn:SetText(L["Bank"])
+if city.bankBtn:GetFontString() then city.bankBtn:GetFontString():SetFontObject("GameFontNormalSmall") end
+city.bankBtn:SetScript("OnClick", function()
+    local ok, p, d = pcall(NS.NearestTownsfolk, "Banker")
+    if not (ok and p) then
+        NS.Loud(NS.Print, L["No known banker nearby."])
+        return
+    end
+    NS.SetWaypoint(p, p.name)
+    NS.Loud(NS.Print, L["Marker: |cffffff00%s|r (%d yd)"], p.name or "?", d or 0)
+end)
+city.bankBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(L["Bank"], 1, 1, 1)
+    GameTooltip:AddLine(L["Marker on the nearest banker."], 0.8, 0.8, 0.8)
+    GameTooltip:Show()
+end)
+city.bankBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
 local function InCity() return IsResting and IsResting() end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
 
@@ -293,24 +413,42 @@ local function RefreshCityList()
         r:Show()
         y = y - CITY_ROW_H
     end
-    if n == 0 then city:Hide() return end
-    city.title:SetText((L["Quests to pick up here (%d)"]):format(n))
+    -- teendok (javitas, ammo, XP kaja) a questek folott
+    local needs = CityNeeds()
+    for _, r in ipairs(needRows) do r:Hide() end
+    for i, e in ipairs(needs) do
+        local r = NeedRow(i)
+        r.data = e
+        r.icon:SetTexture(e.icon)
+        r.text:SetText("|cffffb060" .. e.text .. "|r")
+        r.right:SetText(e.point and ("%s  |cff99ccff%d yd|r"):format(e.point.name or "?", e.dist or 0)
+            or "|cff808080" .. L["no NPC known nearby"] .. "|r")
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", city, "TOPLEFT", 14, -38 - (i - 1) * NEED_ROW_H)
+        r:Show()
+    end
+    if n == 0 and #needs == 0 then city:Hide() return end
+    local top = -38 - (#needs > 0 and (#needs * NEED_ROW_H + 6) or 0)
+    city.title:SetText(n > 0 and (L["Quests to pick up here (%d)"]):format(n) or L["In town"])
     cContent:SetHeight(math.max(-y, 1))
     local visH = math.min(n, CITY_VISIBLE) * CITY_ROW_H
     -- csuszka csak ha tobb sor van, mint ami kifer
     local needBar = n > CITY_VISIBLE
-    cScroll:SetPoint("BOTTOMRIGHT", city, "TOPLEFT", CITY_W - (needBar and 34 or 12), -38 - visH)
+    cScroll:ClearAllPoints()
+    cScroll:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top)
+    cScroll:SetPoint("BOTTOMRIGHT", city, "TOPLEFT", CITY_W - (needBar and 34 or 12), top - math.max(visH, 1))
+    cScroll:SetShown(n > 0)
     if cScroll.ScrollBar then cScroll.ScrollBar:SetShown(needBar) end
     if not needBar then cScroll:SetVerticalScroll(0) end
     city.foot:ClearAllPoints()
-    city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, -38 - visH - 4)
+    city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, top - visH - 4)
     city.ignoreBtn:ClearAllPoints()
-    city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, -38 - visH - 20)
+    city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 20)
     city.disableBtn:ClearAllPoints()
     city.disableBtn:SetPoint("LEFT", city.ignoreBtn, "RIGHT", 6, 0)
     -- van dungeon quest a listaban: Start dungeon gomb is
     city.dungeonBtn:SetShown(anyDungeon)
-    city:SetHeight(38 + visH + 52)
+    city:SetHeight(-top + visH + 52)
     if not city:IsShown() and not city.closedHere then city:Show() end
 end
 

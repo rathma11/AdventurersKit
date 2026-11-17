@@ -132,6 +132,39 @@ end
 
 NS.QuestIsDone = IsDone
 
+-- Legkozelebbi NPC egy tipusbol (Questie Townsfolk): "Repair", "Banker", "Innkeeper" a
+-- Townsfolk modulbol, "Ammo", "Food", "Drink" a karakter vendor listajabol. A sajat
+-- frakciodhoz baratsagosak kozul, ugyanazon a kontinensen. Forras lista tipusonkent egyszer.
+local folkCache = {}
+local function FolkIds(kind)
+    if kind == "Ammo" or kind == "Food" or kind == "Drink" then
+        local db = _G.Questie and Questie.db and Questie.db.char
+        return db and type(db.vendorList) == "table" and db.vendorList[kind]
+    end
+    local T = NS.Module("Townsfolk")
+    return T and type(T.townsfolk) == "table" and T.townsfolk[kind]
+end
+NS.NearestTownsfolk = function(kind)
+    local pc, px, py = NS.PlayerWorldPos()
+    if not pc then return end
+    local src = folkCache[kind]
+    if not src then
+        local ids = FolkIds(kind)
+        if type(ids) ~= "table" or #ids == 0 then return end -- meg nem toltotte be a Questie
+        local fac = UnitFactionGroup("player") == "Alliance" and "A" or "H"
+        src = {}
+        for _, id in ipairs(ids) do
+            local npc = NS.GetNPC(id)
+            local f = npc and npc.friendlyToFaction
+            if npc and type(npc.spawns) == "table" and (not f or f == "AH" or f == fac) then
+                src[#src + 1] = { id = id, name = npc.name, spawns = npc.spawns, isNpc = true }
+            end
+        end
+        folkCache[kind] = src
+    end
+    return Nearest(src, pc, px, py)
+end
+
 local starterCache = {} -- qid -> quest giver forrasok
 
 local function BuildPickups(pc, px, py, maxN)
