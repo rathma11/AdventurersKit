@@ -98,7 +98,7 @@ cl:Place(ignBox, 28, 8)
 local ignRows = {}
 local ignAll
 local function RebuildIgnore()
-    local list = QuestFocusDB.cityIgnore or {}
+    local list = NS.CharDB().cityIgnore or {}
     for _, r in ipairs(ignRows) do r:Hide() end
     for i, e in ipairs(list) do
         local r = ignRows[i]
@@ -119,7 +119,7 @@ local function RebuildIgnore()
         r:SetPoint("TOPLEFT", ignBox, "TOPLEFT", 0, -(i - 1) * 24)
         r.text:SetText("|cffffff00" .. (e.name or "?") .. "|r")
         r.btn:SetScript("OnClick", function()
-            local cur = QuestFocusDB.cityIgnore or {}
+            local cur = NS.CharDB().cityIgnore or {}
             for j, x in ipairs(cur) do
                 if x == e then
                     table.remove(cur, j)

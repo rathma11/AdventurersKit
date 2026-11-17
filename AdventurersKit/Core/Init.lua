@@ -82,6 +82,49 @@ end
 NS.Print, NS.PrintAlways, NS.Loud = Print, PrintAlways, Loud
 
 
+---------------------------------------------------------------------------
+-- Karakterenkenti beallitasok: QuestFocusDB.chars["Nev-Realm"]. Ide kerulnek a buff
+-- kapcsolok (noBuff_*), a valasztott itemek / sajat buffok / percek / class buff valasztasok
+-- es a city list kihagyott helyei. Ami itt nincs, a kozos QuestFocusDB-bol olvas (__index).
+-- Elso alkalommal karakterenkent a korabbi kozos ertekek masolatabol indul.
+---------------------------------------------------------------------------
+NS.CHAR_KEYS = { "buffItems", "customBuffs", "buffWarn", "classPref", "cityIgnore" }
+local function DeepCopy(v)
+    if type(v) ~= "table" then return v end
+    local t = {}
+    for k, x in pairs(v) do t[k] = DeepCopy(x) end
+    return t
+end
+local charKey
+NS.CharDB = function()
+    local db = QuestFocusDB
+    if not db then return {} end
+    db.chars = db.chars or {}
+    charKey = charKey or ((UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?"))
+    local c = db.chars[charKey]
+    if not c then
+        c = {}
+        for _, k in ipairs(NS.CHAR_KEYS) do
+            if db[k] ~= nil then c[k] = DeepCopy(db[k]) end
+        end
+        for k, v in pairs(db) do
+            if type(k) == "string" and k:find("^noBuff_") then c[k] = v end
+        end
+        db.chars[charKey] = c
+    end
+    if not getmetatable(c) then
+        -- a karakteres kulcsok soha nem olvasnak a kozosbol (kulonben a kozos tablat kapnad
+        -- vissza, es a ket karakter ugyanazt irna); minden mas igen
+        local own = {}
+        for _, k in ipairs(NS.CHAR_KEYS) do own[k] = true end
+        setmetatable(c, { __index = function(_, k)
+            if own[k] or (type(k) == "string" and k:find("^noBuff_")) then return nil end
+            return db[k]
+        end })
+    end
+    return c
+end
+
 -- belso exportok a tobbi core fajlnak
 NS.C = NS.C or {}
 NS.C.ICON_FALLBACK, NS.C.ICON_HUNT, NS.C.ICON_IDLE, NS.C.ICON_TURNIN, NS.C.MACRO_MAX, NS.C.MACRO_NAME, NS.C.Print, NS.C.QF = ICON_FALLBACK, ICON_HUNT, ICON_IDLE, ICON_TURNIN, MACRO_MAX, MACRO_NAME, Print, QF

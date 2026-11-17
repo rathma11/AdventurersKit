@@ -167,7 +167,7 @@ city.sep:SetHeight(1)
 city.sep:SetColorTexture(1, 0.82, 0, 0.3)
 
 ---------------------------------------------------------------------------
--- Ignoralt helyek: QuestFocusDB.cityIgnore = { {c, x, y, name} }. Vilag koordinatan
+-- Ignoralt helyek: NS.CharDB().cityIgnore = { {c, x, y, name} }. Vilag koordinatan
 -- (yard) tarolva, CITY_IGNORE_R sugaron belul ignoralt (varos es fogados falu is).
 ---------------------------------------------------------------------------
 local CITY_IGNORE_R = 500
@@ -177,7 +177,7 @@ local function PlaceName()
     return z ~= "" and z or "?"
 end
 local function IgnoredHere()
-    local list = QuestFocusDB.cityIgnore
+    local list = NS.CharDB().cityIgnore
     if not list or #list == 0 then return end
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
@@ -236,16 +236,16 @@ city.disableBtn = MakeBtn(L["Disable city list everywhere"])
 city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
     local i, e = IgnoredHere()
     if i then
-        table.remove(QuestFocusDB.cityIgnore, i)
+        table.remove(NS.CharDB().cityIgnore, i)
         NS.Print(L["City list: |cffffff00%s|r is no longer ignored."], e.name or "?")
         city.ignoreBtn:SetText(L["Don't open here again"])
         return
     end
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
-    QuestFocusDB.cityIgnore = QuestFocusDB.cityIgnore or {}
+    NS.CharDB().cityIgnore = NS.CharDB().cityIgnore or {}
     local name = PlaceName()
-    table.insert(QuestFocusDB.cityIgnore, { c = pc, x = px, y = py, name = name })
+    table.insert(NS.CharDB().cityIgnore, { c = pc, x = px, y = py, name = name })
     NS.Print(L["City list: |cffffff00%s|r ignored (also next time). |cffffff00/qf city|r opens it anyway, |cffffff00/qf cityreset|r clears the ignore list."], name)
     city:Hide()
 end) end)
@@ -944,8 +944,8 @@ NS.ShowCityList = function()
     RefreshCityList()
 end
 NS.ResetCityIgnore = function()
-    local n = QuestFocusDB.cityIgnore and #QuestFocusDB.cityIgnore or 0
-    QuestFocusDB.cityIgnore = {}
+    local n = NS.CharDB().cityIgnore and #NS.CharDB().cityIgnore or 0
+    NS.CharDB().cityIgnore = {}
     NS.Print(L["City list: ignore list cleared (%d places)."], n)
 end
 

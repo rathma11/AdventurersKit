@@ -88,24 +88,28 @@ local function Copy(v)
     return t
 end
 
+local CHARK = {}
+for _, k in ipairs(NS.CHAR_KEYS or {}) do CHARK[k] = true end
+
 local function Export()
-    local db = QuestFocusDB
+    local db, cdb = QuestFocusDB, NS.CharDB()
+    local function src(k) return CHARK[k] and cdb or db end
     local data = { v = NS.Version and NS.Version() or "?", class = select(2, UnitClass("player")), s = {} }
-    for _, k in ipairs(PLAIN) do if db[k] ~= nil then data.s[k] = Copy(db[k]) end end
-    for _, k in ipairs(CLASS_ONLY) do if db[k] ~= nil then data.s[k] = Copy(db[k]) end end
-    for k, v in pairs(db) do
+    for _, k in ipairs(PLAIN) do if src(k)[k] ~= nil then data.s[k] = Copy(src(k)[k]) end end
+    for _, k in ipairs(CLASS_ONLY) do if src(k)[k] ~= nil then data.s[k] = Copy(src(k)[k]) end end
+    for k, v in pairs(cdb) do
         if type(k) == "string" and k:find("^noBuff_") then data.s[k] = v end
     end
     -- item valasztasok: itemID + nev (a nev a jelentesbe, ha a masiknal nincs meg)
-    if type(db.buffItems) == "table" then
+    if type(cdb.buffItems) == "table" then
         data.items = {}
-        for key, id in pairs(db.buffItems) do
+        for key, id in pairs(cdb.buffItems) do
             data.items[key] = { id = id, name = GetItemInfo(id) or ("item " .. tostring(id)) }
         end
     end
-    if type(db.customBuffs) == "table" then
+    if type(cdb.customBuffs) == "table" then
         data.custom = {}
-        for _, cb in ipairs(db.customBuffs) do
+        for _, cb in ipairs(cdb.customBuffs) do
             local e = Copy(cb)
             if e.itemId then e.itemName = GetItemInfo(e.itemId) or ("item " .. tostring(e.itemId)) end
             data.custom[#data.custom + 1] = e
@@ -127,21 +131,23 @@ local function Import(text)
     if not ok or type(data) ~= "table" or type(data.s) ~= "table" then
         return false, { L["The settings text is damaged (copy it again, all of it)."] }
     end
-    local db, report = QuestFocusDB, {}
+    local report = {}
+    local gdb, db = QuestFocusDB, NS.CharDB()
+    local function dst(k) return (CHARK[k] or k:find("^noBuff_")) and db or gdb end
     local myClass = select(2, UnitClass("player"))
     local allowed = {}
     for _, k in ipairs(PLAIN) do allowed[k] = true end
     local n = 0
     for k, v in pairs(data.s) do
         if type(k) == "string" and (allowed[k] or k:find("^noBuff_")) then
-            db[k] = Copy(v)
+            dst(k)[k] = Copy(v)
             n = n + 1
         end
     end
     -- class beallitasok
     if data.class == myClass then
         for _, k in ipairs(CLASS_ONLY) do
-            if data.s[k] ~= nil then db[k] = Copy(data.s[k]); n = n + 1 end
+            if data.s[k] ~= nil then dst(k)[k] = Copy(data.s[k]); n = n + 1 end
         end
     elseif data.class then
         report[#report + 1] = (L["Class settings (macro spell, class buff choices) skipped: they are for %s."]):format(

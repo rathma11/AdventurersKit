@@ -30,7 +30,7 @@ if select(2, UnitClass("player")) == "ROGUE" then
     end
 end
 -- Ezekbol a tipusokbol egyszerre csak egy lehet (Options > Buffs > Add buff); a tobbi
--- ("Other item") barmennyi: QuestFocusDB.customBuffs = { { key = "i_<itemId>", itemId } }
+-- ("Other item") barmennyi: NS.CharDB().customBuffs = { { key = "i_<itemId>", itemId } }
 local MAX_CUSTOM = 8
 
 -- Class buffok: 'spells' = a buff nevei (barmelyik eleg, a "Greater ..." is), 'cast' = amit
@@ -104,9 +104,12 @@ for _, list in ipairs({ CLASS_BUFFS[PLAYER_CLASS] or {}, CLASS_BUFFS.ALL }) do
 end
 
 local function DB()
-    QuestFocusDB.buffItems = QuestFocusDB.buffItems or {}
+    -- karakterenkenti tabla (buff kapcsolok, valasztott itemek); a buffLearn kozos marad
+    -- (item -> buff: minden karakternek ugyanaz), azt a __index a kozosbol adja
+    local c = NS.CharDB()
+    c.buffItems = c.buffItems or {}
     QuestFocusDB.buffLearn = QuestFocusDB.buffLearn or {}
-    return QuestFocusDB
+    return c
 end
 
 -- Ki van-e kapcsolva a tipus: noBuff_<key> = true (ki) / false (kifejezetten be) / nil (alap:
@@ -123,7 +126,7 @@ end
 
 -- Figyelmeztetesi kuszob percben, buffonkent (alap: slot.warn). 0 = csak ha hianyzik.
 local function Minutes(slot)
-    local t = QuestFocusDB.buffWarn
+    local t = NS.CharDB().buffWarn
     return (t and tonumber(t[slot.key])) or slot.warn or 10
 end
 
@@ -135,7 +138,7 @@ end
 -- Sajat buff (spell ID / nev alapjan): a buffot nevrol / ID-rol ismerjuk fel; ha a spellt
 -- te tudod castolni, az emlekezteto gombja fel is teszi, kulonben csak szol, hogy hianyzik.
 local function EnsureCustomBuffs()
-    local list = QuestFocusDB.customBuffs or {}
+    local list = NS.CharDB().customBuffs or {}
     for _, e in ipairs(list) do
         local i = CustomSlotIndex(e.key)
         if e.itemId then
@@ -155,29 +158,29 @@ local function EnsureCustomBuffs()
 end
 NS.EnsureCustomBuffs = EnsureCustomBuffs
 local function AddCustomSpellBuff(spellId, name, minutes)
-    QuestFocusDB.customBuffs = QuestFocusDB.customBuffs or {}
+    NS.CharDB().customBuffs = NS.CharDB().customBuffs or {}
     local key = "s_" .. tostring(spellId or name)
-    if CustomSlotIndex(key) or #QuestFocusDB.customBuffs >= MAX_CUSTOM then return false end
-    table.insert(QuestFocusDB.customBuffs, { key = key, spellId = spellId, name = name })
-    QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
-    QuestFocusDB.buffWarn[key] = minutes or 0
+    if CustomSlotIndex(key) or #NS.CharDB().customBuffs >= MAX_CUSTOM then return false end
+    table.insert(NS.CharDB().customBuffs, { key = key, spellId = spellId, name = name })
+    NS.CharDB().buffWarn = NS.CharDB().buffWarn or {}
+    NS.CharDB().buffWarn[key] = minutes or 0
     EnsureCustomBuffs()
     return true
 end
 local function AddCustomBuff(itemId, minutes)
-    QuestFocusDB.customBuffs = QuestFocusDB.customBuffs or {}
+    NS.CharDB().customBuffs = NS.CharDB().customBuffs or {}
     local key = "i_" .. itemId
     if CustomSlotIndex(key) then return false end
-    if #QuestFocusDB.customBuffs >= MAX_CUSTOM then return false end
-    table.insert(QuestFocusDB.customBuffs, { key = key, itemId = itemId })
-    QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
-    QuestFocusDB.buffWarn[key] = minutes or 0
+    if #NS.CharDB().customBuffs >= MAX_CUSTOM then return false end
+    table.insert(NS.CharDB().customBuffs, { key = key, itemId = itemId })
+    NS.CharDB().buffWarn = NS.CharDB().buffWarn or {}
+    NS.CharDB().buffWarn[key] = minutes or 0
     EnsureCustomBuffs()
     return true
 end
 local function RemoveCustomBuff(key)
-    for i, e in ipairs(QuestFocusDB.customBuffs or {}) do
-        if e.key == key then table.remove(QuestFocusDB.customBuffs, i) break end
+    for i, e in ipairs(NS.CharDB().customBuffs or {}) do
+        if e.key == key then table.remove(NS.CharDB().customBuffs, i) break end
     end
     local i = CustomSlotIndex(key)
     if i then table.remove(SLOTS, i) end
@@ -590,7 +593,7 @@ local function SlotSpell(slot)
         for _, c in ipairs(castable) do if c == name then return true end end
         return false
     end
-    local pref = QuestFocusDB.classPref and QuestFocusDB.classPref[slot.key]
+    local pref = NS.CharDB().classPref and NS.CharDB().classPref[slot.key]
     if ok(pref) then return pref end
     local seen = QuestFocusDB.classSeen and QuestFocusDB.classSeen[slot.key]
     if seen then seen = seen:gsub("^Greater ", "") end
@@ -878,7 +881,7 @@ for i = 1, #SLOTS + MAX_CUSTOM + 2 do -- +2: kinti figyelmeztetesek (taska, javi
         local kind, itemId, _, spellID = GetCursorInfo()
         if s.isClass and kind == "spell" then
             local name = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)) or (GetSpellInfo and GetSpellInfo(spellID))
-            if name then QuestFocusDB.classPref = QuestFocusDB.classPref or {}; QuestFocusDB.classPref[s.key] = name end
+            if name then NS.CharDB().classPref = NS.CharDB().classPref or {}; NS.CharDB().classPref[s.key] = name end
         elseif not s.isClass and not s.customSpell and kind == "item" then
             DB().buffItems[s.key] = itemId
             DB()["noBuff_" .. s.key] = false
@@ -1525,8 +1528,8 @@ local function FlyBtn(i)
     f:HookScript("PreClick", function(self)
         local s, a = self.slot, self.act
         if s.isClass then
-            QuestFocusDB.classPref = QuestFocusDB.classPref or {}
-            QuestFocusDB.classPref[s.key] = a.name
+            NS.CharDB().classPref = NS.CharDB().classPref or {}
+            NS.CharDB().classPref[s.key] = a.name
         else
             DB().buffItems[s.key] = a.id
             DB()["noBuff_" .. s.key] = false
@@ -1719,8 +1722,8 @@ local function OpenChooser(anchor, slot)
             b:SetScript("OnClick", function(self)
                 local s, act = chooser.slot, self.act
                 if act.kind == "spell" then
-                    QuestFocusDB.classPref = QuestFocusDB.classPref or {}
-                    QuestFocusDB.classPref[s.key] = act.name
+                    NS.CharDB().classPref = NS.CharDB().classPref or {}
+                    NS.CharDB().classPref[s.key] = act.name
                 else
                     DB().buffItems[s.key] = act.id
                 end
@@ -1837,8 +1840,8 @@ local function GetRow(i)
     r.min:SetScript("OnEnterPressed", function(self)
         local v = tonumber(self:GetText())
         if v and v >= 0 and r.slot then
-            QuestFocusDB.buffWarn = QuestFocusDB.buffWarn or {}
-            QuestFocusDB.buffWarn[r.slot.key] = v
+            NS.CharDB().buffWarn = NS.CharDB().buffWarn or {}
+            NS.CharDB().buffWarn[r.slot.key] = v
             AfterChange()
         end
         self:SetText(r.slot and Minutes(r.slot) or "")
@@ -1879,8 +1882,8 @@ local function GetRow(i)
             end)
             ClearCursor()
             if ok and name then
-                QuestFocusDB.classPref = QuestFocusDB.classPref or {}
-                QuestFocusDB.classPref[s.key] = name
+                NS.CharDB().classPref = NS.CharDB().classPref or {}
+                NS.CharDB().classPref[s.key] = name
                 DB()["noBuff_" .. s.key] = false -- rahuztad: figyelje is
             end
         elseif not s.custom then
@@ -1900,7 +1903,7 @@ local function GetRow(i)
         local s = r.slot
         if not s then return end
         if button == "RightButton" then
-            if s.isClass and QuestFocusDB.classPref then QuestFocusDB.classPref[s.key] = nil
+            if s.isClass and NS.CharDB().classPref then NS.CharDB().classPref[s.key] = nil
             elseif not s.custom then DB().buffItems[s.key] = nil end
             AfterChange()
             RefreshList()

@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.24", date = "2026-11-17", items = {
+        "Per character: the Buffs tab's ticks, chosen items, own buffs, minutes and class buff choices, and the city list's "
+            .. "ignore list. Each character starts once from the old shared values, after that they are separate. "
+            .. "Share settings exports / imports the current character's.",
+    } },
     { version = "0.6.23", date = "2026-11-17", items = {
         "Travel: WoW Forever's own boat / zeppelin / airship list with exact dock positions from the game tables: "
             .. "Stormwind Harbor - Auberdine, the Menethil -> Southshore -> Auberdine loop (one way), Menethil - Theramore, "
