@@ -79,7 +79,7 @@ cl:Check(L["City list"],
 cl:Button(L["Open the list now"], 160, L["Same as /qf city: opens the list here, even outside a city or in a skipped place."],
     function() if NS.ShowCityList then NS.ShowCityList() end end, 28)
 
-cl:Header(L["Places where it doesn't open by itself"])
+cl:Header(L["Ignore list: places where it doesn't open by itself"])
 local ignInfo = cl:Text(L["Added with 'Don't open here again' on the list (it covers ~500 yards around that spot). "]
     .. L["Remove a place to get the list back there."], 2)
 -- Helyek listaja: soronkent nev + Remove gomb (frissiteskor ujraepitve)

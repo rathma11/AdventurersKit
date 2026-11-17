@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.12", date = "2026-11-17", items = {
+        "City list: flat buttons in the list's own style instead of the red ones; Bank / AH / Trainer have small icons "
+            .. "(Trainer shows your class icon).",
+        "City list: in a skipped place the button reads 'Remove from ignore list'; the Options section is now 'Ignore list'.",
+    } },
     { version = "0.6.11", date = "2026-11-17", items = {
         "Options: Quest pickup split in two tabs. Quest pickup = the nearby popup out in the world and the quest level range; "
             .. "City list = the list in cities / inns, skipped places, to-do thresholds. Each starts with a short intro and its on / off switch.",

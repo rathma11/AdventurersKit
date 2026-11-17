@@ -127,15 +127,49 @@ local function IgnoredHere()
 end
 NS.CityIgnoredHere = IgnoredHere
 
-local function MakeBtn(text, w)
-    local b = CreateFrame("Button", nil, city, "UIPanelButtonTemplate")
-    b:SetSize(w, 20)
+-- Lapos gomb a lista stilusahoz (a piros UIPanelButton helyett): sotet hatter, vekony arany
+-- keret, hoverre vilagosabb; opcionalis kis ikon a szoveg elott. Szelesseg a szoveghez igazodik.
+local function FlatBtn(text, icon, coords)
+    local b = CreateFrame("Button", nil, city)
+    b:SetHeight(18)
+    local bg = b:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.08, 0.06, 0.03, 0.85)
+    local function edge(p1, p2, w, h)
+        local t = b:CreateTexture(nil, "BORDER")
+        t:SetColorTexture(1, 0.82, 0, 0.35)
+        t:SetPoint(p1); t:SetPoint(p2)
+        if w then t:SetWidth(w) else t:SetHeight(h) end
+        return t
+    end
+    b.edges = { edge("TOPLEFT", "TOPRIGHT", nil, 1), edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1),
+        edge("TOPLEFT", "BOTTOMLEFT", 1), edge("TOPRIGHT", "BOTTOMRIGHT", 1) }
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    hl:SetColorTexture(1, 0.82, 0, 0.15)
+    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    if icon then
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(13, 13)
+        b.icon:SetPoint("LEFT", 4, 0)
+        b.icon:SetTexture(icon)
+        if coords then b.icon:SetTexCoord(unpack(coords)) else b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+        b.text:SetPoint("LEFT", b.icon, "RIGHT", 4, 0)
+    else
+        b.text:SetPoint("CENTER", 0, 0)
+    end
+    function b:SetText(t)
+        self.text:SetText(t)
+        self:SetWidth(math.ceil(self.text:GetStringWidth()) + (self.icon and 25 or 16))
+    end
+    b:SetScript("OnEnable", function(self) self.text:SetFontObject("GameFontNormalSmall") end)
+    b:SetScript("OnDisable", function(self) self.text:SetFontObject("GameFontDisableSmall") end)
     b:SetText(text)
-    if b:GetFontString() then b:GetFontString():SetFontObject("GameFontNormalSmall") end
     return b
 end
-city.ignoreBtn = MakeBtn(L["Don't open here again"], 170)
-city.disableBtn = MakeBtn(L["Disable city list everywhere"], 190)
+local function MakeBtn(text) return FlatBtn(text) end
+city.ignoreBtn = MakeBtn(L["Don't open here again"])
+city.disableBtn = MakeBtn(L["Disable city list everywhere"])
 city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
     local i, e = IgnoredHere()
     if i then
@@ -154,7 +188,7 @@ city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
 end) end)
 city.ignoreBtn:SetScript("OnEnter", function(self)
     local ignored = IgnoredHere()
-    local tt = NS.TT.Begin(self, "ANCHOR_TOP", ignored and L["Open here again"] or L["Don't open here again"])
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", ignored and L["Remove from ignore list"] or L["Don't open here again"])
     if ignored then
         NS.TT.Note(tt, (L["The list opens by itself in %s again."]):format(PlaceName()))
     else
@@ -177,15 +211,8 @@ city.disableBtn:SetScript("OnEnter", function(self)
     NS.TT.Finish(tt)
 end)
 city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-city.dungeonBtn = MakeBtn("    " .. L["Start dungeon"], 124)
+city.dungeonBtn = FlatBtn(L["Start dungeon"], NS.DUNGEON_ICON)
 city.dungeonBtn:SetPoint("BOTTOMRIGHT", city, "BOTTOMRIGHT", -12, 12)
-do
-    local ic = city.dungeonBtn:CreateTexture(nil, "OVERLAY")
-    ic:SetSize(14, 14)
-    ic:SetPoint("LEFT", 6, 0)
-    ic:SetTexture(NS.DUNGEON_ICON)
-    ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-end
 city.dungeonBtn:SetScript("OnClick", function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
 city.dungeonBtn:SetScript("OnEnter", function(self)
     local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Start dungeon"])
@@ -386,12 +413,9 @@ end
 
 -- Fejlec gombok (a bezaras mellett, jobbrol balra): Bank, aukcioshaz, class trainer.
 -- Kattintasra marker a legkozelebbire (Questie town data, a sajat frakciod).
-local function HeadBtn(text, width, kind, tipTitle, tipText, anchor)
-    local b = CreateFrame("Button", nil, city, "UIPanelButtonTemplate")
-    b:SetSize(width, 20)
+local function HeadBtn(text, icon, coords, kind, tipTitle, tipText, anchor)
+    local b = FlatBtn(text, icon, coords)
     b:SetPoint("RIGHT", anchor, "LEFT", -4, 0)
-    b:SetText(text)
-    if b:GetFontString() then b:GetFontString():SetFontObject("GameFontNormalSmall") end
     b:SetScript("OnClick", function()
         local ok, p, d = pcall(NS.NearestTownsfolk, kind)
         if not (ok and p) then
@@ -412,9 +436,17 @@ local function HeadBtn(text, width, kind, tipTitle, tipText, anchor)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return b
 end
-city.bankBtn = HeadBtn(L["Bank"], 46, "Banker", L["Banker"], L["Click: marker on the nearest banker."], cClose)
-city.ahBtn = HeadBtn(L["AH"], 36, "Auctioneer", L["Auction House"], L["Click: marker on the nearest auctioneer."], city.bankBtn)
-city.trainerBtn = HeadBtn(L["Trainer"], 58, "Class Trainer", L["Class trainer"], L["Click: marker on the nearest trainer of your class."], city.ahBtn)
+city.bankBtn = HeadBtn(L["Bank"], "Interface\\Icons\\INV_Misc_Bag_10_Blue", nil, "Banker", L["Banker"],
+    L["Click: marker on the nearest banker."], cClose)
+city.ahBtn = HeadBtn(L["AH"], "Interface\\Icons\\INV_Misc_Coin_01", nil, "Auctioneer", L["Auction House"],
+    L["Click: marker on the nearest auctioneer."], city.bankBtn)
+do -- trainer: a sajat class ikonja (ha a koordinatak elerhetok), kulonben konyv
+    local cls = select(2, UnitClass("player"))
+    local tc = CLASS_ICON_TCOORDS and cls and CLASS_ICON_TCOORDS[cls]
+    city.trainerBtn = HeadBtn(L["Trainer"], tc and "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
+        or "Interface\\Icons\\INV_Misc_Book_09", tc and { tc[1], tc[2], tc[3], tc[4] } or nil, "Class Trainer",
+        L["Class trainer"], L["Click: marker on the nearest trainer of your class."], city.ahBtn)
+end
 
 local function InCity() return IsResting and IsResting() end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
@@ -423,7 +455,7 @@ local function RefreshCityList()
     if QuestFocusDB.noCityMode or not NS.QuestieAvailable() then city:Hide() return end
     local ignored = IgnoredHere()
     if ignored and not city.forced then city:Hide() return end
-    city.ignoreBtn:SetText(ignored and L["Open here again"] or L["Don't open here again"])
+    city.ignoreBtn:SetText(ignored and L["Remove from ignore list"] or L["Don't open here again"])
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
     local ok, list = pcall(BuildPickups, pc, px, py, CITY_MAX)
