@@ -933,7 +933,7 @@ local function Panel_Update()
     --   - "Also nearby" es az utvonal legalabb 3-3 sort kap (ha van annyi)
     --   - az objective-ek a tobbit; ha igy sem fernek ki, gorgethetok (legalabb 3 latszik,
     --     ehhez kell a hely eloszor az utvonaltol, aztan a kozeli questektol vesszuk el)
-    --   - ami marad: kozeli questek 4 sorig, utvonal 5 sorig, aztan mindketto tovabb
+    --   - az utvonal legfeljebb 3 sor (a tobbi gorgetheto); ami marad, a kozeli questeke
     local avail = QuestH() - (8 + rh + 12) - (-y) - (escTxt and (rh + 3) or 0) - (hsShow and (rh + 5) or 0)
         - (nE > 0 and 19 or 0) - (routeN > 0 and 19 or 0)
     local nbRows, rRows = math.min(nE, 3), math.min(routeN, 3)
@@ -951,10 +951,7 @@ local function Panel_Update()
         rest = rest - add * cost
         return cur + add
     end
-    nbRows = grow(nbRows, math.min(nE, EXTRA_SHOW + 1), step)
-    rRows = grow(rRows, math.min(routeN, 5), rh)
     nbRows = grow(nbRows, nE, step)
-    rRows = grow(rRows, routeN, rh)
 
     -- Objective-ek (gorgetheto teruleten). A kozos elotag (pl. "Green Hills of Stranglethorn - ")
     -- lemarad, a teljes szoveg a tooltipben van.
