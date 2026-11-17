@@ -5,6 +5,22 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.0", date = "2026-11-17", items = {
+        "Dungeon prep: click a dungeon to get a checklist of its quests to pick up, then the entrance; inside the "
+            .. "dungeon the panel lists every quest objective in boss order, and in a group you can share the dungeon "
+            .. "quests with the party. Aborting goes back to the quest you had before.",
+        "Quest panel: fixed size with shared space for objectives, Also nearby and the route; previous / next quest "
+            .. "arrows (with key bindings), skipped quests saved per character; thin scrollbars.",
+        "QFocus macro: keeps a living enemy you clicked; ping modes (always / never / ask in a group); escort quests.",
+        "Travel: next zone suggestion; boats, zeppelins, tram and hearthstone in route planning, with WoW Forever's "
+            .. "own transport routes.",
+        "City list: to-do section (repair, ammo, XP food, bags), Bank / Trainer / AH buttons, Directions menu, works "
+            .. "in villages with an innkeeper, resizable.",
+        "Buff reminder: tiered bags warning by free slots and vendor distance, one Vendor nearby row, gear warning "
+            .. "outside towns, per-character buff settings, gathering tracking first, others' buffs handled correctly. "
+            .. "A sleeping bag out in the world is not town.",
+        "Less CPU: quest changes from specific events instead of every quest log update; safer item API calls.",
+    } },
     { version = "0.6.68", date = "2026-11-17", items = {
         "Inside the dungeon, quests that start outside and you didn't pick up are no longer in the list: one dim "
             .. "\"Missed outside: N\" line at the end, with their names in its tooltip.",
