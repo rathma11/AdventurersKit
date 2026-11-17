@@ -128,6 +128,23 @@ local function CollectTargets(quest, isComplete)
                 end
             end
 
+            -- Vendorok (a spawnList-ben mobkent szerepelnek): ezeket meg kell talalni, nem
+            -- "a teruleten vagy" - a marker mindig kell (static = egy konkret NPC)
+            if entry.itemId and #entry.sources > 0 then
+                local DB = Module("QuestieDB")
+                local ok, item = false, nil
+                if DB and type(DB.GetItem) == "function" then ok, item = pcall(DB.GetItem, DB, entry.itemId) end
+                if ok and type(item) == "table" and type(item.Sources) == "table" then
+                    local vend = {}
+                    for _, src in ipairs(item.Sources) do
+                        if src.Vendor and src.Id then vend[src.Id] = true end
+                    end
+                    for _, s in ipairs(entry.sources) do
+                        if s.isNpc and vend[s.id] then s.static = true end
+                    end
+                end
+            end
+
             -- Tartalek: ha a Questie meg nem toltotte ki a spawnList-et
             if #entry.sources == 0 and o.Type == "monster" and o.Id then
                 local npc = GetNPC(o.Id)

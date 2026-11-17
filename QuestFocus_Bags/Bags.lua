@@ -804,6 +804,8 @@ local function RowRect(r)
     local s = r:GetEffectiveScale() / UIParent:GetEffectiveScale()
     local right, top, h = r:GetRight(), r:GetTop(), r:GetHeight()
     if not (right and top) then return end
+    -- a panel objective sor vegen terkep gomb van (qfMapInset): az item gomb ele kerul
+    right = right - (r.qfMapInset or 0)
     return right * s, top * s, h * s
 end
 
@@ -818,7 +820,8 @@ local function UpdateUseButton()
         for _, r in ipairs(list) do
             if r.text and r.qfUseInset then
                 r.text:ClearAllPoints()
-                r.text:SetAllPoints()
+                r.text:SetPoint("TOPLEFT")
+                r.text:SetPoint("BOTTOMRIGHT", -(r.qfMapInset or 0), 0)
                 r.qfUseInset = nil
             end
         end
@@ -846,7 +849,7 @@ local function UpdateUseButton()
             if e.row.text then
                 e.row.text:ClearAllPoints()
                 e.row.text:SetPoint("TOPLEFT")
-                e.row.text:SetPoint("BOTTOMRIGHT", -(size + 4), 0)
+                e.row.text:SetPoint("BOTTOMRIGHT", -(size + 4 + (e.row.qfMapInset or 0)), 0)
                 e.row.qfUseInset = true
             end
             shown[e.id] = true

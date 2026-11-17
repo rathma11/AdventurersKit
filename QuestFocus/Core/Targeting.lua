@@ -359,6 +359,37 @@ local function MarkObjective(i)
         dist and (" (%d yd)"):format(dist) or "")
 end
 
+-- Terkep gomb (panel cim / objective sor): a cel helye a vilagterkepen. A markert akkor is
+-- lerakja, ha a teruleten vagy (ott a "nem kell marker" itt nem szamit), es a terkepet a
+-- cel zonajan nyitja meg. i = objective index, nil = a hatralevo objective-ek.
+local function ShowObjectiveOnMap(i)
+    local objs = state.objectives or {}
+    local list = {}
+    if i and objs[i] then
+        list[1] = objs[i]
+    else
+        for _, o in ipairs(objs) do if not o.completed then list[#list + 1] = o end end
+        if #list == 0 then list = objs end
+    end
+    local sources = {}
+    for _, o in ipairs(list) do
+        for _, s in ipairs(o.sources or {}) do sources[#sources + 1] = s end
+    end
+    local p = (#sources > 0) and FindSpawnTarget(sources) or nil
+    if not p then
+        NS.Loud(Print, L["No coordinates found (it may be inside an instance)."])
+        return
+    end
+    SetWaypoint(p, p.name or state.title)
+    local wm = WorldMapFrame
+    if not wm then return end
+    if not wm:IsShown() then
+        if ToggleWorldMap then ToggleWorldMap() else ShowUIPanel(wm) end
+    end
+    if wm.SetMapID then pcall(wm.SetMapID, wm, p.map) end
+end
+NS.ShowObjectiveOnMap = ShowObjectiveOnMap
+
 
 -- belso exportok a tobbi core fajlnak
 NS.C.ApplyMacro, NS.C.BuildMacroBody, NS.C.ClearWaypoint, NS.C.CurrentIcon, NS.C.IconId, NS.C.MarkObjective, NS.C.NameplatesUsable, NS.C.PickNameplate = ApplyMacro, BuildMacroBody, ClearWaypoint, CurrentIcon, IconId, MarkObjective, NameplatesUsable, PickNameplate

@@ -92,7 +92,7 @@ local function FindSpawnTarget(sources)
                             local wc, wx, wy = WorldPos(uiMap, x / 100, y / 100)
                             if wc == pc and wx then
                                 pts[#pts + 1] = { map = uiMap, x = x, y = y, name = src.name, wc = wc, wx = wx, wy = wy,
-                                    d = math.sqrt((wx - px) ^ 2 + (wy - py) ^ 2) }
+                                    d = math.sqrt((wx - px) ^ 2 + (wy - py) ^ 2), static = src.static }
                             end
                         end
                     end
@@ -103,6 +103,8 @@ local function FindSpawnTarget(sources)
     if #pts == 0 then return FindNearest(sources) end -- masik kontinens: a regi mod
     local nearest
     for _, p in ipairs(pts) do if not nearest or p.d < nearest.d then nearest = p end end
+    -- vendor (egy konkret NPC, sokszor epuletben): oda mindig marker kell, nincs "teruleten vagy"
+    if nearest.static then return nearest, nearest.d, false end
     if nearest.d <= IN_AREA then return nearest, nearest.d, true end
     -- csak a kozelebbi pontokat nezzuk (a legkozelebbi tavolsaganak 3x-osaig), sulyozva a surusseggel
     local best, bestScore

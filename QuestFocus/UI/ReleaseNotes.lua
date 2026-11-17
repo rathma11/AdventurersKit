@@ -5,6 +5,12 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.5.3", date = "2026-11-17", items = {
+        "Vendors (e.g. a trade supplies NPC selling a quest item) always get a marker; it no longer says "
+            .. "'you are in the spawn area' when the vendor is nearby but hidden in a building.",
+        "Map button: on the panel before the clear-focus button, and at the end of every open objective row; "
+            .. "it opens the world map on the target and puts the marker there.",
+    } },
     { version = "0.5.2", date = "2026-11-17", items = {
         "Share settings tab (and /qf export, /qf import): your settings as text to send to others, or load theirs. "
             .. "Item choices (XP food, sleeping bag, stones / oils, own item buffs) are only taken if the importer has the item; "

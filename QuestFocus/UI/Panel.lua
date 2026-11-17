@@ -95,7 +95,7 @@ panel.icon:SetTexture("Interface\\Icons\\" .. ICON_IDLE)
 
 panel.title = panel:CreateFontString(nil, "OVERLAY", "QuestFocusFontTitle")
 panel.title:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 8, -1)
-panel.title:SetWidth(PANEL_W - 80) -- a vegen a fokusz torles gomb
+panel.title:SetWidth(PANEL_W - 100) -- a vegen a terkep + fokusz torles gomb
 panel.title:SetJustifyH("LEFT")
 panel.title:SetWordWrap(false)
 panel.title:SetTextColor(1, 0.86, 0.5)
@@ -137,6 +137,33 @@ clearBtn:SetScript("OnEnter", function(self)
 end)
 clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 panel.clearBtn = clearBtn
+
+-- Terkep: a fokuszalt quest celja a vilagterkepen (a fokusz torles elott)
+local MAP_ICON = "Interface\\Icons\\INV_Misc_Map_01"
+local function MapButton(parent, size)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(size, size)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetAllPoints()
+    b.tex:SetTexture(MAP_ICON)
+    b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+local mapBtn = MapButton(panel, 15)
+mapBtn:SetPoint("RIGHT", clearBtn, "LEFT", -5, 0)
+mapBtn:Hide()
+mapBtn:SetScript("OnClick", function() if NS.ShowObjectiveOnMap then NS.ShowObjectiveOnMap(state.objIndex) end end)
+mapBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetText(L["Show on map"], 1, 1, 1)
+    GameTooltip:AddLine(L["Opens the world map on the quest's target (the selected objective, or the remaining ones) and puts the marker there."], 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+panel.mapBtn = mapBtn
+clearBtn:HookScript("OnShow", function() mapBtn:Show() end)
+clearBtn:HookScript("OnHide", function() mapBtn:Hide() end)
 
 -- Ikonsor gombjai (jobbrol balra, az X mellett): dungeon, options
 local function ToolButton(icon, title, desc, onClick)
@@ -244,7 +271,7 @@ panel.lines = {}
 local function ApplyPanelWidth()
     local w = PW()
     panel:SetWidth(w)
-    panel.title:SetWidth(w - 80)
+    panel.title:SetWidth(w - 100)
     panel.sub:SetWidth(w - 60)
     panel.footer:SetWidth(w - 44)
     local bw = (w - 24 - 8) / 3
@@ -429,12 +456,29 @@ local function GetLine(i)
     line:SetSize(PANEL_W - 24, 16)
     line:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     line.text = line:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
-    line.text:SetAllPoints()
+    -- a sor vegen terkep gomb: a szoveg nem fut ala (a Bags hasznalhato item gombja ez ele kerul)
+    line.qfMapInset = 18
+    line.text:SetPoint("TOPLEFT")
+    line.text:SetPoint("BOTTOMRIGHT", -line.qfMapInset, 0)
     line.text:SetJustifyH("LEFT")
     line.text:SetWordWrap(false)
     local hl = line:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
+    line.mapBtn = MapButton(line, 14)
+    line.mapBtn:SetPoint("RIGHT", line, "RIGHT", -1, 0)
+    line.mapBtn:SetScript("OnClick", function(self)
+        local idx = self:GetParent().index
+        -- kijeloli is az objective-et (macro + panel), majd terkep
+        if idx and state.objIndex ~= idx then PanelSelectObjective(idx) end
+        if NS.ShowObjectiveOnMap then NS.ShowObjectiveOnMap(idx) end
+    end)
+    line.mapBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L["Show on map"], 1, 1, 1)
+        GameTooltip:AddLine(L["Selects this objective and opens the world map on it."], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
     line:SetScript("OnClick", function(self, button)
         if button == "RightButton" then PanelSelectObjective(nil) else PanelSelectObjective(self.index) end
     end)
@@ -605,6 +649,7 @@ local function Panel_Update()
             or (state.objIndex == i and "|cff33ff99") or "|cffffffff"
         local eta = not o.completed and NS.EtaShort and NS.EtaShort(o)
         line.text:SetText(icon .. color .. o.desc .. "|r" .. (eta and ("  |cff999999" .. eta .. "|r") or ""))
+        line.mapBtn:SetShown(not o.completed and o.sources ~= nil and #o.sources > 0)
         line:ClearAllPoints()
         line:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
         line:Show()
