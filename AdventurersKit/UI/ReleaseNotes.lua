@@ -5,6 +5,9 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.6.37", date = "2026-11-17", items = {
+        "Macro ping: the default is 'ask when I join a group' (if you had turned ping off before, it stays off).",
+    } },
     { version = "0.6.36", date = "2026-11-17", items = {
         "Ping in the QFocus macro has three settings (Macro & marker tab, /qf ping): always, never, or ask when you join a group. "
             .. "The question window (ping in this group / no ping) can change the setting for next time too. Solo there's no ping in ask mode.",

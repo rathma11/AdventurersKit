@@ -132,7 +132,8 @@ end
 NS.PingMode = function()
     local m = QuestFocusDB and QuestFocusDB.pingMode
     if m == "on" or m == "off" or m == "ask" then return m end
-    return (QuestFocusDB and QuestFocusDB.noPing) and "off" or "on"
+    -- alap: kerdezzen csapatba lepeskor (aki a regi kapcsoloval kikapcsolta, annal "off")
+    return (QuestFocusDB and QuestFocusDB.noPing) and "off" or "ask"
 end
 NS.pingSession = nil -- "ask" modban a mostani csapatra adott valasz (true / false)
 NS.UsePing = function()
