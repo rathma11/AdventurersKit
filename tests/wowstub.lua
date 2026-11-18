@@ -678,7 +678,7 @@ function W.InstallModernAH()
     local function rows(id, commodity)
         local out = {}
         for _, a in ipairs(W.ahAll) do
-            if a.itemId == id and ((a.unit ~= nil) == commodity) then out[#out + 1] = a end
+            if a.itemId == id and not a.sold and ((a.unit ~= nil) == commodity) then out[#out + 1] = a end
         end
         return out
     end
@@ -700,9 +700,15 @@ function W.InstallModernAH()
         StartCommoditiesPurchase = function(id, qty) W.ahStarts[#W.ahStarts + 1] = { itemID = id, quantity = qty } end,
         ConfirmCommoditiesPurchase = function(id, qty) W.ahBids[#W.ahBids + 1] = { commodity = true, itemID = id, quantity = qty } end,
         CancelCommoditiesPurchase = function() W.ahCancelled = W.ahCancelled + 1 end,
+        GetAuctionInfoByID = function(auctionID)
+            for _, a in ipairs(W.ahAll) do
+                if a.auctionID == auctionID then return { itemKey = { itemID = a.itemId }, quantity = a.count, buyoutAmount = a.buyout } end
+            end
+        end,
         PlaceBid = function(auctionID, amount)
             W.ahBids[#W.ahBids + 1] = { auctionID = auctionID, amount = amount }
-            for k, a in ipairs(W.ahAll) do if a.auctionID == auctionID then table.remove(W.ahAll, k) break end end
+            -- sold: gone from new searches, but its info stays readable (the real call is asynchronous)
+            for _, a in ipairs(W.ahAll) do if a.auctionID == auctionID then a.sold = true end end
         end,
     })
 end

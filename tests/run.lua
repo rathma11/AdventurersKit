@@ -1169,7 +1169,9 @@ test("AH quest items: needed items, scan, buy one auction per click", function()
     A.rows[1].buy:Click()
     local pop = rawget(_G, "AdventurersKitAHBuy")
     check(pop and pop:IsShown(), "confirm popup")
-    eq(pop.text:GetText(), "Buy 4 x Linen Cloth for 3s 20c?", "confirm text")
+    check(contains(pop.text:GetText(), "Buy 4 x Linen Cloth for 3s 20c?"), "confirm text: " .. tostring(pop.text:GetText()))
+    check(contains(pop.text:GetText(), "(80c each)"), "unit price under the question")
+    check(pop.rows[1] and not pop.rows[1]:IsShown(), "one item: no list")
     check(not pop.ok:IsEnabled(), "button waits for a fresh list")
     pop.ok:Click()
     eq(#W.ahBids, 0, "no purchase before the fresh query")
@@ -1203,6 +1205,8 @@ test("AH quest items: needed items, scan, buy one auction per click", function()
     eq(A.current[1].plan.cost, 500, "linen: only the stack of 5 left")
     A.frame.buyAll:Click()
     eq(pop.text:GetText(), "Buy all: 2 items (2 auctions) for 8s?", "buy all text")
+    check(pop.rows[1]:IsShown() and pop.rows[2]:IsShown() and not pop.rows[3]:IsShown(), "buy all: the items are listed")
+    check(contains(pop.rows[1].name:GetText(), "Linen Cloth"), "list row: item name")
     local guard = 0
     while A.buy and not A.buy.done and guard < 20 do
         guard = guard + 1
@@ -1420,7 +1424,8 @@ test("AH quest items: items in the mail count, list closes after buying", functi
     check(A.frame:IsShown(), "list still open right after the click (a late error could undo it)")
     W.Advance(2)
     check(not A.frame:IsShown(), "list closed after the purchase")
-    eq(A.InMail(2592), 1, "wool on its way")
+    W.Fire("AUCTION_HOUSE_PURCHASE_COMPLETED", 21) -- the game confirms our purchase
+    eq(A.InMail(2592), 1, "wool on its way (our own purchase counted once)")
     pop.ok:Click()
     A.tab:Click()
     check(A.frame:IsShown(), "the tab reopens it")
@@ -1434,6 +1439,31 @@ test("AH quest items: items in the mail count, list closes after buying", functi
 end)
 
 -- 0.7.17: the list is always closed when the AH opens; only the tab opens it
+-- 0.7.18: purchases made in the AH's own Buy tab or Auctionator also count as "in the mail",
+-- without opening a mailbox (hooks on C_AuctionHouse.PlaceBid / ConfirmCommoditiesPurchase)
+test("AH quest items: purchases from any AH UI count without a mailbox", function()
+    local A = NS.AHQ
+    A.MailDB().buys, A.MailDB().snap = {}, {}
+    W.InstallModernAH()
+    W.ahAll = { { itemId = 2592, buyout = 300, count = 2, auctionID = 41 } }
+    W.Fire("AUCTION_HOUSE_SHOW")
+    local C = rawget(_G, "C_AuctionHouse")
+    C.PlaceBid(41, 300) -- the AH's own Buy tab
+    eq(A.InMail(2592), 0, "not counted before the game confirms it")
+    W.Fire("AUCTION_HOUSE_PURCHASE_COMPLETED", 41)
+    eq(A.InMail(2592), 2, "item auction bought elsewhere: in the mail")
+    C.ConfirmCommoditiesPurchase(2589, 3)
+    W.Fire("COMMODITY_PURCHASE_SUCCEEDED")
+    eq(A.InMail(2589), 3, "commodity bought elsewhere: in the mail")
+    C.ConfirmCommoditiesPurchase(2589, 5)
+    W.Fire("COMMODITY_PURCHASE_FAILED")
+    W.Fire("COMMODITY_PURCHASE_SUCCEEDED") -- a stray success later must not count the failed one
+    eq(A.InMail(2589), 3, "failed purchase not counted")
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    W.RemoveModernAH()
+    A.MailDB().buys = {}
+end)
+
 test("AH quest items: list closed when the AH opens", function()
     local A = NS.AHQ
     W.Fire("AUCTION_HOUSE_SHOW")

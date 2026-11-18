@@ -521,7 +521,7 @@ local function StartBuy(list)
             b.items[#b.items + 1] = {
                 id = e.id, name = e.name, need = math.min(e.need, plan.covered), cap = plan.cost,
                 maxUnit = plan.maxUnit, spent = 0, got = 0, pages = pages, pageIdx = 1, count = plan.covered,
-                auctions = #plan.picks, commodity = plan.commodity,
+                auctions = #plan.picks, commodity = plan.commodity, icon = e.icon,
             }
             b.capAll = b.capAll + plan.cost
         end
@@ -632,11 +632,14 @@ function A.BuyClick()
         return "money"
     end
     local ok
+    A.ownCall = true -- a sajat hivasunkat a vasarlas-figyelo (lent) ne szamolja meg meg egyszer
     if l.commodity then
         ok = C and type(C.ConfirmCommoditiesPurchase) == "function" and pcall(C.ConfirmCommoditiesPurchase, st.id, l.count)
     elseif l.auctionID then
         ok = C and type(C.PlaceBid) == "function" and pcall(C.PlaceBid, l.auctionID, l.buyout)
-    else
+    end
+    A.ownCall = nil
+    if not (l.commodity or l.auctionID) then -- klasszikus AH
         ok = type(PlaceAuctionBid) == "function" and pcall(PlaceAuctionBid, "list", l.idx, l.buyout)
     end
     if not ok then
@@ -725,55 +728,165 @@ local function ConfirmText(list)
 end
 A.ConfirmText = ConfirmText
 
+-- Megerosito ablak: az Auctionator / AH "Confirm purchase" ablakahoz hasonlo (DESIGN.md: Blizzard
+-- ablakon belul a gazda stilusa). Kozepen, "Dialog" NineSlice keret, majdnem teli fekete hatter,
+-- felul a quest item ikonja es a kerdes; Buy all-nal az itemek listaja (kesz / soron levo / hatra);
+-- alul Accept / Cancel (piros AH gombok). A magassag a tartalomhoz igazodik.
+local PW, LIST_MAX, LROW = 360, 8, 18
+
+-- Gomb felirat: Blizzard gombnal SetText, a mi lapos gombunknal a sajat FontString
+local function BtnText(b, s)
+    if b.blizz then b:SetText(s) elseif b.text then b.text:SetText(s) end
+end
+
 local function BuildPopup()
     if popup then return popup end
-    local p = S.Box("AdventurersKitAHBuy", 320, 132, L["BUY QUEST ITEMS"], "DIALOG")
-    p:SetPoint("TOP", UIParent, "TOP", 0, -160)
-    p:EnableMouse(true)
+    local p = CreateFrame("Frame", "AdventurersKitAHBuy", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    p:SetSize(PW, 150)
+    p:SetFrameStrata("DIALOG")
     p:SetToplevel(true)
+    p:EnableMouse(true)
+    p:Hide()
+    p:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    S.Draggable(p)
+    p.bg = p:CreateTexture(nil, "BACKGROUND")
+    p.bg:SetPoint("TOPLEFT", 6, -8)
+    p.bg:SetPoint("BOTTOMRIGHT", -6, 8)
+    p.bg:SetColorTexture(0, 0, 0, 0.95)
+    local okNS, ns = pcall(CreateFrame, "Frame", nil, p, "NineSlicePanelTemplate")
+    local util = rawget(_G, "NineSliceUtil")
+    if okNS and ns and type(util) == "table" and type(util.ApplyLayoutByName) == "function"
+        and pcall(util.ApplyLayoutByName, ns, "Dialog") then
+        ns:SetAllPoints()
+        p.nineSlice = ns
+    else
+        if okNS and ns then ns:Hide() end
+        S.Backdrop(p, "box")
+        if p.SetBackdropColor then p:SetBackdropColor(0.04, 0.04, 0.06, 0.97) end
+    end
+
+    p.icon = p:CreateTexture(nil, "ARTWORK")
+    p.icon:SetSize(32, 32)
+    p.icon:SetPoint("TOPLEFT", 18, -18)
+    p.icon:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
     p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    p.text:SetPoint("TOPLEFT", 12, -26)
-    p.text:SetWidth(296)
+    p.text:SetPoint("TOPLEFT", p.icon, "TOPRIGHT", 10, 0)
+    p.text:SetWidth(PW - 18 - 32 - 10 - 18)
     p.text:SetJustifyH("LEFT")
     p.text:SetWordWrap(true)
+
+    -- Buy all: itemlista (ikon, "x4 Linen Cloth", ar)
+    p.rows = {}
+    for i = 1, LIST_MAX do
+        local r = CreateFrame("Frame", nil, p)
+        r:SetSize(PW - 36, LROW)
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(16, 16)
+        r.icon:SetPoint("LEFT", 0, 0)
+        r.icon:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
+        r.price = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        r.price:SetPoint("RIGHT", 0, 0)
+        r.price:SetJustifyH("RIGHT")
+        r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+        r.name:SetPoint("RIGHT", r.price, "LEFT", -8, 0)
+        r.name:SetJustifyH("LEFT")
+        r.name:SetWordWrap(false)
+        r:Hide()
+        p.rows[i] = r
+    end
+    p.more = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    p.more:SetJustifyH("LEFT")
+
     p.step = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    p.step:SetPoint("TOPLEFT", p.text, "BOTTOMLEFT", 0, -6)
-    p.step:SetWidth(296)
-    p.step:SetJustifyH("LEFT")
+    p.step:SetWidth(PW - 36)
+    p.step:SetJustifyH("CENTER")
     p.step:SetWordWrap(true)
     p.hint = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    p.hint:SetPoint("BOTTOMLEFT", 12, 36)
-    p.hint:SetWidth(296)
-    p.hint:SetJustifyH("LEFT")
+    p.hint:SetPoint("TOP", p.step, "BOTTOM", 0, -6)
+    p.hint:SetWidth(PW - 36)
+    p.hint:SetJustifyH("CENTER")
     p.hint:SetWordWrap(true)
     p.hint:SetText(L["One purchase per click: the game needs a click for every purchase."])
-    p.ok = S.FlatButton(p, L["Buy"], 180, 22)
-    p.ok.text:SetFontObject("GameFontNormal")
-    p.ok:SetPoint("BOTTOMLEFT", 12, 10)
+
+    p.ok = A.AHButton(p, L["Accept"], 150, 22)
+    p.ok:SetPoint("BOTTOMRIGHT", p, "BOTTOM", -4, 16)
     p.ok:SetScript("OnClick", function()
         if buy and buy.done then StopBuy() return end
         if buy and buy.needStart then A.StartCommodity() return end
         A.BuyClick()
     end)
-    p.cancel = S.FlatButton(p, L["Cancel"], 100, 22)
-    p.cancel:SetPoint("BOTTOMRIGHT", -12, 10)
+    p.cancel = A.AHButton(p, L["Cancel"], 110, 22)
+    p.cancel:SetPoint("BOTTOMLEFT", p, "BOTTOM", 4, 16)
     p.cancel:SetScript("OnClick", StopBuy)
-    p.close:SetScript("OnClick", StopBuy)
     p:SetScript("OnHide", function() if buy then StopBuy() end end)
     if UISpecialFrames then table.insert(UISpecialFrames, "AdventurersKitAHBuy") end
     popup = p
     return p
 end
 
+-- Elrendezes: a szovegek / sorok magassaga szerint (semmi nem csuszik egymasra)
+local function LayoutPopup()
+    local p = popup
+    if not (p and buy) then return end
+    local y = -18
+    local th = math.max(32, (p.text.GetStringHeight and p.text:GetStringHeight()) or 14)
+    y = y - th - 10
+    local n = #buy.items
+    local listed = n > 1 and math.min(n, LIST_MAX) or 0
+    for i, r in ipairs(p.rows) do
+        if i <= listed then
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", 18, y - (i - 1) * LROW)
+            r:Show()
+        else
+            r:Hide()
+        end
+    end
+    y = y - listed * LROW
+    if n > LIST_MAX then
+        p.more:ClearAllPoints()
+        p.more:SetPoint("TOPLEFT", 18, y)
+        p.more:SetText((L["+%d more"]):format(n - LIST_MAX))
+        p.more:Show()
+        y = y - 14
+    else
+        p.more:Hide()
+    end
+    if listed > 0 then y = y - 8 end
+    p.step:ClearAllPoints()
+    p.step:SetPoint("TOP", p, "TOP", 0, y)
+    local sh = (p.step.GetStringHeight and p.step:GetStringHeight()) or 12
+    local hh = (p.hint.GetStringHeight and p.hint:GetStringHeight()) or 12
+    p:SetHeight(-y + sh + 6 + hh + 14 + 22 + 16)
+end
+
 UpdatePopup = function()
     if not (popup and popup:IsShown() and buy) then return end
     local p = popup
     local hex = S.HEX
+    -- a lista sorai: kesz (zold), soron levo (feher, >), meg hatra (halvany)
+    for i, st in ipairs(buy.items) do
+        local r = p.rows[i]
+        if r then
+            r.icon:SetTexture(st.icon or 134400)
+            local mark, col
+            if i < buy.cur or (buy.done and st.got > 0) then
+                mark, col = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t ", st.got > 0 and hex.GOOD or hex.WARN
+            elseif i == buy.cur and not buy.done then
+                mark, col = "> ", "ffffff"
+            else
+                mark, col = "", hex.DIM
+            end
+            r.name:SetText(("%s|cff%sx%d %s|r"):format(mark, col, st.need, st.name))
+            r.price:SetText(Money(st.cap))
+        end
+    end
     if buy.done then
         p.step:SetText((L["Bought %d auctions for %s."]):format(buy.bought, A.FormatCoins(buy.spentAll))
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or "")
             .. (buy.bought > 0 and ("\n|cff" .. hex.DIM .. L["Bought items arrive in your mailbox."] .. "|r") or ""))
-        p.ok.text:SetText(L["Close"])
+        BtnText(p.ok, L["Close"])
         p.ok:Enable()
         p.cancel:Hide()
         -- sikeres vasarlas utan a lista bezarul (a ful ujranyitja); kis kesleltetessel, hogy egy
@@ -787,6 +900,7 @@ UpdatePopup = function()
             end
             if C_Timer and C_Timer.After then C_Timer.After(1.5, closeList) else closeList() end
         end
+        LayoutPopup()
         return
     end
     p.cancel:Show()
@@ -795,19 +909,21 @@ UpdatePopup = function()
     if st and l then
         p.step:SetText(head .. "\n" .. (L["Next: %d x %s for %s"]):format(l.count, st.name, A.FormatCoins(l.buyout))
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or ""))
-        p.ok.text:SetText(l.commodity and L["Buy"] or (L["Buy (%d left)"]):format(math.max(1, st.need - st.got)))
+        BtnText(p.ok, (buy.bought == 0 and buy.cur == 1) and L["Accept"]
+            or (l.commodity and L["Buy"] or (L["Buy (%d left)"]):format(math.max(1, st.need - st.got))))
         p.ok:Enable()
     elseif st and buy.needStart then
         p.step:SetText(head .. "\n" .. (L["Next: %d x %s"]):format(st.need - st.got, st.name)
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or ""))
-        p.ok.text:SetText(L["Get current price"])
+        BtnText(p.ok, L["Get current price"])
         p.ok:Enable()
     else
         p.step:SetText(head .. "\n|cff" .. hex.DIM .. (L["Looking up %s..."]):format(st and st.name or "?") .. "|r"
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or ""))
-        p.ok.text:SetText(L["Searching..."])
+        BtnText(p.ok, L["Searching..."])
         p.ok:Disable()
     end
+    LayoutPopup()
 end
 
 local function OpenConfirm(list)
@@ -815,7 +931,16 @@ local function OpenConfirm(list)
     if buy then StopBuy() end
     if not StartBuy(list) then return end
     local p = BuildPopup()
-    p.text:SetText(ConfirmText(list))
+    -- "Confirm purchase of x4 Linen Cloth for 3s 20c? (80c each)" / Buy all: a lista adja a reszleteket
+    local x = list[1]
+    if #buy.items == 1 then
+        p.text:SetText(ConfirmText(list) .. "\n|cff" .. S.HEX.DIM
+            .. (L["(%s each)"]):format(A.FormatCoins(math.floor(x.plan.cost / math.max(1, x.plan.covered) + 0.5))) .. "|r")
+        p.icon:SetTexture(x.entry.icon or 134400)
+    else
+        p.text:SetText(ConfirmText(list))
+        p.icon:SetTexture(A.AddonIcon())
+    end
     p:Show()
     if buy.items[1].commodity then
         A.StartCommodity() -- most kattintottal (Buy): az ar kerese mehet rogton
@@ -1294,9 +1419,52 @@ driver:SetScript("OnUpdate", function(_, dt)
     Tick()
 end)
 
+-- Vasarlas-figyelo (modern AH): barhonnan veszel (az AH sajat Buy fule, Auctionator, mi), az item
+-- a postara megy; a sikeres vasarlast feljegyezzuk "uton"-nak (A.AddPending), igy postalada-nyitas
+-- nelkul is lejon a listarol. A sajat vasarlasunkat a BuyClick mar feljegyezte (A.ownCall).
+--   PlaceBid(auctionID, bid) -> AUCTION_HOUSE_PURCHASE_COMPLETED(auctionID): csak a kivasarlas
+--   ConfirmCommoditiesPurchase(itemID, db) -> COMMODITY_PURCHASE_SUCCEEDED / _FAILED
+local extBids, extCommodity, hookedAH = {}, nil, nil
+local function HookPurchases()
+    local C = Modern()
+    if not C or hookedAH == C or type(hooksecurefunc) ~= "function" then return end
+    hookedAH = C
+    if type(C.PlaceBid) == "function" then
+        hooksecurefunc(C, "PlaceBid", function(auctionID)
+            if A.ownCall or not auctionID then return end
+            local ok, info = pcall(C.GetAuctionInfoByID, auctionID)
+            local key = ok and type(info) == "table" and info.itemKey
+            local id = type(key) == "table" and tonumber(key.itemID)
+            if id then extBids[auctionID] = { id = id, n = tonumber(info.quantity) or 1 } end
+        end)
+    end
+    if type(C.ConfirmCommoditiesPurchase) == "function" then
+        hooksecurefunc(C, "ConfirmCommoditiesPurchase", function(itemID, quantity)
+            if A.ownCall or not tonumber(itemID) then return end
+            extCommodity = { id = tonumber(itemID), n = tonumber(quantity) or 1 }
+        end)
+    end
+end
+A.HookPurchases = HookPurchases
+
+local function OnPurchaseDone(event, auctionID)
+    local x
+    if event == "AUCTION_HOUSE_PURCHASE_COMPLETED" then
+        x = extBids[auctionID]
+        extBids[auctionID] = nil
+    elseif event == "COMMODITY_PURCHASE_SUCCEEDED" then
+        x, extCommodity = extCommodity, nil
+    else -- COMMODITY_PURCHASE_FAILED
+        extCommodity = nil
+    end
+    if x then A.AddPending(x.id, x.n) end
+    return x
+end
+
 local function OnShowAH()
     ahOpen = true
     driver:Show()
+    HookPurchases()
     if not Enabled() then return end
     BuildTab()
     PlaceTab()
@@ -1351,7 +1519,8 @@ for _, e in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "QUEST_LOG_UP
     "GET_ITEM_INFO_RECEIVED", "UI_ERROR_MESSAGE", "MAIL_SHOW", "MAIL_INBOX_UPDATE", "MAIL_CLOSED",
     "AUCTION_ITEM_LIST_UPDATE",                                                   -- klasszikus AH
     "COMMODITY_SEARCH_RESULTS_UPDATED", "ITEM_SEARCH_RESULTS_UPDATED",            -- modern AH
-    "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED" }) do
+    "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED",
+    "COMMODITY_PURCHASE_SUCCEEDED", "AUCTION_HOUSE_PURCHASE_COMPLETED" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
 ev:SetScript("OnEvent", function(_, event, a1, a2)
@@ -1372,7 +1541,10 @@ ev:SetScript("OnEvent", function(_, event, a1, a2)
             BuyNextItem(L["The auction house has no price for it right now; skipped."])
             UpdatePopup()
         end
+    elseif event == "AUCTION_HOUSE_PURCHASE_COMPLETED" or event == "COMMODITY_PURCHASE_SUCCEEDED" then
+        if OnPurchaseDone(event, a1) then SoonRefresh() end
     elseif event == "UI_ERROR_MESSAGE" or event == "COMMODITY_PURCHASE_FAILED" then
+        if event == "COMMODITY_PURCHASE_FAILED" then OnPurchaseDone(event) end
         OnBuyError()
     elseif event == "MAIL_SHOW" or event == "MAIL_INBOX_UPDATE" then
         if event == "MAIL_SHOW" then mailOpen = true end
