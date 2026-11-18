@@ -559,7 +559,9 @@ def("EditMacro", function(idx, name, icon, body)
     if W.inCombat then error("EditMacro in combat (protected)") end
     local n = W.macroOrder[idx]
     if not n then error("EditMacro: bad index " .. tostring(idx)) end
-    W.macros[n] = { name = name or n, icon = icon, body = body }
+    local newName = name or n
+    if newName ~= n then W.macros[n] = nil; W.macroOrder[idx] = newName end
+    W.macros[newName] = { name = newName, icon = icon, body = body }
     return idx
 end)
 

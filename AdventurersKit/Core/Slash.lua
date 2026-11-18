@@ -19,8 +19,9 @@ NS.CollectTargets, NS.WorldPos, NS.UiMapFromArea, NS.PlayerWorldPos = CollectTar
 NS.ZoneName, NS.SetWaypoint, NS.Panel_Update, NS.GetNPC, NS.GetObject, NS.Module = ZoneName, SetWaypoint, Panel_Update, GetNPC, GetObject, Module
 NS.ClearWaypoint, NS.AddQuestTooltip, NS.QuestieAvailable = ClearWaypoint, AddQuestTooltip, QuestieAvailable
 
-SLASH_QUESTFOCUS1 = "/qf"
-SLASH_QUESTFOCUS2 = "/questfocus"
+SLASH_QUESTFOCUS1 = "/ak"
+SLASH_QUESTFOCUS2 = "/qf"          -- regi parancs, csendes alias
+SLASH_QUESTFOCUS3 = "/questfocus"
 local function SlashHandler(msg)
     local raw = (msg or ""):match("^%s*(.-)%s*$")
     msg = raw:lower()
@@ -39,10 +40,10 @@ local function SlashHandler(msg)
     elseif msg == "dungeon" or msg == "dungeons" then
         if NS.ToggleDungeonList then NS.ToggleDungeonList() end
     elseif msg:match("^dungeons?%s") then
-        -- /qf dungeon <nev> (reszleges nev is): dungeon prep mod; /qf dungeon off: vege
+        -- /ak dungeon <nev> (reszleges nev is): dungeon prep mod; /ak dungeon off: vege
         if NS.PrepCommand then NS.PrepCommand(raw:match("^%S+%s+(.+)$")) end
     elseif msg == "farm" or msg:match("^farm%s") then
-        -- Planner\Farm.lua: /qf farm (start / stop), /qf farm pause | resume | reset
+        -- Planner\Farm.lua: /ak farm (start / stop), /ak farm pause | resume | reset
         if NS.FarmCommand then NS.FarmCommand(msg:match("^farm%s+(%S+)")) end
     elseif msg == "export" then
         if NS.OpenShareSettings then NS.OpenShareSettings("export") end
@@ -97,7 +98,7 @@ local function SlashHandler(msg)
         QuestFocusDB.pingMode = nextMode
         QuestFocusDB.noPing = (nextMode == "off") or nil
         if NS.RefreshPingUI then NS.RefreshPingUI() end
-        Print(L["Ping in the QFocus macro: %s"], nextMode == "ask" and L["ask when joining a group"]
+        Print(L["Ping in the AKit macro: %s"], nextMode == "ask" and L["ask when joining a group"]
             or nextMode == "on" and L["on"] or L["off"])
         state.lastBody = nil
         if state.questId then UpdateMacro() Panel_Update() end
@@ -111,10 +112,10 @@ local function SlashHandler(msg)
                 return
             end
             for kind in pairs(NS.MacroIconDefaults) do NS.SetMacroIcon(kind, name, true) end
-            Print(L["QFocus icon (all states): |T%d:16|t %s"], id, name)
+            Print(L["AKit icon (all states): |T%d:16|t %s"], id, name)
         else
             for kind in pairs(NS.MacroIconDefaults) do NS.SetMacroIcon(kind, nil, true) end
-            Print(L["QFocus icons: defaults (map / crosshair / letter at turn-in)"])
+            Print(L["AKit icons: defaults (map / crosshair / letter at turn-in)"])
         end
     elseif msg == "unmark" then
         ClearWaypoint()
@@ -127,27 +128,27 @@ local function SlashHandler(msg)
         if NS.SelfTest then NS.SelfTest() end
     else
         Print(L["Commands:"])
-        Print(L["  /qf - toggle panel"])
-        Print(L["  /qf options - settings (tag spell, auto attack, ping, arrow, debug tab)"])
-        Print(L["  /qf zone - toggle zone focus (only current zone quests in the tracker)"])
-        Print(L["  /qf minimap - toggle minimap button"])
-        Print(L["  /qf bags - toggle quest item list next to the bags"])
-        Print(L["  /qf junk - destroy unsellable leftover quest items (asks one by one)"])
-        Print(L["  /qf debug - diagnostics to chat"])
-        Print(L["  /qf spell <name> - tag spell in the macro; /qf spell - clear; /qf spell off - disable"])
-        Print(L["  /qf next - next objective (marker + macro)"])
-        Print(L["  /qf all - macro for mobs of all remaining objectives"])
-        Print(L["  /qf mark - re-place the marker at the nearest spot"])
-        Print(L["  /qf arrow - toggle own arrow"])
-        Print(L["  /qf ping - toggle target ping in the macro"])
-        Print(L["  /qf icon <iconname> - custom icon; /qf icon - automatic"])
-        Print(L["  /qf unmark - remove marker"])
-        Print(L["  /qf clear - clear selection + marker"])
-        Print(L["  /qf city - open / close the city list (also outside towns)"])
-        Print(L["  /qf dungeon - dungeon list; /qf dungeon <name> - dungeon prep (quests, then the entrance); /qf dungeon off - end it"])
-        Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset | show"])
-        Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])
-        Print(L["  /qf selftest - quick self test (Questie data, macro, settings, tables)"])
+        Print(L["  /ak - toggle panel"])
+        Print(L["  /ak options - settings (tag spell, auto attack, ping, arrow, debug tab)"])
+        Print(L["  /ak zone - toggle zone focus (only current zone quests in the tracker)"])
+        Print(L["  /ak minimap - toggle minimap button"])
+        Print(L["  /ak bags - toggle quest item list next to the bags"])
+        Print(L["  /ak junk - destroy unsellable leftover quest items (asks one by one)"])
+        Print(L["  /ak debug - diagnostics to chat"])
+        Print(L["  /ak spell <name> - tag spell in the macro; /ak spell - clear; /ak spell off - disable"])
+        Print(L["  /ak next - next objective (marker + macro)"])
+        Print(L["  /ak all - macro for mobs of all remaining objectives"])
+        Print(L["  /ak mark - re-place the marker at the nearest spot"])
+        Print(L["  /ak arrow - toggle own arrow"])
+        Print(L["  /ak ping - toggle target ping in the macro"])
+        Print(L["  /ak icon <iconname> - custom icon; /ak icon - automatic"])
+        Print(L["  /ak unmark - remove marker"])
+        Print(L["  /ak clear - clear selection + marker"])
+        Print(L["  /ak city - open / close the city list (also outside towns)"])
+        Print(L["  /ak dungeon - dungeon list; /ak dungeon <name> - dungeon prep (quests, then the entrance); /ak dungeon off - end it"])
+        Print(L["  /ak farm - start / stop a farm session; /ak farm pause | resume | reset | show"])
+        Print(L["  /ak chat - toggle chat messages; /ak notes - release notes"])
+        Print(L["  /ak selftest - quick self test (Questie data, macro, settings, tables)"])
     end
 end
 -- a parancsok valasza mindig kikerul a chatre (akkor is, ha a chat uzenetek ki vannak kapcsolva)

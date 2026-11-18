@@ -374,7 +374,7 @@ local function RowTooltip(tt)
     if info.text then tt:AddLine(info.text, 0.8, 0.8, 0.8, true) end
     if info.giver then tt:AddLine((L["Quest giver (restart): %s"]):format(info.giver.name or "?"), 0.7, 0.7, 0.7) end
     if live.attacker then tt:AddLine((L["Attacked by: %s"]):format(live.attacker), 1, 0.5, 0.3) end
-    tt:AddLine(L["The QFocus macro targets whatever the escort is fighting, otherwise the escort itself."], 0.6, 0.8, 1, true)
+    tt:AddLine(L["The AKit macro targets whatever the escort is fighting, otherwise the escort itself."], 0.6, 0.8, 1, true)
     tt:AddLine((L["Health warning below %d%%. Health is read when the escort is your target, mouseover or has a nameplate."]):format(LOW_PCT), 0.6, 0.6, 0.6, true)
     if not (QuestFocusDB and QuestFocusDB.noEscortIcon) then
         tt:AddLine(L["A star raid icon goes on the escort when you target or mouse over it."], 0.6, 0.6, 0.6, true)

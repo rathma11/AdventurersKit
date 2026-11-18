@@ -421,7 +421,7 @@ local pageGen = AddOptionsTab(L["General"], 10)
 local gen = OptFlow(pageGen)
 gen:Header(L["Panel"])
 gen:Check(L["Show the panel"],
-    L["The panel with the selected quest, its objectives and the time left. Same as typing /qf."],
+    L["The panel with the selected quest, its objectives and the time left. Same as typing /ak."],
     function() return not QuestFocusDB.hidePanel end,
     function(v) QuestFocusDB.hidePanel = not v; Panel_Update() end)
 gen:Number(L["Font size"],
@@ -436,7 +436,7 @@ gen:Number(L["Font size"],
 gen:Header(L["Chat"])
 gen:Check(L["Chat messages"],
     L["Status messages in chat (marker moved, quest complete, buff warnings, ...). Off: only one line at login "]
-    .. L["and the replies to your own /qf commands and button clicks. Toggle: /qf chat."],
+    .. L["and the replies to your own /ak commands and button clicks. Toggle: /ak chat."],
     function() return not QuestFocusDB.quietChat end,
     function(v) QuestFocusDB.quietChat = not v end)
 gen:Header(L["Minimap"])
@@ -451,9 +451,9 @@ pageGen:HookScript("OnShow", function() gen:Refresh() end)
 ---------------------------------------------------------------------------
 local pageMac = AddOptionsTab(L["Macro & marker"], 20)
 local mac = OptFlow(pageMac)
-mac:Text(L["The QFocus macro targets the mobs of the selected objective. Put it on your bars once; it updates itself. "]
+mac:Text(L["The AKit macro targets the mobs of the selected objective. Put it on your bars once; it updates itself. "]
     .. L["The macro can't be changed in combat; changes apply after combat."], 2)
-mac:Header(L["QFocus macro"])
+mac:Header(L["AKit macro"])
 local cbSpell = mac:Check(L["Spell in the macro (tagging)"],
     L["After targeting the mob the macro also casts this spell (e.g. a ranged pull). Not at turn-in (friendly NPC)."],
     function() return QuestFocusDB.useSpell end,
@@ -591,7 +591,7 @@ end
 NS.SetMacroIcon = function(kind, name, noApply)
     SetMacroIcon(kind, name, true)
     if noApply then
-        -- a /qf icon az utolso hivas utan frissit
+        -- a /ak icon az utolso hivas utan frissit
         C_Timer.After(0, RefreshMacroIcon)
     else
         RefreshMacroIcon()
@@ -698,7 +698,7 @@ end
 pageMac:HookScript("OnHide", function() fly:Hide() end)
 
 mac:Header(L["Macro icons"])
-mac:Text(L["The QFocus macro (and the panel) changes its icon by state. Click an icon to choose another one from the list "]
+mac:Text(L["The AKit macro (and the panel) changes its icon by state. Click an icon to choose another one from the list "]
     .. L["opening to the side; right click: default."], 2)
 local ICON_KINDS = {
     { kind = "hunt", label = L["Hunting: mobs / items to collect"] },
@@ -767,7 +767,7 @@ pageMac:HookScript("OnShow", function() mac:Refresh() end)
 ---------------------------------------------------------------------------
 local pageZone = AddOptionsTab(L["Zone focus"], 50)
 local zon = OptFlow(pageZone)
-zon:Text(L["Only quests of the current zone stay in the Questie tracker (plus the selected QFocus quest). "]
+zon:Text(L["Only quests of the current zone stay in the Questie tracker (plus the selected AKit quest). "]
     .. L["When you change zones it asks whether to switch to the new zone; turning it off restores everything. Minimap: right click."], 2)
 local zoneBtn = zon:Button("", 220, nil, function() end, 2)
 local zoneState = OptLabel(pageZone, "", "GameFontHighlightSmall")
@@ -932,7 +932,7 @@ OpenOptions = function()
     end
 end
 
--- Megnyitas egy adott fulon (pl. /qf notes)
+-- Megnyitas egy adott fulon (pl. /ak notes)
 NS.OpenOptionsTab = function(label)
     selectedKey = label
     OpenOptions()

@@ -90,7 +90,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_TARGET_CHANGED" then
         if UnitExists("target") and targetNames[UnitName("target") or ""] and TapDenied("target")
             and not UnitIsDead("target") and UIErrorsFrame then
-            UIErrorsFrame:AddMessage(L["QFocus: this mob is already tapped by someone else"], 1, 0.3, 0.3)
+            UIErrorsFrame:AddMessage(L["AKit: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
         -- Target valtas: a ping sor ki/be (uj celpontra pingel, a mostanira nem)
         -- Kesleltetve! A /target sor meg a macro futasa KOZBEN valtja ki ezt az esemenyt;

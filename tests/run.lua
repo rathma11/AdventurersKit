@@ -108,7 +108,9 @@ test("load: all files, events, SavedVariables", function()
     for _, p in ipairs(loadProblems) do check(false, p) end
     check(NS ~= nil, "QuestFocusNS (shared namespace) exists")
     check(type(rawget(_G, "QuestFocusDB")) == "table", "QuestFocusDB created at ADDON_LOADED")
-    check(type(SlashCmdList.QUESTFOCUS) == "function", "/qf registered")
+    check(type(SlashCmdList.QUESTFOCUS) == "function", "slash handler registered")
+    eq(rawget(_G, "SLASH_QUESTFOCUS1"), "/ak", "/ak is the primary slash command")
+    eq(rawget(_G, "SLASH_QUESTFOCUS2"), "/qf", "/qf kept as an alias")
     for name, where in pairs(W.newGlobals) do
         local ok = false
         for _, p in ipairs(ALLOWED_GLOBAL) do if name:find(p) then ok = true end end
@@ -129,8 +131,8 @@ test("SelectQuest: focus, saved quest, macro", function()
     NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
     eq(NS.state.questId, 100, "focused quest")
     eq(QuestFocusDB.lastQuest, 100, "QuestFocusDB.lastQuest")
-    local m = W.macros.QFocus
-    check(m ~= nil, "QFocus macro created")
+    local m = W.macros.AKit
+    check(m ~= nil, "AKit macro created")
     check(m and contains(m.body, "Kobold Vermin"), "macro targets the quest mob")
     check(#NS.state.objectives == 1, "one objective")
     -- no-ops
@@ -211,7 +213,7 @@ test("macro: 255 character limit", function()
     QuestFocusDB.startAttack, QuestFocusDB.useSpell, QuestFocusDB.spell = nil, nil, nil
     -- the real macro, after a refresh
     NS.C.UpdateMacro()
-    check(#(W.macros.QFocus.body) <= 255, "saved macro under 255")
+    check(#(W.macros.AKit.body) <= 255, "saved macro under 255")
     -- nothing to target
     local b2, n2 = NS.C.BuildMacroBody({}, nil)
     eq(n2, 0, "empty objective list")
@@ -224,8 +226,22 @@ test("macro: combat defers the edit", function()
     eq(NS.state.pendingBody, "/say combat test", "pending body in combat")
     W.inCombat = false
     W.Fire("PLAYER_REGEN_ENABLED")
-    eq(W.macros.QFocus.body, "/say combat test", "written after combat")
+    eq(W.macros.AKit.body, "/say combat test", "written after combat")
     eq(NS.state.pendingBody, nil, "pending cleared")
+    NS.C.UpdateMacro()
+end)
+
+test("macro: old QFocus macro renamed in place to AKit", function()
+    local slot = GetMacroIndexByName("AKit")
+    check(slot > 0, "AKit macro exists")
+    -- pretend it still has the pre-0.8.0 name
+    W.macroOrder[slot], W.macros.QFocus, W.macros.AKit = "QFocus", W.macros.AKit, nil
+    local before = #W.macroOrder
+    NS.C.ApplyMacro("/say renamed")
+    eq(#W.macroOrder, before, "no second macro created")
+    eq(GetMacroIndexByName("AKit"), slot, "same macro index (action bar slot kept)")
+    eq(GetMacroIndexByName("QFocus"), 0, "old name gone")
+    eq(W.macros.AKit and W.macros.AKit.body, "/say renamed", "body written to the renamed macro")
     NS.C.UpdateMacro()
 end)
 
@@ -453,7 +469,7 @@ test("dungeon prep: start, auto-select blocked, abort restores", function()
     eq(NS.state.questId, 102, "...and focuses it")
     -- slash command, partial name, inside the instance and out
     SlashCmdList.QUESTFOCUS("dungeon deadm")
-    eq(NS.PrepActive(), "The Deadmines", "/qf dungeon deadm")
+    eq(NS.PrepActive(), "The Deadmines", "/ak dungeon deadm")
     W.instance = { name = "The Deadmines", type = "party", instanceID = 36 }
     W.Fire("PLAYER_ENTERING_WORLD", false, false)
     W.Fire("ZONE_CHANGED_NEW_AREA")
@@ -463,8 +479,8 @@ test("dungeon prep: start, auto-select blocked, abort restores", function()
     W.Fire("ZONE_CHANGED_NEW_AREA")
     W.Advance(4)
     SlashCmdList.QUESTFOCUS("dungeon off")
-    eq(NS.PrepActive(), nil, "/qf dungeon off")
-    eq(NS.state.questId, 102, "/qf dungeon off restores the quest")
+    eq(NS.PrepActive(), nil, "/ak dungeon off")
+    eq(NS.state.questId, 102, "/ak dungeon off restores the quest")
 end)
 
 -- Regression (0.7.2): the suggestion view's own refreshers (its 3 s OnUpdate, the
@@ -749,7 +765,7 @@ test("buffs: other players' buffs are not mine", function()
     eq(mine(nil, "Thorns"), false, "Thorns, unknown source")
     eq(mine(nil, "Well Fed"), true, "consumable, unknown source (XP food row needs it)")
     eq(mine(nil, "Spicy Beefstick"), true, "item buff, unknown source")
-    -- end to end: the /qf debug aura lines
+    -- end to end: the /ak debug aura lines
     local T = W.time + 3600
     W.player.auras = {
         { name = "Mark of the Wild", spellId = 5234, duration = 1800, expires = T, source = "party1" },
@@ -810,7 +826,7 @@ test("farm session: totals, pause, summary", function()
     local level = W.player.level
     W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [1111] = false, [2222] = { "Quest Thing", 0 }, [3333] = { "BoP Ring", 500, 1 } }
     SlashCmdList.QUESTFOCUS("farm start")
-    check(F.IsRunning(), "running after /qf farm start")
+    check(F.IsRunning(), "running after /ak farm start")
     check(F.Viewing(), "the panel shows the farm session")
     check(NS.panel:IsShown(), "panel shown")
     eq(NS.panel.title:GetText(), "Farm session", "panel title")
@@ -1045,11 +1061,11 @@ end)
 test("slash commands", function()
     for _, cmd in ipairs({ "help", "", "", "debug", "notes", "options", "city", "dungeon", "dungeon", "zone", "zone",
         "next", "all", "mark", "unmark", "arrow", "arrow", "chat", "chat", "clear", "selftest" }) do
-        W.safecall("/qf " .. cmd, SlashCmdList.QUESTFOCUS, cmd)
+        W.safecall("/ak " .. cmd, SlashCmdList.QUESTFOCUS, cmd)
     end
     local sawSummary = false
     for _, l in ipairs(W.chat) do if contains(l, "Self test:") then sawSummary = true end end
-    check(sawSummary, "/qf selftest printed a summary")
+    check(sawSummary, "/ak selftest printed a summary")
     W.Advance(5)
 end)
 

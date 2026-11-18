@@ -1,6 +1,6 @@
 -- Farm session: ido, XP (+ /ora, ETA a szintig), lootolt arany, lootolt itemek erteke
 -- (vendor ar, es "legjobb eladas" = max(AH ar, vendor ar), ha van aukcios addon).
--- Inditas / leallitas: a panel ikonsoraban az ora gomb, vagy /qf farm (start / stop / pause / reset).
+-- Inditas / leallitas: a panel ikonsoraban az ora gomb, vagy /ak farm (start / stop / pause / reset).
 -- Futas kozben a quest panelen latszik, mint egy quest (UI\Panel.lua: NS.FarmViewing), az utvonal
 -- elso allomasakent; leallitaskor osszegzo ablak (kill, XP, szint, arany, itemek).
 -- A futo session karakterenkent mentve (NS.CharDB().farm): /reload es ujra belepes utan folytatodik.
@@ -385,7 +385,7 @@ end
 
 function F.FooterText()
     local fd = DB()
-    if fd and fd.paused then return L["Paused: /qf farm resume"] end
+    if fd and fd.paused then return L["Paused: /ak farm resume"] end
     return L["Hover a row: top items. Stop: the clock button."]
 end
 
@@ -531,7 +531,7 @@ local function SummaryFrame()
     sum.newBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText(L["Start new"], 1, 1, 1)
-        GameTooltip:AddLine(L["Starts a new farm session from zero. Same as /qf farm start."], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["Starts a new farm session from zero. Same as /ak farm start."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     sum.newBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -627,7 +627,7 @@ function F.Start()
     rawset(c, "farm", fd)
     lastTick = GetTime()
     if QuestFocusDB then QuestFocusDB.hidePanel = false end
-    NS.Print(L["Farm session started. Click the clock button (or /qf farm) to stop it."])
+    NS.Print(L["Farm session started. Click the clock button (or /ak farm) to stop it."])
     EnsureTicker()
     UpdateButton()
     PanelUpdate()
@@ -661,12 +661,12 @@ function F.Toggle()
 end
 NS.FarmToggle = function() NS.Loud(F.Toggle) end
 
--- /qf farm [start | stop | pause | resume | reset | show]
+-- /ak farm [start | stop | pause | resume | reset | show]
 function F.Command(arg)
     arg = (arg or ""):lower()
     if arg == "" then F.Toggle()
     elseif arg == "start" then
-        if F.IsRunning() then NS.Print(L["A farm session is already running (/qf farm reset starts over)."]) else F.Start() end
+        if F.IsRunning() then NS.Print(L["A farm session is already running (/ak farm reset starts over)."]) else F.Start() end
     elseif arg == "stop" then F.Stop()
     elseif arg == "show" then
         if F.IsRunning() then F.SetView(true) else NS.Print(L["No farm session is running."]) end
@@ -676,7 +676,7 @@ function F.Command(arg)
         if F.IsRunning() then Accumulate() NS.Print(F.ChatLine()) end
         F.Start()
     else
-        NS.Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset | show"])
+        NS.Print(L["  /ak farm - start / stop a farm session; /ak farm pause | resume | reset | show"])
     end
 end
 NS.FarmCommand = F.Command

@@ -1,5 +1,5 @@
 -- QuestFocus
--- Quest kijelolesre: QFocus target macro, marker (waypoint + nyil), tooltip.
+-- Quest kijelolesre: AKit target macro, marker (waypoint + nyil), tooltip.
 -- Az adatokat (mobok, itemek, spawn helyek, leado NPC) a Questie-bol veszi.
 
 local ADDON_NAME, NS = ...
@@ -39,7 +39,8 @@ NS.SafeItem = {
     GetItemSpell = function(id) if id then return Try({ CI("GetItemSpell"), G("GetItemSpell") }, id) end end,
 }
 
-local MACRO_NAME = "QFocus"
+local MACRO_NAME = "AKit"
+local OLD_MACRO_NAME = "QFocus" -- 0.8.0 elotti nev: atnevezzuk (EditMacro), igy a gyorsgomb hely megmarad
 local ICON_FALLBACK = 134400 -- INV_Misc_QuestionMark
 local ICON_HUNT = "Ability_Hunter_SniperShot"   -- celkereszt: mobok
 local ICON_TURNIN = "INV_Misc_Note_01"          -- level: leadas
@@ -62,7 +63,7 @@ local state = {
 }
 
 -- Chat uzenetek: QuestFocusDB.quietChat eseten csak az kerul ki, amit te kertel
--- (/qf parancsok, gombok: NS.Loud alatt) es a bejelentkezo sor (PrintAlways).
+-- (/ak parancsok, gombok: NS.Loud alatt) es a bejelentkezo sor (PrintAlways).
 local loud = 0
 local function PrintAlways(msg, ...)
     if select("#", ...) > 0 then msg = msg:format(...) end
@@ -126,7 +127,7 @@ NS.CharDB = function()
 end
 
 ---------------------------------------------------------------------------
--- Ping a QFocus makroban: "on" (mindig), "off" (soha), "ask" (csapatba lepeskor megkerdezi,
+-- Ping a AKit makroban: "on" (mindig), "off" (soha), "ask" (csapatba lepeskor megkerdezi,
 -- az valasz az adott csapatra szol; egyedul nincs ping). Regi beallitas: noPing.
 ---------------------------------------------------------------------------
 NS.PingMode = function()
@@ -148,4 +149,5 @@ end
 -- belso exportok a tobbi core fajlnak
 NS.C = NS.C or {}
 NS.C.ICON_FALLBACK, NS.C.ICON_HUNT, NS.C.ICON_IDLE, NS.C.ICON_TURNIN, NS.C.MACRO_MAX, NS.C.MACRO_NAME, NS.C.Print, NS.C.QF = ICON_FALLBACK, ICON_HUNT, ICON_IDLE, ICON_TURNIN, MACRO_MAX, MACRO_NAME, Print, QF
+NS.C.OLD_MACRO_NAME = OLD_MACRO_NAME
 NS.C.state = state

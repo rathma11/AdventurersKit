@@ -228,7 +228,7 @@ local function TransportRoute(from, to, speed, useHearth)
 end
 NS.TransportRoute = TransportRoute
 
--- /qf selftest (Core\SelfTest.lua): a beepitett jaratok ellenorzese. Visszaad: darabszam, hibak
+-- /ak selftest (Core\SelfTest.lua): a beepitett jaratok ellenorzese. Visszaad: darabszam, hibak
 NS.TransportCheck = function()
     local bad = {}
     local function name(s) return type(s) == "table" and tostring(s[4]) or "?" end

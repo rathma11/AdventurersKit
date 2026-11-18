@@ -3,8 +3,8 @@
 -- A marker / nyil a legkozelebbi quest adora mutat, ha mind megvan, a bejaratra (vagy amelyik
 -- sorra kattintasz). A macro nem mob-ot targetel: a kozeli quest adot (/targetexact), kulonben
 -- inert. Karakterenkent mentve (NS.CharDB().prepDungeon), reload utan is megmarad.
--- Belepes: dungeon lista "Prep" gomb / jobb klikk, /qf dungeon <nev>. Kilepes: a fokusz torles
--- gomb a cim mellett, vagy /qf dungeon off.
+-- Belepes: dungeon lista "Prep" gomb / jobb klikk, /ak dungeon <nev>. Kilepes: a fokusz torles
+-- gomb a cim mellett, vagy /ak dungeon off.
 local ADDON_NAME, NS = ...
 local L = NS.L
 local P = NS.P
@@ -248,7 +248,7 @@ end
 local lastBody
 local function PrepMacro()
     if not prep.dungeon or (NS.PrepIsInside and NS.PrepIsInside()) then return end
-    local body = '/run UIErrorsFrame:AddMessage("QFocus: dungeon prep - no quest giver nearby",1,.8,.2)'
+    local body = '/run UIErrorsFrame:AddMessage("AKit: dungeon prep - no quest giver nearby",1,.8,.2)'
     local giver
     local t = Target()
     -- a kijelolt (vagy legkozelebbi) quest ado, ha kozel van; kulonben barmelyik kozeli
@@ -689,7 +689,7 @@ NS.StartPrep = function(name, restoring)
     if not restoring then
         local n = 0
         for _, r in ipairs(prep.rows) do if r.kind == "pickup" then n = n + 1 end end
-        NS.Loud(NS.Print, L["Dungeon prep: |cffffff00%s|r - %d quests to pick up, then the entrance. Leave: the X next to the title, or /qf dungeon off."],
+        NS.Loud(NS.Print, L["Dungeon prep: |cffffff00%s|r - %d quests to pick up, then the entrance. Leave: the X next to the title, or /ak dungeon off."],
             name, n)
     end
     -- mar a dungeonban vagy: rogton a beluli fazis
@@ -709,7 +709,7 @@ NS.StopPrep = function(quiet, restore)
     NS.HidePrep()
     NS.ClearWaypoint()
     lastBody = nil
-    if NS.C.ApplyMacro then NS.C.ApplyMacro('/run print("QFocus: no quest selected")') end
+    if NS.C.ApplyMacro then NS.C.ApplyMacro('/run print("AKit: no quest selected")') end
     if NS.Panel_Update then NS.Panel_Update() end
     if not quiet then NS.Loud(NS.Print, L["Dungeon prep ended (%s)."], old) end
     -- megszakitas: vissza az elozo questre (ha meg a logban van), kulonben javaslatok
@@ -724,7 +724,7 @@ NS.StopPrep = function(quiet, restore)
     end
 end
 
--- /qf dungeon <nev> | off
+-- /ak dungeon <nev> | off
 NS.PrepCommand = function(arg)
     arg = (arg or ""):match("^%s*(.-)%s*$")
     local low = arg:lower()

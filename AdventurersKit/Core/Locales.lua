@@ -47,7 +47,7 @@ if seterrorhandler and prevHandler then
                 table.insert(NS.errors, 1, e)
                 while #NS.errors > 20 do table.remove(NS.errors) end
                 if DEFAULT_CHAT_FRAME and not (QuestFocusDB and (QuestFocusDB.showErrors or QuestFocusDB.quietChat)) then
-                    DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99Adventurer's Kit|r: |cffff5555Lua error|r logged (/qf options > Debug).")
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99Adventurer's Kit|r: |cffff5555Lua error|r logged (/ak options > Debug).")
                 end
             end
             if not (QuestFocusDB and QuestFocusDB.showErrors) then return end

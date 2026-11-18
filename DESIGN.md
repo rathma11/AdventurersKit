@@ -66,7 +66,7 @@ f.header = S.Header(f, L["MY BOX"])
 f.close = S.CloseButton(f)      -- S.CloseButton(f, true) for a large window
 ```
 
-The "capitals" in a header are plain upper-case text in the `L[...]` key (`L["QFOCUS PING"]`), not a
+The "capitals" in a header are plain upper-case text in the `L[...]` key (`L["AKIT PING"]`), not a
 font effect.
 
 **Moving.** Every window can be dragged with the left button and is `SetClampedToScreen(true)`. Save
@@ -129,7 +129,7 @@ end of a row (buff reminder). Use `S.ClearButton(parent, size)`.
 
 **Icon buttons in the panel's top row.** 16px, icon cropped with `SetTexCoord(0.08, 0.92, 0.08, 0.92)`,
 `ButtonHilight-Square` (ADD) hover, a tooltip with a white title and a grey (0.8) description ending
-in "Same as /qf ...". From the right: X, then options 6px left of it, then dungeon, city and farm 7px apart:
+in "Same as /ak ...". From the right: X, then options 6px left of it, then dungeon, city and farm 7px apart:
 `[farm] [city] [dungeon] [options] [X]`. A new one goes on the left of farm. A button that is off is
 desaturated (farm); while it runs, the farm clock gets a green glow and a red X (stop) in the same spot. Use `S.IconButton(parent, icon, title, desc, onClick)`.
 
@@ -221,7 +221,7 @@ distance, and `BTN_HL` hover. The menu is in `UISpecialFrames`.
 - **Saved data:** positions and sizes are saved in `QuestFocusDB` (`panelPos`, `panelH`, `farmSumPos`, `qpopPos`, `citySize`). Per-character settings go in `NS.CharDB()` (its key also in `NS.CHAR_KEYS` if it used to be account-wide).
 - **Options toggle:** every new popup or box gets an on / off switch in Options (`NS.AddOptionsTab` + `NS.OptFlow(page):Check(label, desc, get, set)`), with a short grey description under it.
 - **Strings:** every user-facing string goes through `L["..."]`, written in English (the key is the English text). Code comments may stay Hungarian without accents.
-- **Help text:** give every clickable thing a tooltip, and mention the matching `/qf` command ("Same as /qf ...").
+- **Help text:** give every clickable thing a tooltip, and mention the matching `/ak` command ("Same as /ak ...").
 - **Feedback** from a button click goes through `NS.Loud(...)`, so it reaches chat even when chat output is off.
 
 ## Checklist: adding a new window

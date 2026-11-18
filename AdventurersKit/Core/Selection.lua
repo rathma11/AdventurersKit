@@ -126,7 +126,7 @@ local function ClearQuest()
     Panel_Update() -- kijeloles nelkul javaslatokat mutat
     state.macroCount = 0
     wipe(targetNames)
-    local body = '/run print("QFocus: no quest selected")'
+    local body = '/run print("AKit: no quest selected")'
     if body ~= state.lastBody or CurrentIcon() ~= state.lastIcon then ApplyMacro(body) end
 end
 
@@ -150,7 +150,7 @@ local function AddQuestTooltip(tooltip, questId, isComplete)
     tooltip:AddLine(" ")
     tooltip:AddDoubleLine("|cff33ff99Adventurer's Kit|r", TT.Progress(objs, isComplete), 1, 1, 1, 0.75, 0.75, 0.75)
     TT.Objectives(tooltip, objs)
-    TT.Finish(tooltip, L["Click: marker + QFocus macro"])
+    TT.Finish(tooltip, L["Click: marker + AKit macro"])
 end
 
 local function HookQuestLogButtons()

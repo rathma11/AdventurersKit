@@ -8,10 +8,10 @@ local S = NS.Style
 local FEATURES = {
     { L["Quest focus and targeting"], {
         L["Quest panel: the focused quest with its objectives, the quests also nearby and your route, in a fixed-size panel."],
-        L["QFocus macro: one key targets a living quest mob of your objectives (and of nearby quests), and keeps a living enemy you clicked."],
+        L["AKit macro: one key targets a living quest mob of your objectives (and of nearby quests), and keeps a living enemy you clicked."],
         L["Nameplate mode: with enemy nameplates on, the macro picks a quest mob nobody has tapped from the visible nameplates; otherwise it targets by name."],
-        L["Ping modes: the macro pings its target always, never, or asks when you join a group (/qf ping)."],
-        L["Zone focus: only the current zone's quests in the tracker, with a prompt when you enter another zone (/qf zone)."],
+        L["Ping modes: the macro pings its target always, never, or asks when you join a group (/ak ping)."],
+        L["Zone focus: only the current zone's quests in the tracker, with a prompt when you enter another zone (/ak zone)."],
     } },
     { L["Markers"], {
         L["Markers: the addon's own arrow or a TomTom waypoint points to the nearest spot of the current objective; the map button opens the world map there."],
@@ -33,13 +33,13 @@ local FEATURES = {
         L["Escorts: the panel shows the escort's health and destination, the macro targets whatever attacks it, and a star marks the escort NPC."],
     } },
     { L["Dungeons"], {
-        L["Dungeon list: the dungeons for your level with their quests, WoW Forever's own dungeons included (/qf dungeon)."],
+        L["Dungeon list: the dungeons for your level with their quests, WoW Forever's own dungeons included (/ak dungeon)."],
         L["Dungeon prep: a checklist of the dungeon's quests to pick up (chain steps too), then the entrance on the map."],
         L["Inside the dungeon: every objective in boss order, the next step highlighted and its mobs in the macro."],
         L["Share popup: in a group, entering the dungeon offers to share your dungeon quests with the party."],
     } },
     { L["City list"], {
-        L["City list: in towns and villages, the quests to pick up nearby with XP, chain step and dungeon tags (town icon or /qf city)."],
+        L["City list: in towns and villages, the quests to pick up nearby with XP, chain step and dungeon tags (town icon or /ak city)."],
         L["Errands: repair, ammo, XP food and full bags, each with the nearest NPC to mark."],
         L["Directions: like asking a guard, the nearest bank, auction house, flight master, inn, trainers or repairer."],
         L["Auto-open: the list opens by itself in towns (can be turned off) and closes when you walk away."],
@@ -54,34 +54,34 @@ local FEATURES = {
         L["Outside warnings: bags filling up, worn gear and 'Vendor nearby', with a marker to the nearest vendor or repairer."],
     } },
     { L["Bags module"], {
-        L["Quest items: a list next to the bags (Bagnon coloring, click to highlight), use buttons on objective rows with a key binding, and /qf junk for leftovers."],
+        L["Quest items: a list next to the bags (Bagnon coloring, click to highlight), use buttons on objective rows with a key binding, and /ak junk for leftovers."],
     } },
     { L["Farm session"], {
-        L["Farm session: time, XP per hour with an ETA to level, kills, looted gold and item value (auction price if available), and a summary when you stop (/qf farm)."],
+        L["Farm session: time, XP per hour with an ETA to level, kills, looted gold and item value (auction price if available), and a summary when you stop (/ak farm)."],
     } },
     { L["Auction house"], {
         L["Quest items tab: the items your quests still need with the cheapest price; click to search, Buy / Buy all with one confirmation."],
     } },
     { L["Settings"], {
         L["Per-character settings: buffs, skipped quests, dungeon prep and the farm session are kept per character."],
-        L["Profile export / import: your settings as text to share (/qf export, /qf import)."],
-        L["Self test: /qf selftest checks your live data and prints one summary line."],
+        L["Profile export / import: your settings as text to share (/ak export, /ak import)."],
+        L["Self test: /ak selftest checks your live data and prints one summary line."],
     } },
 }
 
 local COMMANDS = {
-    { "/qf", L["show / hide the quest panel"] },
-    { "/qf options", L["settings"] },
-    { "/qf next | all | mark | unmark | clear", L["objectives, marker and focus"] },
-    { "/qf ping", L["ping mode (ask / always / never)"] },
-    { "/qf zone", L["zone focus on / off"] },
-    { "/qf city", L["city list"] },
-    { "/qf dungeon [name | off]", L["dungeon list, dungeon prep"] },
-    { "/qf farm [stop | pause | resume | reset]", L["farm session"] },
-    { "/qf bags | junk", L["quest item list, destroy leftover quest items"] },
-    { "/qf export | import", L["share settings"] },
-    { "/qf notes", L["release notes"] },
-    { "/qf selftest | debug | copy", L["self test and diagnostics"] },
+    { "/ak", L["show / hide the quest panel"] },
+    { "/ak options", L["settings"] },
+    { "/ak next | all | mark | unmark | clear", L["objectives, marker and focus"] },
+    { "/ak ping", L["ping mode (ask / always / never)"] },
+    { "/ak zone", L["zone focus on / off"] },
+    { "/ak city", L["city list"] },
+    { "/ak dungeon [name | off]", L["dungeon list, dungeon prep"] },
+    { "/ak farm [stop | pause | resume | reset]", L["farm session"] },
+    { "/ak bags | junk", L["quest item list, destroy leftover quest items"] },
+    { "/ak export | import", L["share settings"] },
+    { "/ak notes", L["release notes"] },
+    { "/ak selftest | debug | copy", L["self test and diagnostics"] },
 }
 
 local page = NS.AddOptionsTab(L["About"], 85)
@@ -121,14 +121,14 @@ for _, c in ipairs(COMMANDS) do
 end
 
 fl:Header(L["Release notes"])
-Line(L["Every version's changes are on the Release notes tab (or /qf notes)."], 2, 8)
+Line(L["Every version's changes are on the Release notes tab (or /ak notes)."], 2, 8)
 local btn = S.FlatButton(page, L["Open release notes"], 150, 22)
 fl:Place(btn, 2, 8)
 btn:SetScript("OnClick", function() if NS.OpenReleaseNotes then NS.OpenReleaseNotes() end end)
 btn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(L["Open release notes"], 1, 1, 1)
-    GameTooltip:AddLine(L["Same as /qf notes."], 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L["Same as /ak notes."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end)
 btn:SetScript("OnLeave", function() GameTooltip:Hide() end)

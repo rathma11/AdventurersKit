@@ -3,15 +3,15 @@
 A questing kit for WoW: Forever built on Questie: it picks your next quest target, points the way, plans
 the route and handles the errands around it (towns, dungeons, buffs, bags, farming, the auction house).
 The same list is in game under Options > About. Changes per version: `AdventurersKit\UI\ReleaseNotes.lua`
-(Options > Release notes, `/qf notes`).
+(Options > Release notes, `/ak notes`).
 
 ## Quest focus and targeting
 
 - **Quest panel:** the focused quest with its objectives, the quests also nearby and your route, in a fixed-size panel.
-- **QFocus macro:** one key targets a living quest mob of your objectives (and of nearby quests), and keeps a living enemy you clicked.
+- **AKit macro:** one key targets a living quest mob of your objectives (and of nearby quests), and keeps a living enemy you clicked.
 - **Nameplate mode:** with enemy nameplates on, the macro picks a quest mob nobody has tapped from the visible nameplates; otherwise it targets by name.
-- **Ping modes:** the macro pings its target always, never, or asks when you join a group (`/qf ping`).
-- **Zone focus:** only the current zone's quests in the tracker, with a prompt when you enter another zone (`/qf zone`).
+- **Ping modes:** the macro pings its target always, never, or asks when you join a group (`/ak ping`).
+- **Zone focus:** only the current zone's quests in the tracker, with a prompt when you enter another zone (`/ak zone`).
 
 ## Markers
 
@@ -39,14 +39,14 @@ The same list is in game under Options > About. Changes per version: `Adventurer
 
 ## Dungeons
 
-- **Dungeon list:** the dungeons for your level with their quests, WoW Forever's own dungeons included (`/qf dungeon`).
+- **Dungeon list:** the dungeons for your level with their quests, WoW Forever's own dungeons included (`/ak dungeon`).
 - **Dungeon prep:** a checklist of the dungeon's quests to pick up (chain steps too), then the entrance on the map.
 - **Inside the dungeon:** every objective in boss order, the next step highlighted and its mobs in the macro.
 - **Share popup:** in a group, entering the dungeon offers to share your dungeon quests with the party.
 
 ## City list
 
-- **City list:** in towns and villages, the quests to pick up nearby with XP, chain step and dungeon tags (town icon or `/qf city`).
+- **City list:** in towns and villages, the quests to pick up nearby with XP, chain step and dungeon tags (town icon or `/ak city`).
 - **Errands:** repair, ammo, XP food and full bags, each with the nearest NPC to mark.
 - **Directions:** like asking a guard, the nearest bank, auction house, flight master, inn, trainers or repairer.
 - **Auto-open:** the list opens by itself in towns (can be turned off) and closes when you walk away.
@@ -64,11 +64,11 @@ The same list is in game under Options > About. Changes per version: `Adventurer
 
 ## Bags module
 
-- **Quest items:** a list next to the bags (Bagnon coloring, click to highlight), use buttons on objective rows with a key binding, and `/qf junk` for leftovers.
+- **Quest items:** a list next to the bags (Bagnon coloring, click to highlight), use buttons on objective rows with a key binding, and `/ak junk` for leftovers.
 
 ## Farm session
 
-- **Farm session:** time, XP per hour with an ETA to level, kills, looted gold and item value (auction price if available), and a summary when you stop (`/qf farm`).
+- **Farm session:** time, XP per hour with an ETA to level, kills, looted gold and item value (auction price if available), and a summary when you stop (`/ak farm`).
 
 ## Auction house
 
@@ -77,22 +77,22 @@ The same list is in game under Options > About. Changes per version: `Adventurer
 ## Settings
 
 - **Per-character settings:** buffs, skipped quests, dungeon prep and the farm session are kept per character.
-- **Profile export / import:** your settings as text to share (`/qf export`, `/qf import`).
-- **Self test:** `/qf selftest` checks your live data and prints one summary line.
+- **Profile export / import:** your settings as text to share (`/ak export`, `/ak import`).
+- **Self test:** `/ak selftest` checks your live data and prints one summary line.
 
 ## Main commands
 
 | Command | What it does |
 |---|---|
-| `/qf` | show / hide the quest panel |
-| `/qf options` | settings |
-| `/qf next \| all \| mark \| unmark \| clear` | objectives, marker and focus |
-| `/qf ping` | ping mode (ask / always / never) |
-| `/qf zone` | zone focus on / off |
-| `/qf city` | city list |
-| `/qf dungeon [name \| off]` | dungeon list, dungeon prep |
-| `/qf farm [stop \| pause \| resume \| reset]` | farm session |
-| `/qf bags \| junk` | quest item list, destroy leftover quest items |
-| `/qf export \| import` | share settings |
-| `/qf notes` | release notes |
-| `/qf selftest \| debug \| copy` | self test and diagnostics |
+| `/ak` | show / hide the quest panel |
+| `/ak options` | settings |
+| `/ak next \| all \| mark \| unmark \| clear` | objectives, marker and focus |
+| `/ak ping` | ping mode (ask / always / never) |
+| `/ak zone` | zone focus on / off |
+| `/ak city` | city list |
+| `/ak dungeon [name \| off]` | dungeon list, dungeon prep |
+| `/ak farm [stop \| pause \| resume \| reset]` | farm session |
+| `/ak bags \| junk` | quest item list, destroy leftover quest items |
+| `/ak export \| import` | share settings |
+| `/ak notes` | release notes |
+| `/ak selftest \| debug \| copy` | self test and diagnostics |

@@ -1,4 +1,4 @@
--- /qf selftest: gyors onellenorzes a jatekban, az elo adatokon (csak tiszta logika, semmit
+-- /ak selftest: gyors onellenorzes a jatekban, az elo adatokon (csak tiszta logika, semmit
 -- nem allit at). Rovid osszegzes; reszletek csak hiba eseten.
 -- Az offline tesztek (tests\run.lua) ugyanezt is lefuttatjak a hamis vilagban.
 local ADDON_NAME, NS = ...
@@ -35,7 +35,7 @@ local function Checks()
         return bad, n .. " quests"
     end)
 
-    add("QFocus macro under 255 chars", function()
+    add("AKit macro under 255 chars", function()
         local bad, n = {}, 0
         local state = NS.state
         for i = 1, NS.NumLogEntries() do

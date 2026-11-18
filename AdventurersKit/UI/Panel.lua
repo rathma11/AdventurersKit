@@ -113,11 +113,11 @@ close:SetPoint("TOPRIGHT", -3, -3)
 close:SetScript("OnClick", function()
     QuestFocusDB.hidePanel = true
     panel:Hide()
-    Print(L["Panel hidden. It comes back when you click a quest, or: /qf"])
+    Print(L["Panel hidden. It comes back when you click a quest, or: /ak"])
 end)
 
 -- Fokusz torlese: a kijelolt quest a logban marad, csak a kijeloles + marker + makro
--- celpontjai torlodnek (mint a /qf clear). Csak akkor latszik, ha van kijelolt quest.
+-- celpontjai torlodnek (mint a /ak clear). Csak akkor latszik, ha van kijelolt quest.
 local clearBtn = CreateFrame("Button", nil, panel)
 clearBtn:SetSize(16, 16)
 -- a quest cimsoranak vegen (az ikonsorban nem lenne egyertelmu, mit torol)
@@ -136,12 +136,12 @@ clearBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
     if NS.PrepActive and NS.PrepActive() then
         GameTooltip:SetText(L["Abort dungeon prep"], 1, 1, 1)
-        GameTooltip:AddLine(L["Leaves the dungeon prep mode and goes back to the quest (and objective) you had focused before, if it is still in your log. Same as /qf dungeon off."], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["Leaves the dungeon prep mode and goes back to the quest (and objective) you had focused before, if it is still in your log. Same as /ak dungeon off."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
         return
     end
     GameTooltip:SetText(L["Clear focus"], 1, 1, 1)
-    GameTooltip:AddLine(L["Unselects this quest: marker and macro targets are cleared, the quest stays in your log. Same as /qf clear."], 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L["Unselects this quest: marker and macro targets are cleared, the quest stays in your log. Same as /ak clear."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end)
 clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -221,19 +221,19 @@ end
 local dungeonBtn = ToolButton("Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", L["Dungeons"],
     function()
         return NS.HasDungeonJournal and NS.HasDungeonJournal()
-            and L["Dungeons for your level and their quests; click one to prep it (its quests on this panel, then the entrance). Shift+click: Dungeon Journal. Same as /qf dungeon."]
-            or L["Dungeons for your level and their quests; click one to prep it (its quests on this panel, then the entrance). Shift+click: marker on the quest giver. Same as /qf dungeon."]
+            and L["Dungeons for your level and their quests; click one to prep it (its quests on this panel, then the entrance). Shift+click: Dungeon Journal. Same as /ak dungeon."]
+            or L["Dungeons for your level and their quests; click one to prep it (its quests on this panel, then the entrance). Shift+click: marker on the quest giver. Same as /ak dungeon."]
     end,
     function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
 local optBtn = ToolButton("Interface\\Icons\\INV_Misc_Gear_01", L["Options"],
-    L["Opens the Adventurer's Kit options. Same as /qf options."],
+    L["Opens the Adventurer's Kit options. Same as /ak options."],
     function() if NS.C.OpenOptions then NS.C.OpenOptions() end end)
 -- farm session (Planner\Farm.lua): ido, XP/ora, lootolt arany es itemek erteke
 -- ora ikon; futas kozben zold fenyes + piros X (stop) ugyanott (Farm.lua: UpdateButton)
 local farmBtn = ToolButton("Interface\\Icons\\INV_Misc_PocketWatch_01", L["Farm session"],
     function()
-        return (NS.Farm and NS.Farm.IsRunning() and L["A farm session is running. Click: stop it and show the summary. Same as /qf farm."]
-            or L["Starts a farm session on this panel: time, XP per hour and ETA to level, kills, looted gold and item value (vendor, and auction price if Auctionator / TSM is installed). Same as /qf farm."])
+        return (NS.Farm and NS.Farm.IsRunning() and L["A farm session is running. Click: stop it and show the summary. Same as /ak farm."]
+            or L["Starts a farm session on this panel: time, XP per hour and ETA to level, kills, looted gold and item value (vendor, and auction price if Auctionator / TSM is installed). Same as /ak farm."])
     end,
     function() if NS.FarmToggle then NS.FarmToggle() end end)
 farmBtn.tex:SetDesaturated(true)
@@ -242,7 +242,7 @@ farmBtn.tex:SetDesaturated(true)
 local CITY_ICON = { Alliance = "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
     Horde = "Interface\\Icons\\Spell_Arcane_TeleportOrgrimmar" }
 local cityBtn = ToolButton(CITY_ICON.Alliance, L["City list"],
-    L["Quests to pick up nearby, errands (repair, sell, ammo, XP food) and Directions (bank, AH, trainers...). Click: open / close, also outside towns. Whether it opens by itself in towns: Options > City list. Same as /qf city."],
+    L["Quests to pick up nearby, errands (repair, sell, ammo, XP food) and Directions (bank, AH, trainers...). Click: open / close, also outside towns. Whether it opens by itself in towns: Options > City list. Same as /ak city."],
     function() if NS.ToggleCityList then NS.ToggleCityList() end end)
 local cityIconEv = CreateFrame("Frame")
 cityIconEv:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -803,7 +803,7 @@ local function GetExtraRow(i)
         local tt = TT.Begin(self, "ANCHOR_LEFT", e.title or "?", L["also nearby"])
         TT.Objective(tt, e.obj)
         TT.Note(tt, NS.EtaLine and NS.EtaLine(e.obj) or nil)
-        TT.Note(tt, L["The QFocus macro targets these mobs too."])
+        TT.Note(tt, L["The AKit macro targets these mobs too."])
         TT.Finish(tt, L["Click: focus this quest and objective (marker + arrow + macro)"])
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -833,7 +833,7 @@ local function GetExtraMoreRow()
         for _, e in ipairs(self.hidden or {}) do
             GameTooltip:AddLine(("|cffd8c8a0%s:|r %s"):format(e.title or "?", e.desc or "?"), 1, 1, 1)
         end
-        GameTooltip:AddLine(L["The QFocus macro targets these mobs too."], 0.45, 0.45, 0.45, true)
+        GameTooltip:AddLine(L["The AKit macro targets these mobs too."], 0.45, 0.45, 0.45, true)
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)

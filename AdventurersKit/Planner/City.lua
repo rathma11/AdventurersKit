@@ -563,7 +563,7 @@ end
 
 -- Csak ami itt, a telepulesen elerheto (GUIDE_R yardon belul): kis faluban nincs AH, bank...
 local GUIDE_R = 700
--- telepulesen kivul (ikonnal / /qf city nyitva): a legkozelebbi, barmilyen messze
+-- telepulesen kivul (ikonnal / /ak city nyitva): a legkozelebbi, barmilyen messze
 local function GuideR() return (NS.InTown and NS.InTown()) and GUIDE_R or math.huge end
 local function ProfList()
     local mine = {}
@@ -767,7 +767,7 @@ NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
 NS.InTown = InCity -- telepulesen vagy-e (a city list kapcsolotol fuggetlenul)
 
 -- Magatol nyilik-e (Options > City list): a lista be van kapcsolva es "Open automatically in
--- towns" is. Kulonben csak a panel ikonja / a /qf city nyitja (city.forced).
+-- towns" is. Kulonben csak a panel ikonja / a /ak city nyitja (city.forced).
 local function AutoOpen()
     return not QuestFocusDB.noCityMode and not QuestFocusDB.cityNoAuto
 end
@@ -781,7 +781,7 @@ city.empty:Hide()
 
 local function RefreshCityList()
     if not NS.QuestieAvailable() then city:Hide() return end
-    -- kikapcsolt city list: csak a kezzel nyitott (ikon, /qf city) marad kint
+    -- kikapcsolt city list: csak a kezzel nyitott (ikon, /ak city) marad kint
     if QuestFocusDB.noCityMode and not city.forced then city:Hide() return end
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
@@ -928,7 +928,7 @@ city:SetScript("OnUpdate", function(_, dt)
     if not city:IsMouseOver() then RefreshCityList() end
 end)
 city:HookScript("OnHide", function() city.forced = nil end)
--- Panel ikon / /qf city: kezzel nyitva (telepulesen kivul is, es akkor is, ha magatol nem
+-- Panel ikon / /ak city: kezzel nyitva (telepulesen kivul is, es akkor is, ha magatol nem
 -- nyilik). Kezzel nyitva kint marad, amig be nem zarod (a telepulest elhagyva is).
 NS.ShowCityList = function()
     if not NS.QuestieAvailable() then

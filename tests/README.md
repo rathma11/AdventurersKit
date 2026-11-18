@@ -1,6 +1,6 @@
 # Tesztek
 
-Két réteg: **offline** (ezen a gépen, játék nélkül) és **játékon belüli** (`/qf selftest`).
+Két réteg: **offline** (ezen a gépen, játék nélkül) és **játékon belüli** (`/ak selftest`).
 
 ## Offline: lint + smoke tesztek
 
@@ -67,7 +67,7 @@ A tisztább megoldás egy hordozható Lua 5.1: a LuaBinaries `lua-5.1.5_Win64_bi
 - Valódi Questie adat, valódi térkép- és világkoordináták, más addonok (Bagnon, Journal).
 - A hamis világban csak néhány uiMap van, ezért a selftest „Dungeon entrances” pontja itt elbukik. Ez várható, a teszt ezt nem számítja hibának.
 
-## Játékban: `/qf selftest`
+## Játékban: `/ak selftest`
 
 Az élő adatokon ellenőrzi:
 

@@ -524,7 +524,7 @@ local function GetRow(i)
         if e.surplus then GameTooltip:AddLine((L["%d surplus (you carry more than needed)"]):format(e.surplus), 0.6, 0.6, 0.6) end
         if e.bank then GameTooltip:AddLine((L["Also in the bank: %d"]):format(e.bank), 0.6, 0.8, 1) end
         if e.kind == "leftover" then
-            GameTooltip:AddLine(e.noValue and L["Unsellable: /qf junk can destroy it"] or L["Can be sold to a vendor"], 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(e.noValue and L["Unsellable: /ak junk can destroy it"] or L["Can be sold to a vendor"], 0.6, 0.6, 0.6)
             -- ertek: vendor es AH ar (Auctionator scan / TSM / sajat AH lekerdezes; Core\Prices.lua)
             local vendor, ah, best, src, age
             if NS.ItemPrice then vendor, ah, best, src, age = NS.ItemPrice(e.link or e.id) end
@@ -537,7 +537,7 @@ local function GetRow(i)
             end
         end
         GameTooltip:AddLine(L["Click: highlight it in the bag; click again: clear"], 0.5, 0.5, 0.5)
-        if e.needs then GameTooltip:AddLine(L["...and select the quest (QFocus marker + macro)"], 0.5, 0.5, 0.5) end
+        if e.needs then GameTooltip:AddLine(L["...and select the quest (AKit marker + macro)"], 0.5, 0.5, 0.5) end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -581,7 +581,7 @@ local function RowText(e)
         return ("%s |cffffffff%s|r%s"):format(n.title or "?", prog, extra), COLORS.need
     end
     if e.kind == "starts" then return L["Starts a quest! (right click it in the bag)"], c end
-    return e.noValue and L["No active quest, unsellable (/qf junk)"] or L["No active quest, sellable"], c
+    return e.noValue and L["No active quest, unsellable (/ak junk)"] or L["No active quest, sellable"], c
 end
 
 RefreshBagList = function()
@@ -996,7 +996,7 @@ end)
 fl:Header(L["Quest items in your bags"])
 fl:Check(L["Quest item list next to the bags"],
     L["While your bags are open (Bagnon or Blizzard), lists your quest items next to them: which quest needs them, "]
-    .. L["how many are surplus, what is in the bank, which ones start a quest. Click a row to select the quest. Toggle: /qf bags."],
+    .. L["how many are surplus, what is in the bank, which ones start a quest. Click a row to select the quest. Toggle: /ak bags."],
     function() return not QuestFocusDB.noBagList end,
     function(v) QuestFocusDB.noBagList = not v; RefreshBagList() end)
 fl:Check(L["Color quest items in Bagnon"],
@@ -1016,6 +1016,6 @@ fl:Check(L["Usable quest items on the panel"],
     function() return not QuestFocusDB.noUseButton end,
     function(v) QuestFocusDB.noUseButton = not v; RefreshBagList(); UpdateUseButton() end)
 fl:Button(L["Destroy leftover quest items"], 200,
-    L["Unsellable quest items no active quest needs any more. Asks one by one before destroying. Same as /qf junk."],
+    L["Unsellable quest items no active quest needs any more. Asks one by one before destroying. Same as /ak junk."],
     function() if NS.DiscardLeftovers then NS.DiscardLeftovers() end end, 28)
 page:HookScript("OnShow", function() fl:Refresh() end)

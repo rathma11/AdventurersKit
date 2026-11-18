@@ -110,7 +110,7 @@ MakeRow = function(parent)
             if d.deferred then
                 tt:AddLine(L["Skipped with the next-quest arrow: at the end of the route for now."], 0.6, 0.6, 0.6, true)
             end
-            TT.Finish(tt, L["Click: focus this quest (marker + QFocus macro)"])
+            TT.Finish(tt, L["Click: focus this quest (marker + AKit macro)"])
         elseif d.kind == "zone" then
             local z = d.zone
             GameTooltip:SetOwner(self, "ANCHOR_LEFT")

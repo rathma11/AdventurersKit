@@ -91,7 +91,7 @@ local function ZoneFocusOn()
         end
     end
     QuestFocusDB.zoneFocus = zf
-    Print(L["Zone focus: |cffffff00%s|r (%d quests kept, %d hidden). Turn off: same button / /qf zone"],
+    Print(L["Zone focus: |cffffff00%s|r (%d quests kept, %d hidden). Turn off: same button / /ak zone"],
         zone or "?", kept, hidden)
 end
 

@@ -334,7 +334,7 @@ local function Macro(nx)
         if QuestFocusDB.startAttack then add("/startattack [@target,harm,nodead]") end
         body = table.concat(lines, "\n")
     else
-        body = '/run UIErrorsFrame:AddMessage("QFocus: dungeon - nothing to target",1,.8,.2)'
+        body = '/run UIErrorsFrame:AddMessage("AKit: dungeon - nothing to target",1,.8,.2)'
     end
     ins.macroWhat = friendly or names[1]
     if body ~= lastBody or NS.state.pendingBody then

@@ -1,4 +1,4 @@
--- Dungeonok a szintedhez: a panel fejleceben a koponya gomb (es /qf dungeon).
+-- Dungeonok a szintedhez: a panel fejleceben a koponya gomb (es /ak dungeon).
 -- Az adatok a Questie-bol (classic dungeonok) es a beepitett Forever dungeon tablabol
 -- (Planner\DungeonQuests.lua) jonnek. A ForeverDungeonJournal addont nem olvassuk, csak
 -- megnyitjuk, ha fent van (Shift+klikk, "Start dungeon" gomb).
@@ -316,7 +316,7 @@ local function Row(i)
     r.prep:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(L["Prep this dungeon"], 0.4, 1, 0.4)
-        GameTooltip:AddLine(L["The quest panel lists this dungeon's quests you can still pick up (nearest first, with the marker on the quest giver), then the entrance. Same as /qf dungeon <name>, or a click on the row."], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["The quest panel lists this dungeon's quests you can still pick up (nearest first, with the marker on the quest giver), then the entrance. Same as /ak dungeon <name>, or a click on the row."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     r.prep:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -430,7 +430,7 @@ local function Refresh()
     scroll:SetPoint("BOTTOMRIGHT", dj, "TOPLEFT", DJ_W - (needBar and 34 or 12), -38 - visH)
     if scroll.ScrollBar then scroll.ScrollBar:SetShown(needBar) end
     if not needBar then scroll:SetVerticalScroll(0) end
-    dj.foot:SetText(L["Click a dungeon or quest: dungeon prep (its quests on the panel, then an arrow to the entrance; /qf dungeon <name>)."]
+    dj.foot:SetText(L["Click a dungeon or quest: dungeon prep (its quests on the panel, then an arrow to the entrance; /ak dungeon <name>)."]
         .. "\n" .. (f and L["Shift+click: opens the quest in Dungeon Journal. Wheel: scroll. Drag to move."]
         or L["Shift+click: marker on the quest giver. Wheel: scroll. Drag to move. (Dungeon Journal addon: more dungeons and details.)"]))
     dj.foot:ClearAllPoints()

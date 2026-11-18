@@ -735,7 +735,7 @@ local function CheckLearning()
     end
 end
 
--- Debug: mit lat a buff figyelo (Debug ful / /qf debug)
+-- Debug: mit lat a buff figyelo (Debug ful / /ak debug)
 NS.BuffDebugLines = function()
     local out = { L["Buffs:"] }
     local auras = HelpfulAuras()
@@ -765,7 +765,7 @@ NS.BuffDebugLines = function()
     return out
 end
 
--- Megtanult buff torlese (ha rosszat tanult): /qf buffreset
+-- Megtanult buff torlese (ha rosszat tanult): /ak buffreset
 NS.ResetBuffLearn = function()
     wipe(DB().buffLearn)
     NS.Print(L["Learned item buffs cleared; they are learned again on next use."])
@@ -2453,7 +2453,7 @@ fl:Button(L["Add buff"], 140,
 
 fl:Header(L["Other"])
 fl:Button(L["Forget learned buffs"], 200,
-    L["Forget which buff each item gives; learned again the next time you use it from the reminder. Same as /qf buffreset."],
+    L["Forget which buff each item gives; learned again the next time you use it from the reminder. Same as /ak buffreset."],
     function() if NS.ResetBuffLearn then NS.ResetBuffLearn() end end, 4)
 fl:Text(L["Tracking (Find Minerals / Find Herbs) can be switched with a key: Options > Keybindings > AddOns > Adventurer's Kit - Buffs."], 2)
 fl:Check(L["Tracking: with a gathering profession, only Find Minerals / Herbs / Fish count"],

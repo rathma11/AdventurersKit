@@ -2,7 +2,7 @@ local ADDON_NAME, NS = ...
 local L = NS.L
 
 ---------------------------------------------------------------------------
--- Ping a QFocus makroban: mod beallitasa (on / off / ask) es a csapatba lepeskori kerdes.
+-- Ping a AKit makroban: mod beallitasa (on / off / ask) es a csapatba lepeskori kerdes.
 -- A kerdo ablakban is atallithato, mi legyen legkozelebb (mindig / soha / kerdezze).
 ---------------------------------------------------------------------------
 local function RefreshMacro()
@@ -60,7 +60,7 @@ accent:SetColorTexture(1, 0.55, 0.25, 1)
 local head = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 head:SetPoint("TOPLEFT", 12, -8)
 head:SetTextColor(1, 0.6, 0.3)
-head:SetText(L["QFOCUS PING"])
+head:SetText(L["AKIT PING"])
 local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
 close:SetSize(20, 20)
 close:SetPoint("TOPRIGHT", -2, -2)
@@ -72,7 +72,7 @@ local sub = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 sub:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -3)
 sub:SetWidth(276)
 sub:SetJustifyH("LEFT")
-sub:SetText(L["You joined a group: they see the QFocus macro's pings. Solo it always pings."])
+sub:SetText(L["You joined a group: they see the AKit macro's pings. Solo it always pings."])
 
 -- lapos gomb (mint a city listen): sotet hatter, vekony arany keret, hoverre vilagosabb
 -- (parent: masik ablakhoz is, pl. a dungeon quest megosztas: NS.FlatButton)

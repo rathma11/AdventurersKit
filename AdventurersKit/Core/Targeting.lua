@@ -108,7 +108,7 @@ local function BuildMacroBody(objectives, onlyIndex)
     local DEADCLR = "/cleartarget [dead]"
     local pick = useNP and state.pick or nil
     if pick == "busy" then
-        CLEAR = '/run UIErrorsFrame:AddMessage("QFocus: nearby quest mobs are taken",1,.6,.2)'
+        CLEAR = '/run UIErrorsFrame:AddMessage("AKit: nearby quest mobs are taken",1,.6,.2)'
     elseif pick then
         CLEAR = (dropTarget and "/target " or "/target [noharm][dead] ") .. pick
     end
@@ -170,7 +170,7 @@ local function BuildMacroBody(objectives, onlyIndex)
         end
     end
     if n == 0 then
-        return '/run print("QFocus: no targetable mob")', 0
+        return '/run print("AKit: no targetable mob")', 0
     end
     for _, t in ipairs(tail) do lines[#lines + 1] = t end
     return table.concat(lines, "\n"), n
@@ -198,7 +198,7 @@ local ICON_DEFAULTS = { idle = ICON_IDLE, hunt = ICON_HUNT, turnin = ICON_TURNIN
 local function MacroIconName(kind)
     local db = QuestFocusDB
     if not db then return ICON_DEFAULTS[kind] end
-    -- regi /qf icon beallitas (egy ikon mindenre) -> mindharom allapotra
+    -- regi /ak icon beallitas (egy ikon mindenre) -> mindharom allapotra
     if db.icon then
         db.macroIcons = { idle = db.icon, hunt = db.icon, turnin = db.icon }
         db.icon = nil
@@ -219,12 +219,17 @@ NS.MacroIconName, NS.MacroIconDefaults, NS.CurrentIconKind = MacroIconName, ICON
 
 local function ApplyMacro(body)
     if InCombatLockdown() then
-        if not state.pendingBody then Print(L["You are in combat, the QFocus macro will update after combat."]) end
+        if not state.pendingBody then Print(L["You are in combat, the AKit macro will update after combat."]) end
         state.pendingBody = body
         return
     end
     state.pendingBody = nil
     local idx = GetMacroIndexByName(MACRO_NAME)
+    if not (idx and idx > 0) and C.OLD_MACRO_NAME then
+        -- 0.8.0 elotti "QFocus" makro: ugyanazon az indexen atnevezzuk, nem hozunk letre masodikat,
+        -- igy az akciosavon levo gomb megmarad
+        idx = GetMacroIndexByName(C.OLD_MACRO_NAME)
+    end
     if idx and idx > 0 then
         EditMacro(idx, MACRO_NAME, CurrentIcon(), body)
     else

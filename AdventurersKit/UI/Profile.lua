@@ -1,4 +1,4 @@
--- Beallitasok exportja / importja (Options > Share settings, /qf export, /qf import).
+-- Beallitasok exportja / importja (Options > Share settings, /ak export, /ak import).
 -- Szoveg: "AK1:" + sajat, hossz-prefixes formatum. Importnal SAJAT parser olvassa (nincs
 -- loadstring), igy egy kapott szoveg nem futtathat kodot.
 -- Ami nem megy at: allapot (panel helye, tempo statisztika, utolso quest...).
@@ -305,9 +305,9 @@ local fl = NS.OptFlow(page)
 fl:Header(L["Share settings"])
 fl:Text(L["Send your Adventurer's Kit settings to someone else, or load theirs. Not shared: panel position, your kill pace and other personal data."], 2)
 fl:Button(L["Export"], 140,
-    L["Shows your settings as text; copy it (Ctrl+C) and send it. Also: /qf export"],
+    L["Shows your settings as text; copy it (Ctrl+C) and send it. Also: /ak export"],
     function() Open("export") end)
 fl:Button(L["Import"], 140,
     L["Paste someone's settings text. XP food, sleeping bag, stones / oils and your own item buffs are only taken if you have that item in your bags; "]
-    .. L["class settings (macro spell, class buffs) only from the same class. Also: /qf import"],
+    .. L["class settings (macro spell, class buffs) only from the same class. Also: /ak import"],
     function() Open("import") end)

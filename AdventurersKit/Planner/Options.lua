@@ -50,7 +50,7 @@ rt:Check(L["Ask to share dungeon quests on entering"],
     function(v) QuestFocusDB.noShareAsk = not v end)
 rt:Header(L["Farm session"])
 rt:Check(L["Summary window when a farm session stops"],
-    L["Stopping a farm session (the clock button or /qf farm stop) opens a window with the duration, kills, XP, "]
+    L["Stopping a farm session (the clock button or /ak farm stop) opens a window with the duration, kills, XP, "]
     .. L["levels, looted gold, item value and gold per hour. A one-line summary goes to chat either way."],
     function() return not QuestFocusDB.noFarmSummary end,
     function(v) QuestFocusDB.noFarmSummary = not v or nil end)
@@ -87,12 +87,12 @@ local pageCity = NS.AddOptionsTab(L["City list"], 45)
 local cl = NS.OptFlow(pageCity)
 cl:Text(L["In a city, or in a village with an inn (innkeeper within ~250 yd): a list of every quest you can pick up nearby (XP, chain position, "]
     .. L["dungeon tag), with errands on top (repair, sell, ammo, XP food) and a Directions menu (bank, AH, trainers...). "]
-    .. L["The town icon on the quest panel (or /qf city) opens and closes it anywhere."], 0)
+    .. L["The town icon on the quest panel (or /ak city) opens and closes it anywhere."], 0)
 cl:Header(L["On / off"])
 local autoCb
 cl:Check(L["City list"],
     L["Off: the list never opens by itself, and the nearby quest popups (Quest pickup tab) show in towns too. "]
-    .. L["The panel icon and /qf city still open it."],
+    .. L["The panel icon and /ak city still open it."],
     function() return not QuestFocusDB.noCityMode end,
     function(v)
         QuestFocusDB.noCityMode = not v or nil
@@ -102,7 +102,7 @@ cl:Check(L["City list"],
     end)
 autoCb = cl:Check(L["Open automatically in towns"],
     L["On: the list pops up when you arrive in a city or a village with an inn (closing it keeps it closed until you leave). "]
-    .. L["Off: only the panel icon or /qf city opens it."],
+    .. L["Off: only the panel icon or /ak city opens it."],
     function() return not QuestFocusDB.cityNoAuto end,
     function(v)
         QuestFocusDB.cityNoAuto = not v or nil
@@ -113,7 +113,7 @@ cl:OnRefresh(function()
     if autoCb.SetEnabled then autoCb:SetEnabled(not QuestFocusDB.noCityMode) end
     autoCb.label:SetFontObject(QuestFocusDB.noCityMode and "GameFontDisable" or "GameFontHighlight")
 end)
-cl:Button(L["Open the list now"], 160, L["Same as the town icon on the panel and /qf city: opens the list here, also outside towns."],
+cl:Button(L["Open the list now"], 160, L["Same as the town icon on the panel and /ak city: opens the list here, also outside towns."],
     function() if NS.ShowCityList then NS.ShowCityList() end end, 28)
 
 cl:Header(L["Errands: when to warn"])
