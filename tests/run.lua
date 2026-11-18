@@ -1083,6 +1083,151 @@ test("locale: every L[\"...\"] key has a value", function()
     check(n > 100, "found the locale keys (" .. n .. ")")
 end)
 
+-- 0.7.10: auction house "Quest items" tab (Planner\AuctionQuest.lua): what is still needed,
+-- the cheapest set of auctions, and the one-auction-per-click buy flow that never goes over the
+-- confirmed price.
+test("AH quest items: price math", function()
+    local A = NS.AHQ
+    eq(A.FormatCoins(10203), "1g 2s 3c", "coins")
+    eq(A.FormatCoins(500), "5s", "silver only")
+    eq(A.FormatCoins(0), "0c", "zero")
+    local ls = {
+        { count = 5, buyout = 500 },                    -- 100 / unit
+        { count = 2, buyout = 150 },                    -- 75
+        { count = 2, buyout = 170 },                    -- 85
+        { count = 1, buyout = 50, owner = "Tester" },   -- own auction: never
+        { count = 3, buyout = 0 },                      -- bid only: never
+    }
+    local p = A.Plan(ls, 4, "Tester")
+    eq(p.cost, 320, "4 needed: 2 + 2 is cheaper than the stack of 5")
+    eq(p.covered, 4, "covered")
+    eq(#p.picks, 2, "two auctions")
+    eq(p.lowestUnit, 75, "lowest unit price")
+    eq(p.maxUnit, 85, "highest unit price in the plan")
+    p = A.Plan(ls, 1, "Tester")
+    eq(p.cost, 150, "1 needed: the cheapest whole auction")
+    p = A.Plan(ls, 5, "Tester")
+    eq(p.cost, 500, "5 needed: the stack of 5 (500) beats 2+2+5")
+    p = A.Plan(ls, 20, "Tester")
+    check(p.partial, "not enough on the AH: partial")
+    eq(p.covered, 9, "partial: everything there is")
+    eq(p.available, 9, "available")
+    eq(A.Plan(ls, 0, "Tester"), nil, "nothing needed")
+    eq(A.Plan({ { count = 1, buyout = 0 } }, 2), nil, "no buyout auctions")
+    -- buying: the cheapest that still fits the confirmed price
+    local st = { maxUnit = 85, spent = 0, cap = 320 }
+    eq(A.PickNext(ls, st, "Tester").buyout, 150, "next: cheapest")
+    st.spent = 200
+    eq(A.PickNext(ls, st, "Tester"), nil, "over the confirmed total: nothing")
+    eq(A.PickNext({ { count = 2, buyout = 400 } }, { maxUnit = 85, spent = 0, cap = 1000 }), nil,
+        "dearer per unit than confirmed: nothing")
+end)
+
+test("AH quest items: needed items, scan, buy one auction per click", function()
+    local A = NS.AHQ
+    Q.Quest({ id = 104, name = "Cloth for the Poor", finisher = 900, starter = 900, objectives = {
+        { Type = "item", Id = 2589, Description = "Linen Cloth", Needed = 6, Collected = 1 },
+        { Type = "item", Id = 2592, Description = "Wool Cloth", Needed = 1, Collected = 0 },
+        { Type = "item", Id = 5000, Description = "Quest Thing", Needed = 1, Collected = 0 },
+        { Type = "item", Id = 5001, Description = "BoP Thing", Needed = 1, Collected = 0 },
+    } })
+    Q.SetLog({ { qid = 100 }, { qid = 104 } })
+    W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [2592] = { "Wool Cloth", 33 },
+        [5000] = { "Quest Thing", 0, 4 }, [5001] = { "BoP Thing", 0, 1 } }
+    W.items = { [2589] = 2 }
+    local items = A.NeededItems()
+    eq(#items, 2, "quest-only and BoP items left out")
+    eq(items[1].name, "Linen Cloth", "first item")
+    eq(items[1].need, 4, "needed 6, have max(collected 1, bags 2) = 2")
+    eq(items[1].quest, "Cloth for the Poor", "quest name")
+    eq(items[2].need, 1, "wool")
+
+    W.ahAll = {
+        { name = "Linen Cloth", count = 5, buyout = 500, owner = "Bob", itemId = 2589 },
+        { name = "Linen Cloth", count = 2, buyout = 150, owner = "Bob", itemId = 2589 },
+        { name = "Linen Cloth", count = 2, buyout = 170, owner = "Ann", itemId = 2589 },
+        { name = "Wool Cloth", count = 20, buyout = 2000, owner = "Bob", itemId = 2592 },
+        { name = "Wool Cloth", count = 1, buyout = 300, owner = "Ann", itemId = 2592 },
+    }
+    W.ahQueries, W.ahBids, W.money = {}, {}, 100000
+    W.Fire("AUCTION_HOUSE_SHOW")
+    check(A.tab and A.tab:IsShown(), "tab shown at the AH")
+    A.tab:Click()
+    check(A.frame:IsShown(), "panel opens from the tab")
+    for _ = 1, 4 do
+        W.Advance(0.5)
+        W.Fire("AUCTION_ITEM_LIST_UPDATE")
+    end
+    eq(#W.ahQueries, 2, "one query per item")
+    eq(W.ahQueries[1].text, "Linen Cloth", "query text")
+    check(W.ahQueries[1].exact, "exact match")
+    eq(A.current[1].plan.cost, 320, "linen price")
+    eq(A.current[2].plan.cost, 300, "wool price")
+    check(contains(A.frame.total:GetText(), "6s 20c"), "total in the footer: " .. tostring(A.frame.total:GetText()))
+
+    -- Buy linen: confirm, then one auction per click
+    A.rows[1].buy:Click()
+    local pop = rawget(_G, "AdventurersKitAHBuy")
+    check(pop and pop:IsShown(), "confirm popup")
+    eq(pop.text:GetText(), "Buy 4 x Linen Cloth for 3s 20c?", "confirm text")
+    check(not pop.ok:IsEnabled(), "button waits for a fresh list")
+    pop.ok:Click()
+    eq(#W.ahBids, 0, "no purchase before the fresh query")
+    W.Advance(0.5)
+    W.Fire("AUCTION_ITEM_LIST_UPDATE")
+    check(pop.ok:IsEnabled(), "ready after the fresh query")
+    pop.ok:Click()
+    eq(#W.ahBids, 1, "one click = one auction")
+    eq(W.ahBids[1].amount, 150, "cheapest first, at its buyout")
+    pop.ok:Click()
+    eq(#W.ahBids, 1, "second click waits for the next query")
+    -- meanwhile someone buys the 170 one: only the 500 stack is left, dearer than confirmed
+    for k, a in ipairs(W.ahAll) do if a.buyout == 170 then table.remove(W.ahAll, k) break end end
+    W.Advance(0.5)
+    W.Fire("AUCTION_ITEM_LIST_UPDATE")
+    pop.ok:Click()
+    eq(#W.ahBids, 1, "never above the confirmed price")
+    check(A.buy == nil or A.buy.done, "buying stops")
+    eq(A.pendingMail[2589], 2, "bought count waits for the mailbox")
+    eq(A.NeededItems()[1].need, 2, "still needed counts the mailbox")
+    pop.ok:Click() -- Close
+    check(not pop:IsShown(), "popup closes")
+
+    -- Buy all: wool (1 auction) + the rest of the linen (now 2 x 5-stack? no: only the 500 one)
+    A.Scan(A.NeededItems(), true)
+    for _ = 1, 4 do
+        W.Advance(0.5)
+        W.Fire("AUCTION_ITEM_LIST_UPDATE")
+    end
+    A.Refresh()
+    eq(A.current[1].plan.cost, 500, "linen: only the stack of 5 left")
+    A.frame.buyAll:Click()
+    eq(pop.text:GetText(), "Buy all: 2 items (2 auctions) for 8s?", "buy all text")
+    local guard = 0
+    while A.buy and not A.buy.done and guard < 20 do
+        guard = guard + 1
+        W.Advance(0.5)
+        W.Fire("AUCTION_ITEM_LIST_UPDATE")
+        pop.ok:Click()
+    end
+    eq(#W.ahBids, 3, "buy all: two more clicks")
+    eq(W.ahBids[3].amount, 300, "wool at 300")
+
+    -- AH closes: tab and panel go; Options off keeps the tab away
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    check(not A.tab:IsShown(), "tab hidden after closing the AH")
+    check(not A.frame:IsShown(), "panel hidden after closing the AH")
+    A.SetEnabled(false)
+    W.Fire("AUCTION_HOUSE_SHOW")
+    check(not A.tab:IsShown(), "option off: no tab")
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    A.SetEnabled(true)
+    QuestFocusDB.ahqOpen = nil
+    W.Fire("MAIL_CLOSED")
+    Q.SetLog({ { qid = 100 }, { qid = 101 }, { qid = 102 }, { qid = 103, complete = true } })
+    W.items, W.itemInfo, W.ahAll = {}, nil, {}
+end)
+
 test("no errors logged by the addon", function()
     for _, e in ipairs(NS.errors or {}) do check(false, "NS.errors: " .. tostring(e.msg)) end
 end)

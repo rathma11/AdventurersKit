@@ -617,6 +617,43 @@ def("CursorHasItem", function() return false end)
 def("GetCursorInfo", function() return nil end)
 def("ClearCursor", function() end)
 
+-- Auction house (classic "list" API). W.ahAll = every auction on the fake AH:
+--   { name, count, buyout, owner, itemId }. QueryAuctionItems fills W.ahList (exact / substring
+--   match on name, 50 per page) and records the call in W.ahQueries; the test fires
+--   AUCTION_ITEM_LIST_UPDATE itself. PlaceAuctionBid records W.ahBids and removes the auction.
+W.ahAll, W.ahList, W.ahTotal, W.ahQueries, W.ahBids, W.ahCanQuery = {}, {}, 0, {}, {}, true
+def("CanSendAuctionQuery", function() return W.ahCanQuery, false end)
+def("QueryAuctionItems", function(text, minL, maxL, page, usable, quality, getAll, exact)
+    W.ahQueries[#W.ahQueries + 1] = { text = text, page = page or 0, exact = exact }
+    local hits = {}
+    for _, a in ipairs(W.ahAll) do
+        if (exact and a.name == text) or (not exact and a.name:lower():find((text or ""):lower(), 1, true)) then
+            hits[#hits + 1] = a
+        end
+    end
+    W.ahList, W.ahTotal = {}, #hits
+    for i = (page or 0) * 50 + 1, math.min(#hits, ((page or 0) + 1) * 50) do W.ahList[#W.ahList + 1] = hits[i] end
+end)
+def("GetNumAuctionItems", function(kind) if kind == "list" then return #W.ahList, W.ahTotal end return 0, 0 end)
+def("GetAuctionItemInfo", function(kind, i)
+    local a = kind == "list" and W.ahList[i]
+    if not a then return nil end
+    return a.name, 134400, a.count, 1, true, 1, "", 1, 1, a.buyout, 0, nil, nil, a.owner, a.owner, 0, a.itemId, true
+end)
+def("GetAuctionItemLink", function(kind, i)
+    local a = kind == "list" and W.ahList[i]
+    return a and ("|cffffffff|Hitem:" .. a.itemId .. "::::::::|h[" .. a.name .. "]|h|r") or nil
+end)
+def("PlaceAuctionBid", function(kind, i, amount)
+    local a = W.ahList[i]
+    W.ahBids[#W.ahBids + 1] = { index = i, amount = amount, auction = a }
+    if a then
+        for k, x in ipairs(W.ahAll) do if x == a then table.remove(W.ahAll, k) break end end
+        table.remove(W.ahList, i)
+        W.money = (W.money or 0) - amount
+    end
+end)
+
 -- optional addons that must stay absent unless a test installs them
 def("TomTom", nil)
 def("Bagnon", nil)

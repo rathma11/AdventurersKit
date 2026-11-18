@@ -5,6 +5,17 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.10", date = "2026-11-18", items = {
+        "Auction house: a coin tab on the right of the auction house window opens \"Quest items to buy\": the "
+            .. "items your quests still need that can be sold there (quest-only and soulbound items are left out), "
+            .. "with the count, the quest, and the cheapest price from a quick lookup of each item (plus the "
+            .. "Auctionator / TSM price when installed).",
+        "Click a row to search for the item in the auction house. Buy asks once (\"Buy 4 x Linen Cloth for 3s 20c?\"), "
+            .. "then buys one auction per click (the game needs a click for every purchase) and never pays more than "
+            .. "the price you confirmed. At the bottom: the total if you buy all, and Buy all. Bought items arrive in "
+            .. "your mailbox and already count as yours on the list.",
+        "Options > Auction house: 'Show quest items tab at the auction house' (on by default).",
+    } },
     { version = "0.7.9", date = "2026-11-18", items = {
         "City list: a town icon on the quest panel (between the farm clock and the dungeon icon) opens and closes "
             .. "it, also outside towns: then it shows nearby quests, errands and Directions to the nearest bank, "
