@@ -165,12 +165,16 @@ local function ItemValue(rec, id)
     if sell == nil then return nil end
     local n = rec.n or 0
     if sell <= 0 then return 0, 0 end
-    local best, src, age = sell, "vendor", nil
-    if not rec.bop then
+    local best, src, age, why = sell, "vendor", nil, nil
+    if rec.bop then
+        why = "bop"                                   -- soulbound: csak vendor
+    else
         local ah, s, a = AHPrice(id, rec.link)
-        if ah and ah > best then best, src, age = ah, s, a end
+        if not ah then why = "noah"                   -- nincs AH ara: vendor ar
+        elseif ah > best then best, src, age = ah, s, a
+        else why = "lower" end                        -- az AH ar kevesebb a vendor arnal
     end
-    return n * sell, n * best, src, age
+    return n * sell, n * best, src, age, why
 end
 
 -- ETA a szintig az alap (rested nelkuli) tempobol: amig van rested pool, a kill dupla XP-t ad
@@ -197,13 +201,17 @@ function F.Totals(fd, now)
     fd = fd or DB()
     if not fd then return nil end
     local t = { elapsed = fd.elapsed or 0, xp = fd.xp or 0, money = fd.money or 0,
-        vendor = 0, best = 0, pending = 0, items = {} }
+        vendor = 0, best = 0, pending = 0, items = {}, ahItems = 0, fallback = 0 }
     for id, rec in pairs(fd.items or {}) do
-        local v, b, src, age = ItemValue(rec, id)
+        local v, b, src, age, why = ItemValue(rec, id)
         if v == nil then
             t.pending = t.pending + 1
         else
             t.vendor, t.best = t.vendor + v, t.best + b
+            -- AH aron szamolt / vendor arra visszaeso (nincs AH ar, BoP, vagy az AH olcsobb) eladhato itemek
+            if v > 0 then
+                if why then t.fallback = t.fallback + 1 else t.ahItems = t.ahItems + 1 end
+            end
             t.items[#t.items + 1] = { id = id, n = rec.n, link = rec.link or rec.name or ("item:" .. id), vendor = v, best = b, src = src, age = age }
         end
     end
@@ -384,9 +392,10 @@ function F.PanelLines(t, fd)
         .. (t.pending > 0 and dim("+" .. t.pending .. "?") or "")
     local src = F.AHSource()
     if src then
-        out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_02") .. lab(L["Best sale"]) .. F.FormatMoney(t.money + t.best) .. dim(src)
+        out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_02") .. lab(L["Items (AH)"]) .. F.FormatMoney(t.best)
+            .. dim(src .. (t.fallback > 0 and (", " .. (L["%d at vendor price"]):format(t.fallback)) or ""))
     else
-        out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_02") .. "|cff777777" .. L["Best sale: needs Auctionator, TSM or Auctioneer"] .. "|r"
+        out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_02") .. "|cff777777" .. L["Items (AH): needs Auctionator, TSM or Auctioneer"] .. "|r"
     end
     return out
 end
@@ -402,9 +411,19 @@ function F.UpdatePanelStats(panel)
     -- az elso percben meg nincs megbizhato ora rata: addig a szerzett osszeg latszik ("+250"),
     -- igy az elso killtol latod, hogy szamol (0.7.8-ban ilyenkor "-" volt: mintha nem szamolna)
     b[2].label:SetText(t.xpH and L["XP / HOUR"] or L["XP GAINED"])
-    b[3].label:SetText(t.goldH and L["GOLD / HOUR"] or L["GOLD GAINED"])
+    -- arany: AH aron, ha van aukcios addon (a cimke mutatja), kulonben vendor aron; hoverre bontas
+    local gH, kind = F.GoldPerHour(t)
+    local gained = t.money + (kind == "AH" and t.best or t.vendor)
+    b[3].label:SetText(gH and (kind == "AH" and L["GOLD/H (AH)"] or L["GOLD/H VENDOR"])
+        or (kind == "AH" and L["GOLD (AH)"] or L["GOLD VENDOR"]))
     b[2].value:SetText(t.xpH and Num(t.xpH) or ((t.xp > 0) and ("+" .. Num(t.xp)) or "-"))
-    b[3].value:SetText(t.goldH and Short(t.goldH) or ((t.money + t.vendor > 0) and ("+" .. Short(t.money + t.vendor)) or "-"))
+    b[3].value:SetText(gH and Short(gH) or ((gained > 0) and ("+" .. Short(gained)) or "-"))
+    if not b[3].qfFarmTip then
+        b[3].qfFarmTip = true
+        b[3]:SetScript("OnEnter", function(self) if F.Viewing() and F.RouteTooltip then F.RouteTooltip(self) end end)
+        b[3]:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    b[3]:EnableMouse(true)
     local max = UnitXPMax("player") or 0
     panel.bar:SetValue(max > 0 and (UnitXP("player") or 0) / max or 0)
     panel.bar:SetStatusBarColor(0.58, 0.35, 0.85) -- XP lila (mint a jatek XP csikja)
@@ -420,6 +439,41 @@ function F.FooterText()
     return L["Hover a row: top items. Stop: the clock button."]
 end
 
+-- Arany per ora: aukcios addonnal AH aron (az item max(AH, vendor) aron), kulonben vendor aron.
+-- Visszaadja: ertek (nil az elso percben), "AH" / "vendor"
+function F.GoldPerHour(t)
+    if F.AHSource() then return t.bestH, "AH" end
+    return t.goldH, "vendor"
+end
+
+-- Arany bontas a tooltipbe: nyers arany, itemek vendor / AH aron, ossz vendorolva / AH-zva;
+-- osszeg es ora rata (az elso perc utan)
+function F.GoldBreakdown(tt, t)
+    local src = F.AHSource()
+    local h = t.elapsed >= 60 and (t.elapsed / 3600) or nil
+    local function line(label, v, r, g, b)
+        tt:AddDoubleLine(label, F.FormatMoney(v) .. (h and ("  |cff999999" .. F.FormatMoney(v / h, true) .. L["/h"] .. "|r") or ""),
+            r or 1, g or 1, b or 1, 1, 1, 1)
+    end
+    if NS.TT then NS.TT.Sub(tt, L["Gold breakdown"]) else tt:AddLine(L["Gold breakdown"], 1, 0.82, 0) end
+    line(L["Raw gold looted (coins)"], t.money)
+    line(L["Items: if you vendor them"], t.vendor)
+    if src then
+        line((L["Items: if you sell them on the AH (%s)"]):format(src), t.best)
+        if t.fallback > 0 then
+            tt:AddLine((L["  %d of them at vendor price (no AH price, soulbound, or the AH pays less)"]):format(t.fallback),
+                0.6, 0.6, 0.6, true)
+        end
+    else
+        tt:AddLine(L["  AH value: needs Auctionator, TSM or Auctioneer"], 0.6, 0.6, 0.6, true)
+    end
+    line(L["Total if vendored"], t.money + t.vendor, 1, 0.86, 0.5)
+    if src then line(L["Total if sold on the AH"], t.money + t.best, 1, 0.86, 0.5) end
+    tt:AddLine(src and L["Gold per hour = (raw gold + items at AH price) / time; an item without an AH price counts at vendor price."]
+        or L["Gold per hour = (raw gold + items at vendor price) / time."], 0.6, 0.6, 0.6, true)
+    if not h then tt:AddLine(L["Per hour values come after the first minute."], 0.6, 0.6, 0.6, true) end
+end
+
 -- Sorok (sajat keszlet a panelen)
 local rows = {}
 local function TopItemsTooltip(owner)
@@ -428,6 +482,7 @@ local function TopItemsTooltip(owner)
     local fd = DB()
     local tt = NS.TT and NS.TT.Begin(owner, "ANCHOR_LEFT", L["Farm session"], F.FormatTime(t.elapsed))
     if not tt then GameTooltip:SetOwner(owner, "ANCHOR_LEFT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
+    F.GoldBreakdown(tt, t)
     if NS.TT then NS.TT.Sub(tt, L["Top looted items"]) else tt:AddLine(L["Top looted items"], 1, 0.82, 0) end
     if #t.items == 0 then tt:AddLine(L["Nothing looted yet."], 0.8, 0.8, 0.8) end
     local src = F.AHSource()
@@ -483,6 +538,9 @@ function F.DrawPanel(panel, y, w, rh)
 end
 function F.HidePanelRows()
     for _, r in ipairs(rows) do r:Hide() end
+    -- quest modban a 3. stat doboz nem a farm tooltipje
+    local b3 = NS.panel and NS.panel.statBoxes and NS.panel.statBoxes[3]
+    if b3 and b3.qfFarmTip then b3:EnableMouse(false) end
 end
 
 -- masodpercenkent: csak a szovegek (a sorok helye nem valtozik)
@@ -570,20 +628,29 @@ function F.SummaryData(fd)
     for _, k in ipairs(F.TopKills(fd, 3)) do row(k.name, "x" .. k.n, true) end
     div()
 
+    -- a LOOT csoport sorai hoverre az arany bontast mutatjak (tip = true)
     sec(L["LOOT"])
-    row(L["Looted gold"], F.FormatMoney(t.money))
+    local function trow(label, value, sub) row(label, value, sub); out[#out].tip = true end
+    trow(L["Raw gold looted"], F.FormatMoney(t.money))
     local nItems = 0
     for _, it in pairs(fd.items or {}) do nItems = nItems + (it.n or 0) end
-    row(L["Items looted"], Num(nItems))
-    row(L["Vendor value"], F.FormatMoney(t.vendor))
+    trow(L["Items looted"], Num(nItems))
+    trow(L["Items at vendor price"], F.FormatMoney(t.vendor))
     local src = F.AHSource()
-    if src then row(L["Best sale"], F.FormatMoney(t.money + t.best) .. "  " .. dim(src)) end
+    if src then
+        trow(L["Items at AH price"], F.FormatMoney(t.best) .. "  " .. dim(src))
+        if t.fallback > 0 then trow((L["%d at vendor price (no AH price)"]):format(t.fallback), "", true) end
+    end
     for i = 1, math.min(3, #t.items) do
         local it = t.items[i]
-        row(it.link .. " x" .. (it.n or 1), F.FormatMoney(src and it.best or it.vendor), true)
+        trow(it.link .. " x" .. (it.n or 1), F.FormatMoney(src and it.best or it.vendor)
+            .. (src and it.src == "vendor" and it.vendor > 0 and ("  " .. dim(L["vendor"])) or ""), true)
     end
-    row(L["Gold per hour"], t.goldH and F.FormatMoney(t.goldH) or dim(short and L["- (under 1 min)"] or "-"))
-    if src and t.bestH then row(L["best sale per hour"], F.FormatMoney(t.bestH), true) end
+    local gH, kind = F.GoldPerHour(t)
+    trow(kind == "AH" and L["Gold per hour (AH)"] or L["Gold per hour (vendor)"],
+        gH and F.FormatMoney(gH) or dim(short and L["- (under 1 min)"] or "-"))
+    if kind == "AH" and t.goldH then trow(L["if vendored"], F.FormatMoney(t.goldH), true) end
+    out.totals = t
     return out
 end
 
@@ -604,7 +671,10 @@ function F.ChatLine(fd)
     if not t then return "" end
     return (L["Farm session: %s, %d kills, %s XP (%s/h), looted gold %s, items %s (vendor), %s per hour"]):format(
         F.FormatTime(t.elapsed), fd.killCount or 0, Num(t.xp), t.xpH and Num(t.xpH) or "-", F.FormatMoney(t.money),
-        F.FormatMoney(t.vendor), t.goldH and F.FormatMoney(t.goldH) or "-")
+        F.FormatMoney(t.vendor), (function()
+            local gH, kind = F.GoldPerHour(t)
+            return gH and (F.FormatMoney(gH) .. " (" .. (kind == "AH" and L["AH"] or L["vendor"]) .. ")") or "-"
+        end)())
 end
 
 local SUM_W, ROW_H = 300, 15
@@ -646,6 +716,7 @@ local function SumItem(i, kind)
     if it and it.kind ~= kind then
         if it.a then it.a:Hide() end
         if it.b then it.b:Hide() end
+        if it.hit then it.hit:Hide() end
         it = nil
     end
     if not it then
@@ -661,6 +732,18 @@ local function SumItem(i, kind)
             it.b = sum:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             it.b:SetJustifyH("RIGHT")
             it.b:SetWordWrap(false)
+            -- hover terulet (LOOT sorok): arany bontas tooltip
+            it.hit = CreateFrame("Button", nil, sum)
+            S.RowHighlight(it.hit)
+            it.hit:SetScript("OnEnter", function(self)
+                local t = sum.totals
+                if not t then return end
+                local tt = NS.TT and NS.TT.Begin(self, "ANCHOR_RIGHT", L["Farm session"], F.FormatTime(t.elapsed))
+                if not tt then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
+                F.GoldBreakdown(tt, t)
+                if NS.TT then NS.TT.Finish(tt) else GameTooltip:Show() end
+            end)
+            it.hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
         sum.items[i] = it
     end
@@ -672,6 +755,7 @@ function F.ShowSummary(fd)
     S.RestorePos(f, "farmSumPos")
     local y = -26
     local data = F.SummaryData(fd)
+    f.totals = data.totals -- a LOOT sorok tooltipje ebbol bont
     for i, e in ipairs(data) do
         local kind = e.sec and "sec" or (e.div and "div" or "row")
         local it = SumItem(i, kind)
@@ -695,6 +779,10 @@ function F.ShowSummary(fd)
             it.b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, y)
             it.b:SetWidth(SUM_W * 0.42)
             it.b:Show()
+            it.hit:ClearAllPoints()
+            it.hit:SetPoint("TOPLEFT", f, "TOPLEFT", 10, y + 1)
+            it.hit:SetSize(SUM_W - 20, ROW_H)
+            it.hit:SetShown(e.tip and true or false)
             y = y - ROW_H
         end
         it.a:Show()
@@ -703,6 +791,7 @@ function F.ShowSummary(fd)
         local it = f.items[i]
         if it.a then it.a:Hide() end
         if it.b then it.b:Hide() end
+        if it.hit then it.hit:Hide() end
     end
     f:SetHeight(-y + 8 + 44)
     f:Show()

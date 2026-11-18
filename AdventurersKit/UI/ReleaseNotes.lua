@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.5", date = "2026-11-18", items = {
+        "Farm session: gold per hour says how it is counted. With Auctionator / TSM / Auctioneer it uses AH prices "
+            .. "(\"GOLD/H (AH)\", \"Gold per hour (AH)\"), otherwise vendor prices. An item with no AH price, a soulbound "
+            .. "one, or one the AH pays less for counts at vendor price, and the item rows say how many.",
+        "Farm session: hover the gold box, a farm row or a Loot row in the summary for the breakdown: raw gold "
+            .. "looted, items if vendored, items if sold on the AH (with the price source), and both totals, each "
+            .. "with a per hour value after the first minute.",
+    } },
     { version = "0.8.4", date = "2026-11-18", items = {
         "Farm session: the counters move from the first kill. In the first minute the boxes show the XP and gold "
             .. "gained (\"+250\") instead of \"-\" (the per hour rate comes after a minute), the panel updates right "

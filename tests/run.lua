@@ -903,7 +903,7 @@ test("farm session: totals, pause, summary", function()
     check(NS.panel:IsShown(), "panel shown")
     eq(NS.panel.title:GetText(), "Farm session", "panel title")
     eq(NS.panel.statBoxes[1].label:GetText(), "TIME", "stat box 1")
-    eq(NS.panel.statBoxes[3].label:GetText(), "GOLD GAINED", "stat box 3 (first minute: the gain)")
+    eq(NS.panel.statBoxes[3].label:GetText(), "GOLD VENDOR", "stat box 3 (first minute: the gain, vendor prices)")
     W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 45 experience.")
     W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 45 experience.")
     W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Kobold Vermin dies, you gain 40 experience.")
@@ -985,13 +985,31 @@ test("farm session: totals, pause, summary", function()
         end
     end
     local all = table.concat(rowsText, "\n")
-    for _, want in ipairs({ "XP gained", "To level", "Mobs killed", "Looted gold", "Items (vendor)", "Best sale" }) do
+    for _, want in ipairs({ "XP gained", "To level", "Mobs killed", "Looted gold", "Items (vendor)", "Items (AH)" }) do
         check(contains(all, want), "panel row: " .. want)
     end
+    -- 0.8.5: gold per hour is marked AH (with an auction addon) or vendor; items without a better AH
+    -- price (Late: AH cheaper, BoP Ring: soulbound) are counted at vendor price, and it says so
+    check(contains(all, "Auctionator, 2 at vendor price"), "Items (AH) row: source and vendor fallbacks")
+    local t0 = F.Totals()
+    eq(t0.ahItems, 1, "items at AH price")
+    eq(t0.fallback, 2, "items at vendor price (cheaper on the AH / soulbound)")
+    local gH, kind = F.GoldPerHour(t0)
+    eq(kind, "AH", "gold per hour from AH prices")
+    eq(gH, t0.bestH, "gold per hour = raw gold + items at AH price")
+    eq(NS.panel.statBoxes[3].label:GetText(), "GOLD/H (AH)", "stat box 3 says AH")
     eq(#F.PanelLines(F.Totals(), fd), 6, "six farm rows")
     F.RouteTooltip(NS.panel)
     local tip = table.concat(GameTooltip.__lines or {}, "\n")
     check(contains(tip, "[BoP Ring]") and contains(tip, "[Linen Cloth]"), "tooltip lists the top items")
+    for _, want in ipairs({ "Raw gold looted (coins)", "Items: if you vendor them", "Items: if you sell them on the AH (Auctionator)",
+        "2 of them at vendor price", "Total if vendored", "Total if sold on the AH", "Gold per hour = (raw gold + items at AH price)" }) do
+        check(contains(tip, want), "gold breakdown: " .. want)
+    end
+    check(contains(tip, "/h"), "breakdown has per hour values")
+    GameTooltip:Hide()
+    W.FireScript(NS.panel.statBoxes[3], "OnEnter")
+    check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "Total if sold on the AH"), "stat box 3 hover: breakdown")
     GameTooltip:Hide()
 
     -- stop: summary window + one line in chat, panel back to quests
@@ -1009,8 +1027,20 @@ test("farm session: totals, pause, summary", function()
     check(sf and sf:IsShown(), "summary window shown")
     local sum = table.concat(F.SummaryLines(fd), "\n")
     for _, want in ipairs({ "TIME AND XP", "KILLS", "LOOT", "Duration", "Mobs killed", "Mangy Wolf: x2", "XP gained",
-        "Levels gained", "Looted gold", "Items looted", "Vendor value", "Best sale", "Gold per hour" }) do
+        "Levels gained", "Raw gold looted", "Items looted", "Items at vendor price", "Items at AH price",
+        "2 at vendor price (no AH price)", "Gold per hour (AH)", "if vendored" }) do
         check(contains(sum, want), "summary: " .. want)
+    end
+    local sawAH = false
+    for i = before + 1, #W.chat do if contains(W.chat[i], "per hour") and contains(W.chat[i], "(AH)") then sawAH = true end end
+    check(sawAH, "chat line marks gold per hour as AH")
+    local hit
+    for _, it in ipairs(sf.items) do if it.hit and it.hit:IsShown() then hit = it.hit break end end
+    check(hit ~= nil, "summary LOOT rows are hoverable")
+    if hit then
+        W.FireScript(hit, "OnEnter")
+        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "Total if vendored"), "summary hover: gold breakdown")
+        GameTooltip:Hide()
     end
     sf.newBtn:Click()
     check(F.IsRunning() and not sf:IsShown(), "Start new: a new session, window closed")
