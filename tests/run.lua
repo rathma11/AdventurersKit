@@ -500,6 +500,56 @@ test("dungeon prep: chains, later quests, item-started quests, title buttons", f
     AQ.__availableQuests = oldAvail
 end)
 
+-- 0.7.4: the "Dungeons for your level" popup lists Forever's own dungeons (The Drowned City at
+-- 35-42 was missing for a level 36 character) and the classic ones whose quests Questie files
+-- under another area ID (Razorfen Kraul quests are 1717, Uldaman 1517: they showed 0 quests)
+test("dungeon list: Forever dungeons and Questie's alternative area IDs", function()
+    local DB = Q.modules.QuestieDB
+    local oldLevel, oldFaction, oldPtrs = W.player.level, W.player.faction, DB.QuestPointers
+    W.player.level, W.player.faction = 36, "Horde"
+    Q.NPC(961, "Kraul Giver", 17, { { 40, 80 } })
+    Q.Quest({ id = 2101, name = "Blueleaf Tubers", zone = 1717, starter = 961, finisher = 961 })
+    Q.Quest({ id = 2102, name = "Badlands Relic", zone = 1517, starter = 961, finisher = 961 })
+    -- a Forever quest that Questie does know, filed under its outdoor zone (Stranglethorn)
+    Q.Quest({ id = 95776, name = "The Only Good Brinescale...", zone = 33, starter = 961, finisher = 961 })
+    DB.QuestPointers = { [2101] = true, [2102] = true, [95776] = true }
+    -- the dungeon -> quest ID map is built once (an earlier test may have built it): offer them
+    local AQ = Q.modules.AvailableQuests
+    local oldAvail = AQ.__availableQuests
+    AQ.__availableQuests = { [2101] = true, [2102] = true }
+    local byName = {}
+    for _, e in ipairs(NS.DungeonsForLevel(36)) do byName[e.name] = e end
+    local dc = byName["The Drowned City"]
+    check(dc ~= nil, "The Drowned City (35-42) is listed at level 36")
+    eq(dc and dc.lo, 35, "...from level 35")
+    local q = {}
+    for _, d in ipairs(dc and dc.quests or {}) do q[d.qid] = d end
+    check(q[95775] and q[95775].name == "The Drowned City", "...a quest Questie does not know comes from the built-in table")
+    check(q[95776] ~= nil, "...a quest Questie files under Stranglethorn still belongs to the dungeon")
+    check(not q[95787], "...no Alliance quests for a Horde character")
+    check(q[95789] ~= nil, "...quests for both factions are listed")
+    local function has(name, qid)
+        for _, d in ipairs(byName[name] and byName[name].quests or {}) do if d.qid == qid then return true end end
+    end
+    check(has("Razorfen Kraul", 2101), "Razorfen Kraul: its quests (area 1717) are counted")
+    check(byName["Krol'dok Stronghold"] ~= nil, "Krol'dok Stronghold (40-47) is in range too")
+    check(not byName["Blackmaw Hold"], "Blackmaw Hold (55-60) is not")
+    eq(NS.QuestDungeon(NS.GetQuestieQuest(95776), 95776), "The Drowned City", "dungeon tag for the Forever quest")
+    eq(NS.QuestDungeon(NS.GetQuestieQuest(2102), 2102), "Uldaman", "Uldaman quest (area 1517) tagged")
+    for _, n in ipairs({ "The Drowned City", "Krol'dok Stronghold", "Alcaz Prison", "Blackmaw Hold",
+        "Shaper's Terrace", "Hall of Thanes", "City of Dalaran", "Excavation Site: Wetlands", "Ruins of Lordaeron" }) do
+        check(NS.DungeonEntrances[n] ~= nil, n .. ": entrance known")
+        check(NS.DungeonBosses[n] ~= nil, n .. ": boss order known")
+        local e = NS.CollectDungeon(n)
+        check(e and e.name == n, n .. ": dungeon prep finds it")
+    end
+    NS.ToggleDungeonList()
+    check(_G.QuestFocusDungeonList:IsShown(), "popup opens")
+    NS.ToggleDungeonList()
+    W.player.level, W.player.faction, DB.QuestPointers = oldLevel, oldFaction, oldPtrs
+    AQ.__availableQuests = oldAvail
+end)
+
 -- 0.7.3: dragging the resize grip lays the rows out again right away; the panel does not go
 -- below its content (rows used to stay where they were while only the frame shrank)
 test("panel resize: rows follow while dragging", function()

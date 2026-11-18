@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.4", date = "2026-11-18", items = {
+        "Fix: \"Dungeons for your level\" lists WoW: Forever's own dungeons again (The Drowned City, Krol'dok "
+            .. "Stronghold, Alcaz Prison, Blackmaw Hold, Shaper's Terrace, Hall of Thanes, City of Dalaran, Excavation "
+            .. "Site: Wetlands, Ruins of Lordaeron). Their levels and quests are built in; no extra addon needed.",
+        "Fix: Razorfen Kraul, Uldaman, Zul'Farrak and Sunken Temple showed 0 quests (Questie files their quests "
+            .. "under a different area). Their quests are listed, and dungeon prep finds them.",
+    } },
     { version = "0.7.3", date = "2026-11-18", items = {
         "Dungeon prep: quest chains show up. If a dungeon quest needs earlier quests first (e.g. The Defias "
             .. "Brotherhood), the list shows the chain's next step with its quest giver, marked as chain step N/M.",

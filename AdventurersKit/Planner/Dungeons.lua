@@ -1,6 +1,7 @@
 -- Dungeonok a szintedhez: a panel fejleceben a koponya gomb (es /qf dungeon).
--- Az adatok csak a Questie-bol jonnek (classic dungeonok). A ForeverDungeonJournal addont nem
--- olvassuk, csak megnyitjuk, ha fent van (Shift+klikk, "Start dungeon" gomb).
+-- Az adatok a Questie-bol (classic dungeonok) es a beepitett Forever dungeon tablabol
+-- (Planner\DungeonQuests.lua) jonnek. A ForeverDungeonJournal addont nem olvassuk, csak
+-- megnyitjuk, ha fent van (Shift+klikk, "Start dungeon" gomb).
 local ADDON_NAME, NS = ...
 local L = NS.L
 
@@ -117,16 +118,39 @@ end
 
 -- { name, lo, hi, quests = { {qid, name, level, requires, note, inLog, quest, startItem} } }
 -- only: csak ez a dungeon, szintsavtol fuggetlenul (dungeon prep, Planner\Prep.lua)
+-- A Forever sajat dungeon questjei a te frakciodnak (Planner\DungeonQuests.lua)
+local function ForeverQuestIds(name)
+    local faction = UnitFactionGroup and UnitFactionGroup("player")
+    local set = {}
+    for _, d in ipairs(NS.ForeverDungeons or {}) do
+        if d[1] == name then
+            for _, q in ipairs(d[4]) do
+                if not q[5] or not faction or q[5] == faction then set[q[1]] = true end
+            end
+        end
+    end
+    return set
+end
+
+-- Questie nelkuli quest (a Questie nem ismeri a Forever questet): a beepitett adat
+local function BuiltinQuest(qid)
+    local fq = NS.ForeverDungeonQuest and NS.ForeverDungeonQuest(qid)
+    if fq then return { Id = qid, name = fq[2], level = fq[3], requiredLevel = fq[4], builtin = true } end
+end
+
 local function CollectQuestie(level, only)
     local byName = {}
     local out = {}
-    for _, c in ipairs(CLASSIC) do
-        if (only and c[1] == only) or (not only and InRange(c[2], c[3], level)) then
-            local e = { name = c[1], lo = c[2], hi = c[3], quests = {} }
-            byName[c[1]] = e
+    local function consider(name, lo, hi)
+        if byName[name] then return end
+        if (only and name == only) or (not only and InRange(lo, hi, level)) then
+            local e = { name = name, lo = lo, hi = hi, quests = {} }
+            byName[name] = e
             out[#out + 1] = e
         end
     end
+    for _, c in ipairs(CLASSIC) do consider(c[1], c[2], c[3]) end
+    for _, d in ipairs(NS.ForeverDungeons or {}) do consider(d[1], d[2], d[3]) end
     -- a dungeon minden questje (a meg nem felveheto, lancban levo is), a felveheto questek
     -- (Questie AvailableQuests) es ami mar a logodban van
     local AQ = NS.Module("AvailableQuests")
@@ -134,12 +158,13 @@ local function CollectQuestie(level, only)
     local ids = {}
     for _, e in ipairs(out) do
         for qid in pairs(DungeonQuestIds(e.name)) do ids[qid] = false end
+        for qid in pairs(ForeverQuestIds(e.name)) do ids[qid] = false end
     end
     for qid in pairs(AQ and type(AQ.__availableQuests) == "table" and AQ.__availableQuests or {}) do ids[qid] = false end
     for qid in pairs(QP and type(QP.currentQuestlog) == "table" and QP.currentQuestlog or {}) do ids[qid] = true end
     for qid, inLog in pairs(ids) do
         inLog = inLog or InLog(qid)
-        local q = NS.GetQuestieQuest(qid)
+        local q = NS.GetQuestieQuest(qid) or BuiltinQuest(qid)
         local dname = q and NS.QuestDungeon(q, qid)
         local e = dname and byName[dname]
         if e and not q.isHidden and (inLog or not NS.QuestIsDone(qid)) then
@@ -149,7 +174,7 @@ local function CollectQuestie(level, only)
                 giver = npc and npc.name
             end
             e.quests[#e.quests + 1] = { qid = qid, name = q.name, level = q.level, requires = q.requiredLevel,
-                note = giver, inLog = inLog, quest = q, startItem = StartsFromItemOnly(q) or nil }
+                note = giver, inLog = inLog, quest = (not q.builtin) and q or nil, startItem = StartsFromItemOnly(q) or nil }
         end
     end
     return out
@@ -418,11 +443,16 @@ NS.CollectDungeon = function(name)
     local level = UnitLevel("player") or 1
     return CollectQuestie(level, name)[1]
 end
--- Ismert dungeon nevek: a classic lista, plusz a bejarat tabla
+-- A "Dungeons for your level" lista adatai (a tesztekhez is)
+NS.DungeonsForLevel = function(level)
+    return CollectQuestie(level or UnitLevel("player") or 1)
+end
+-- Ismert dungeon nevek: a classic lista, a Forever dungeonok, plusz a bejarat tabla
 NS.DungeonNames = function()
     local seen, out = {}, {}
     local function add(n) if n and not seen[n] then seen[n] = true; out[#out + 1] = n end end
     for _, c in ipairs(CLASSIC) do add(c[1]) end
+    for _, d in ipairs(NS.ForeverDungeons or {}) do add(d[1]) end
     for name in pairs(NS.DungeonEntrances or {}) do add(name) end
     table.sort(out)
     return out

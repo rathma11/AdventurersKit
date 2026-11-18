@@ -264,6 +264,12 @@ local DUNGEONS = {
     [796] = "Scarlet Monastery", [722] = "Razorfen Downs", [1337] = "Uldaman", [1176] = "Zul'Farrak",
     [2100] = "Maraudon", [1477] = "Sunken Temple", [1584] = "Blackrock Depths", [1583] = "Blackrock Spire",
     [2557] = "Dire Maul", [2057] = "Scholomance", [2017] = "Stratholme",
+    -- a Questie ezeknel mas area ID-t ad a questeknek (Zones\dungeons.lua: "quests are 1717")
+    [1717] = "Razorfen Kraul", [1517] = "Uldaman", [978] = "Zul'Farrak", [1417] = "Sunken Temple",
+    [721] = "Gnomeregan",
+    -- Forever sajat dungeonjai, amiket a Questie Forever tablaja ismer (a tobbi: quest ID alapjan)
+    [16919] = "Hall of Thanes", [16611] = "Ruins of Lordaeron", [16732] = "Excavation Site: Wetlands",
+    [16544] = "City of Dalaran",
 }
 local RAIDS = {
     [2717] = "Molten Core", [2159] = "Onyxia's Lair", [1977] = "Zul'Gurub", [2677] = "Blackwing Lair",
@@ -271,6 +277,9 @@ local RAIDS = {
 }
 local function QuestDungeon(q, qid)
     if type(q) ~= "table" then return end
+    -- Forever dungeon quest (Planner\DungeonQuests.lua): a zoneOrSort-ja a kulso zona
+    local fq = NS.ForeverDungeonQuest and NS.ForeverDungeonQuest(qid or q.Id or q.id)
+    if fq then return fq[1], false end
     local zs = tonumber(q.zoneOrSort)
     if not zs then return end
     if DUNGEONS[zs] then return DUNGEONS[zs], false end
