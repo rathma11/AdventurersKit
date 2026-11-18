@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.1", date = "2026-11-18", items = {
+        "AKit macro, quest mob close by (its nameplate shows, about 20 yd): the macro no longer relies only on the "
+            .. "nameplate. If that nameplate is gone or renumbered by the time you press it, it falls back to targeting "
+            .. "the quest mobs by name, like it does further away.",
+    } },
     { version = "0.8.0", date = "2026-11-18", items = {
         "The slash command is now /ak (for example /ak options, /ak city, /ak farm). /qf still works as before.",
         "The target macro is now called AKit. Your old QFocus macro is renamed on the first update, so it stays "

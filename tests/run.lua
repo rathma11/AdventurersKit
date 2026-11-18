@@ -751,6 +751,29 @@ test("macro ping: never a tapped or unpicked mob (nameplate mode)", function()
     check(contains(build(), "/ping"), "nameplates off: ping stays")
 end)
 
+test("macro: nameplate pick (mob within ~20 yd) keeps a by-name fallback", function()
+    W.Advance(1)
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    W.cvars.nameplateShowEnemies = "1"
+    W.units.target = nil
+    NS.state.pick = "nameplate3"
+    W.units.nameplate3 = { name = "Kobold Vermin", hostile = true }
+    local body = NS.C.BuildMacroBody(NS.state.objectives, nil)
+    eq(firstLine(body), "/target [noharm][dead] nameplate3", "targets the picked nameplate first")
+    -- stale token (plate gone or renumbered since the macro was written): names still work
+    check(hasLine(body, "/targetexact [noexists] Kobold Vermin"), "by-name fallback after the token: " .. body)
+    local l1 = ("\n" .. body .. "\n"):find("\n/cleartarget [dead]\n", 1, true)
+    local l2 = ("\n" .. body .. "\n"):find("\n/targetexact [noexists] Kobold Vermin\n", 1, true)
+    check(l1 and l2 and l1 < l2, "a corpse left by the token line is cleared before the names")
+    check(#body <= NS.C.MACRO_MAX, "fits in the macro limit")
+    -- busy: still no targeting at all
+    NS.state.pick = "busy"
+    check(not contains(NS.C.BuildMacroBody(NS.state.objectives, nil), "/targetexact"), "busy: no by-name targeting")
+    NS.state.pick = nil
+    W.units.nameplate3 = nil
+    W.cvars.nameplateShowEnemies = "0"
+end)
+
 test("buffs: other players' buffs are not mine", function()
     local mine = NS.BuffsAuraMine
     check(mine ~= nil, "Buffs exports BuffsAuraMine")

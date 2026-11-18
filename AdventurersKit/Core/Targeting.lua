@@ -138,6 +138,13 @@ local function BuildMacroBody(objectives, onlyIndex)
     if usePing and pingOk and not onTarget then tail[#tail + 1] = PING_LINE end
     local lines, seen = { CLEAR }, {}
     local len = #CLEAR + 1
+    -- Nameplate pick mellett is kell a nev szerinti tartalek: a nameplate (Classicban alapbol
+    -- ~20 yd-on belul latszik) tokenje a macro irasa ota eltunhetett / atszamozodhatott, ekkor a
+    -- /target nameplateN nem talal semmit (vagy hullat hagy) -> a [noexists] sorok potoljak.
+    if pick and pick ~= "busy" then
+        lines[#lines + 1] = DEADCLR
+        len = len + #DEADCLR + 1
+    end
     for _, t in ipairs(tail) do len = len + #t + 1 end
     local n = 0
     wipe(targetNames)
@@ -146,7 +153,7 @@ local function BuildMacroBody(objectives, onlyIndex)
         seen[name] = true
         targetNames[name] = true
         n = n + 1
-        if not pick then -- nev szerint, ha nincs latszo quest mob nameplate (vagy harc)
+        if pick ~= "busy" then -- nev szerint (nameplate pick mellett tartaleknak)
             local line = "/targetexact [noexists] " .. name
             local cost = #line + 1 + #DEADCLR + 1
             if len + cost <= MACRO_MAX then
