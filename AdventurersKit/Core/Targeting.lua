@@ -129,7 +129,13 @@ local function BuildMacroBody(objectives, onlyIndex)
     elseif not pick then
         onTarget = GoodQuestUnit("target")
     end
-    if usePing and not onTarget then tail[#tail + 1] = PING_LINE end
+    -- Tapoltat macro feltetel nem lat, ezert itt dontjuk el: nameplate modban csak a
+    -- kivalasztott (elo, nem tapolt) mobot pingeljuk. "busy" (minden kozeli quest mob tapolt):
+    -- a macro nem targetel, a @target barmi lehet (pl. a tapolt mob) -> nincs ping. Ha nincs
+    -- latszo quest mob nameplate, a nev szerinti /targetexact tapoltat is foghat -> nincs ping.
+    -- Nameplate nelkul (enemy nameplate ki) nincs mibol eldonteni: ott marad a ping.
+    local pingOk = pick ~= "busy" and not (useNP and not pick)
+    if usePing and pingOk and not onTarget then tail[#tail + 1] = PING_LINE end
     local lines, seen = { CLEAR }, {}
     local len = #CLEAR + 1
     for _, t in ipairs(tail) do len = len + #t + 1 end

@@ -706,6 +706,35 @@ test("macro ping: only out of combat (in combat it would ping any attacker)", fu
         "ping line has [nocombat]: " .. body)
 end)
 
+test("macro ping: never a tapped or unpicked mob (nameplate mode)", function()
+    W.Advance(1)
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    local build = function() return NS.C.BuildMacroBody(NS.state.objectives, nil) end
+    W.cvars.nameplateShowEnemies = "1"
+    -- all nearby quest mobs tapped: no target line, the old (tapped) target must not be pinged
+    W.units.target = { name = "Kobold Vermin", hostile = true, tapped = true }
+    NS.state.pick = "busy"
+    local body = build()
+    check(contains(firstLine(body), "quest mobs are taken"), "busy message: " .. body)
+    check(not contains(body, "/ping"), "busy: no ping line: " .. body)
+    W.units.target = nil
+    check(not contains(build(), "/ping"), "busy, no target: no ping line")
+    -- no visible quest nameplate: by-name fallback could hit a tapped mob -> no ping
+    NS.state.pick = nil
+    body = build()
+    check(hasLine(body, "/targetexact [noexists] Kobold Vermin"), "falls back to names: " .. body)
+    check(not contains(body, "/ping"), "unpicked by-name target: no ping: " .. body)
+    -- a real pick (living, untapped): ping it
+    NS.state.pick = "nameplate3"
+    W.units.nameplate3 = { name = "Kobold Vermin", hostile = true }
+    check(contains(build(), "/ping"), "picked mob is pinged")
+    -- nameplates off: nothing to decide from, ping stays
+    NS.state.pick = nil
+    W.units.nameplate3 = nil
+    W.cvars.nameplateShowEnemies = "0"
+    check(contains(build(), "/ping"), "nameplates off: ping stays")
+end)
+
 test("buffs: other players' buffs are not mine", function()
     local mine = NS.BuffsAuraMine
     check(mine ~= nil, "Buffs exports BuffsAuraMine")

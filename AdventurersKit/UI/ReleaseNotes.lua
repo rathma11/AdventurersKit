@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.19", date = "2026-11-18", items = {
+        "The QFocus macro no longer pings a mob someone else has tapped. When every nearby quest mob is taken it "
+            .. "just shows the message and pings nothing; in nameplate mode it only pings the mob it picked (living, "
+            .. "not tapped), not a by-name fallback target.",
+    } },
     { version = "0.7.18", date = "2026-11-18", items = {
         "Auction house quest items: whatever you buy, also in the auction house's own Buy tab or in Auctionator, "
             .. "now counts as \"in the mail\" right away; you no longer need to open a mailbox for the quest items "
