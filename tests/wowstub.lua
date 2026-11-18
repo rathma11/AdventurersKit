@@ -657,6 +657,19 @@ def("PlaceAuctionBid", function(kind, i, amount)
     end
 end)
 
+-- Mailbox: W.inbox = { { { itemId, count }, ... }, ... } (mails, each with its attachments)
+W.inbox = {}
+def("ATTACHMENTS_MAX_RECEIVE", 16)
+def("GetInboxNumItems", function() return #W.inbox, #W.inbox end)
+def("GetInboxItemLink", function(i, j)
+    local a = W.inbox[i] and W.inbox[i][j]
+    return a and ("|cffffffff|Hitem:" .. a[1] .. "::::::::|h[Item]|h|r") or nil
+end)
+def("GetInboxItem", function(i, j)
+    local a = W.inbox[i] and W.inbox[i][j]
+    if a then return "Item", a[1], 134400, a[2], 1, true end
+end)
+
 -- Modern (retail) AH, as on WoW: Forever: C_AuctionHouse. Not installed by default (the classic
 -- stubs above are); W.InstallModernAH() / W.RemoveModernAH(). Uses W.ahAll too: a row with
 -- `unit` is a commodity row { itemId, unit, count, own }, else an item auction

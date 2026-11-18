@@ -1188,7 +1188,7 @@ test("AH quest items: needed items, scan, buy one auction per click", function()
     pop.ok:Click()
     eq(#W.ahBids, 1, "never above the confirmed price")
     check(A.buy == nil or A.buy.done, "buying stops")
-    eq(A.pendingMail[2589], 2, "bought count waits for the mailbox")
+    eq(A.InMail(2589), 2, "bought count waits for the mailbox")
     eq(A.NeededItems()[1].need, 2, "still needed counts the mailbox")
     pop.ok:Click() -- Close
     check(not pop:IsShown(), "popup closes")
@@ -1223,7 +1223,7 @@ test("AH quest items: needed items, scan, buy one auction per click", function()
     W.Fire("AUCTION_HOUSE_CLOSED")
     A.SetEnabled(true)
     QuestFocusDB.ahqOpen = nil
-    W.Fire("MAIL_CLOSED")
+    NS.AHQ.MailDB().buys = {} -- (test) forget the bought items on their way
     Q.SetLog({ { qid = 100 }, { qid = 101 }, { qid = 102 }, { qid = 103, complete = true } })
     W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
@@ -1280,7 +1280,7 @@ test("AH quest items: modern auction house (commodities and item auctions)", fun
     eq(#W.ahQueries, nq, "no search needed for a commodity")
 
     -- Buy all: the commodity price went up -> cancelled and skipped; wool bought by auction ID
-    W.Fire("MAIL_CLOSED")
+    NS.AHQ.MailDB().buys = {} -- (test) forget the bought items on their way
     A.Refresh()
     A.frame.buyAll:Click()
     eq(#W.ahStarts, 2, "first item: price asked")
@@ -1299,7 +1299,7 @@ test("AH quest items: modern auction house (commodities and item auctions)", fun
     W.Fire("AUCTION_HOUSE_CLOSED")
     W.RemoveModernAH()
     QuestFocusDB.ahqOpen = nil
-    W.Fire("MAIL_CLOSED")
+    NS.AHQ.MailDB().buys = {} -- (test) forget the bought items on their way
     Q.SetLog({ { qid = 100 }, { qid = 101 }, { qid = 102 }, { qid = 103, complete = true } })
     W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
@@ -1331,9 +1331,9 @@ test("AH quest items: tab above All The Things' button, vertical drag, AH look",
     eq(p[5], -100, "y follows the mouse")
     W.cursorY = -5000
     A.tab.__scripts.OnUpdate(A.tab, 0.1)
-    eq(A.tab.__pts[1][5], -(600 - 34), "clamped to the AH height")
+    eq(A.tab.__pts[1][5], -(600 - 34 - 30), "clamped to the AH height, 5% margin at the bottom")
     A.tab.__scripts.OnDragStop(A.tab)
-    eq(QuestFocusDB.ahqTabY, -566, "vertical offset saved")
+    eq(QuestFocusDB.ahqTabY, -536, "vertical offset saved")
     A.tab:Click("RightButton")
     eq(QuestFocusDB.ahqTabY, nil, "right click resets the place")
     check(A.tab.__pts[1][2] == att, "back above ATT's button")
@@ -1353,6 +1353,84 @@ test("AH quest items: tab above All The Things' button, vertical drag, AH look",
     QuestFocusDB.ahqOpen = nil
     rawset(_G, "AuctionHouseFrame", nil)
     rawset(_G, "AuctionHouseFrameTabSideBar", nil)
+end)
+
+-- 0.7.16: bought AH items go to the mailbox. They count as yours (saved per character, survive
+-- /reload), the mailbox scan is the truth, 30-day expiry. After a successful buy the list closes.
+test("AH quest items: items in the mail count, list closes after buying", function()
+    local A = NS.AHQ
+    -- top margin of the tab drag (5%)
+    local host = CreateFrame("Frame", "AuctionHouseFrame", UIParent)
+    host:SetSize(800, 600)
+    eq(A.ClampTabY(0), -30, "5% margin at the top")
+    rawset(_G, "AuctionHouseFrame", nil)
+
+    local m = A.MailDB()
+    m.snap, m.snapT, m.buys = {}, 0, {}
+    Q.SetLog({ { qid = 104 } })
+    W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [2592] = { "Wool Cloth", 33 },
+        [5000] = { "Quest Thing", 0, 4 }, [5001] = { "BoP Thing", 0, 1 } }
+    W.items = { [2589] = 2 }
+    eq(A.NeededItems()[1].need, 4, "no mail: 6 - max(1, 2)")
+    A.AddPending(2589, 3)
+    local e = A.NeededItems()[1]
+    eq(e.need, 1, "3 bought, on their way")
+    eq(e.inMail, 3, "row shows 'in mail'")
+    check(NS.CharDB().ahMail and #NS.CharDB().ahMail.buys == 1, "saved per character (survives /reload)")
+    A.AddPending(2589, 1)
+    eq(#A.NeededItems(), 1, "linen fully covered by the mail: row gone (wool left)")
+    -- mailbox open: the inbox is the truth (2 there, 2 already taken out)
+    W.inbox = { { { 2589, 2 } }, { { 9999, 5 } } }
+    W.Fire("MAIL_SHOW")
+    eq(A.InMail(2589), 2, "mailbox scan replaces the guesses")
+    eq(#A.MailDB().buys, 0, "our purchase records are folded into the scan")
+    W.inbox = {}
+    W.Fire("MAIL_INBOX_UPDATE")
+    W.Fire("MAIL_CLOSED")
+    eq(A.InMail(2589), 0, "all taken out")
+    W.Fire("MAIL_INBOX_UPDATE") -- mailbox closed: no scan
+    -- 30 days
+    A.AddPending(2589, 2)
+    A.MailDB().buys[1].t = time() - 31 * 24 * 3600
+    eq(A.InMail(2589), 0, "expired after 30 days")
+
+    -- a successful buy closes the list; the tab reopens it
+    W.InstallModernAH()
+    W.ahAll = { { itemId = 2592, buyout = 300, count = 1, auctionID = 21 } }
+    W.ahQueries, W.ahBids = {}, {}
+    W.Fire("AUCTION_HOUSE_SHOW")
+    A.Toggle(true)
+    A.Scan(A.NeededItems(), true)
+    for _ = 1, 3 do
+        W.Advance(0.5)
+        local q = W.ahQueries[#W.ahQueries]
+        if q and q.itemID == 2589 then W.Fire("COMMODITY_SEARCH_RESULTS_UPDATED", 2589)
+        elseif q then W.Fire("ITEM_SEARCH_RESULTS_UPDATED", { itemID = q.itemID }) end
+    end
+    A.Refresh()
+    local wool
+    for i, x in ipairs(A.current) do if x.entry.id == 2592 then wool = i end end
+    check(wool and A.current[wool].plan, "wool priced")
+    A.rows[wool].buy:Click()
+    W.Advance(0.5)
+    W.Fire("ITEM_SEARCH_RESULTS_UPDATED", { itemID = 2592 })
+    local pop = rawget(_G, "AdventurersKitAHBuy")
+    pop.ok:Click()
+    eq(#W.ahBids, 1, "bought")
+    check(A.frame:IsShown(), "list still open right after the click (a late error could undo it)")
+    W.Advance(2)
+    check(not A.frame:IsShown(), "list closed after the purchase")
+    eq(A.InMail(2592), 1, "wool on its way")
+    pop.ok:Click()
+    A.tab:Click()
+    check(A.frame:IsShown(), "the tab reopens it")
+    A.Toggle(false)
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    W.RemoveModernAH()
+    QuestFocusDB.ahqOpen = nil
+    A.MailDB().buys = {}
+    Q.SetLog({ { qid = 100 }, { qid = 101 }, { qid = 102 }, { qid = 103, complete = true } })
+    W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
 
 test("no errors logged by the addon", function()

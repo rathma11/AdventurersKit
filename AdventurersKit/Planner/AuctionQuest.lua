@@ -44,11 +44,82 @@ end
 
 ---------------------------------------------------------------------------
 -- Mi kell meg: a quest log item objective-jei (Questie), ami meg hianyzik es AH-n lehet.
--- Hianyzik = Needed - max(Collected, ami a taskaban van) - amit most vettel (postaban var).
+-- Hianyzik = Needed - max(Collected, ami a taskaban van) - ami a postan var.
+-- (A Questie Collected-je item objective-nel maga a taskas darabszam, ezert max, nem osszeg.)
 -- bindType 4 (quest item) es 1 (BoP) nem lehet az AH-n: kimarad.
 ---------------------------------------------------------------------------
-local pendingMail = {} -- itemId -> megvett darab (az AH a postara kuldi; MAIL_CLOSED torli)
-A.pendingMail = pendingMail
+-- Postan var (karakterenkent, /reload es kilepes utan is; NS.CharDB().ahMail):
+--   snap  = { [itemId] = db } a postalada legutobbi atnezesekor (ez az igazsag), snapT = ideje
+--   buys  = { { id, n, t } } a mi vasarlasaink azota (az AH postan kuldi az itemet)
+-- Postalada nyitva (MAIL_SHOW / MAIL_INBOX_UPDATE): uj snap, a buys torlodik (azok mar benne vannak,
+-- vagy kivetted oket). 30 nap utan minden lejar (ennyi ideig marad meg egy level).
+local MAIL_TTL = 30 * 24 * 3600
+local function Time() return (time and time()) or 0 end
+
+local function MailDB()
+    local c = NS.CharDB and NS.CharDB()
+    if type(c) ~= "table" then return nil end
+    local m = rawget(c, "ahMail")
+    if type(m) ~= "table" then
+        m = { snap = {}, snapT = 0, buys = {} }
+        rawset(c, "ahMail", m)
+    end
+    m.snap, m.buys, m.snapT = m.snap or {}, m.buys or {}, tonumber(m.snapT) or 0
+    -- lejart bejegyzesek
+    local now = Time()
+    if m.snapT > 0 and now - m.snapT > MAIL_TTL then m.snap, m.snapT = {}, 0 end
+    for i = #m.buys, 1, -1 do
+        local b = m.buys[i]
+        if type(b) ~= "table" or not tonumber(b.id) or now - (tonumber(b.t) or 0) > MAIL_TTL then table.remove(m.buys, i) end
+    end
+    return m
+end
+A.MailDB = MailDB
+
+-- Ennyi darab var a postan ebbol az itembol
+function A.InMail(id)
+    local m = MailDB()
+    if not (m and id) then return 0 end
+    local n = tonumber(m.snap[id]) or 0
+    for _, b in ipairs(m.buys) do if b.id == id then n = n + (tonumber(b.n) or 0) end end
+    return n
+end
+
+function A.AddPending(id, n)
+    local m = MailDB()
+    if not m then return end
+    local b = { id = id, n = n, t = Time() }
+    m.buys[#m.buys + 1] = b
+    return b
+end
+
+function A.RemovePending(b)
+    local m = MailDB()
+    if not (m and b) then return end
+    for i = #m.buys, 1, -1 do if m.buys[i] == b then table.remove(m.buys, i) return end end
+end
+
+-- A postalada atnezese (csak nyitott postaladanal: kulonben a kliens listaja regi / ures lehet)
+local mailOpen = false
+function A.ScanMail()
+    if not mailOpen or type(GetInboxNumItems) ~= "function" then return end
+    local m = MailDB()
+    if not m then return end
+    local snap = {}
+    local okN, n = pcall(GetInboxNumItems)
+    for i = 1, (okN and tonumber(n) or 0) do
+        for j = 1, (tonumber(rawget(_G, "ATTACHMENTS_MAX_RECEIVE")) or 16) do
+            local okL, link = pcall(GetInboxItemLink, i, j)
+            local id = okL and link and tonumber(tostring(link):match("item:(%d+)"))
+            if id then
+                local okI, _, _, _, count = pcall(GetInboxItem, i, j)
+                snap[id] = (snap[id] or 0) + ((okI and tonumber(count)) or 1)
+            end
+        end
+    end
+    m.snap, m.snapT, m.buys = snap, Time(), {}
+end
+
 A.loading = 0           -- hany item info nincs meg betoltve (GET_ITEM_INFO_RECEIVED-re ujra)
 
 function A.NeededItems()
@@ -65,7 +136,8 @@ function A.NeededItems()
                     local id = type(o) == "table" and o.Type == "item" and tonumber(o.Id)
                     if id and not o.Completed then
                         local needed = tonumber(o.Needed) or 0
-                        local have = math.max(tonumber(o.Collected) or 0, GetItemCount(id) or 0) + (pendingMail[id] or 0)
+                        local inMail = A.InMail(id)
+                        local have = math.max(tonumber(o.Collected) or 0, GetItemCount(id) or 0) + inMail
                         local need = needed - have
                         if need > 0 then
                             local name, _, _, _, _, _, _, _, _, icon, _, _, _, bind = GetItemInfo(id)
@@ -77,7 +149,7 @@ function A.NeededItems()
                                     e.need = e.need + need
                                     e.quest = e.quest .. ", " .. (title or "?")
                                 else
-                                    e = { id = id, name = name, icon = icon, need = need, quest = title or "?", qid = qid }
+                                    e = { id = id, name = name, icon = icon, need = need, quest = title or "?", qid = qid, inMail = inMail }
                                     byId[id] = e
                                     out[#out + 1] = e
                                 end
@@ -576,8 +648,8 @@ function A.BuyClick()
     end
     st.spent, st.got = st.spent + l.buyout, st.got + l.count
     buy.spentAll, buy.bought = buy.spentAll + l.buyout, buy.bought + 1
-    pendingMail[st.id] = (pendingMail[st.id] or 0) + l.count
-    buy.last = { st = st, l = l, t = Now() }
+    -- postan jon: karakterenkent mentve, /reload utan is (A.InMail)
+    buy.last = { st = st, l = l, t = Now(), mail = A.AddPending(st.id, l.count) }
     buy.ready = nil
     if st.got >= st.need then BuyNextItem() else buy.wantQuery = 1 end
     if UpdatePopup then UpdatePopup() end
@@ -592,7 +664,7 @@ local function OnBuyError()
     local st, l = last.st, last.l
     st.spent, st.got = st.spent - l.buyout, st.got - l.count
     buy.spentAll, buy.bought = buy.spentAll - l.buyout, buy.bought - 1
-    pendingMail[st.id] = math.max(0, (pendingMail[st.id] or 0) - l.count)
+    A.RemovePending(last.mail)
     buy.last = nil
     if Refresh then Refresh() end
     if UpdatePopup then UpdatePopup() end
@@ -704,6 +776,17 @@ UpdatePopup = function()
         p.ok.text:SetText(L["Close"])
         p.ok:Enable()
         p.cancel:Hide()
+        -- sikeres vasarlas utan a lista bezarul (a ful ujranyitja); kis kesleltetessel, hogy egy
+        -- kesoi hibauzenet (elkelt kozben) visszavonhassa: akkor nyitva marad
+        local b = buy
+        if b.bought > 0 and not b.closeQueued then
+            b.closeQueued = true
+            local function closeList()
+                -- csak ha ez a vasarlas meg az aktualis (kozben bezartad es ujranyitottad: nem csukjuk)
+                if buy == b and b.bought > 0 and frame and frame:IsShown() then frame:Hide() end
+            end
+            if C_Timer and C_Timer.After then C_Timer.After(1.5, closeList) else closeList() end
+        end
         return
     end
     p.cancel:Show()
@@ -762,8 +845,8 @@ local function RowTooltip(row)
         NS.TT.Info(tt, (L["%s: %s each"]):format(NS.PriceSourceText(src, age), Money(hint)))
         if not plan then NS.TT.Note(tt, L["Estimate until the live lookup finishes; Buy uses live auctions only."]) end
     end
-    if (pendingMail[e.id] or 0) > 0 then
-        NS.TT.Note(tt, (L["%d bought, waiting in the mailbox."]):format(pendingMail[e.id]))
+    if (e.inMail or 0) > 0 then
+        NS.TT.Note(tt, (L["In the mail: %d (already counted). Collect it at a mailbox."]):format(e.inMail))
     end
     NS.TT.Finish(tt, L["Click: search for it in the auction house"], L["Buy: buy the cheapest auctions after a confirmation"])
 end
@@ -991,7 +1074,7 @@ Refresh = function()
         local e, plan = x.entry, x.plan
         r.icon:SetTexture(e.icon or 134400)
         r.name:SetText(("|cff%s%d x|r %s"):format(hex.GOLD, e.need, e.name))
-        r.sub:SetText(e.quest)
+        r.sub:SetText(((e.inMail or 0) > 0 and ("|cff" .. hex.DIST .. (L["in mail: %d"]):format(e.inMail) .. "|r  ") or "") .. e.quest)
         if plan then
             r.price:SetText(Money(plan.cost) .. (plan.partial and ("|cff" .. hex.WARN .. " *|r") or ""))
             local hint, src = AddonHint(e)
@@ -1147,12 +1230,17 @@ function A.ATTButton()
     end
 end
 
--- Fuggoleges eltolas az oszlop tetejehez kepest, az AH magassagan belul tartva
+-- Fuggoleges eltolas az oszlop tetejehez kepest, az AH magassagan belul tartva; fent es lent
+-- az AH magassaganak 5%-a margo (huzaskor ott megall)
+local TAB_MARGIN = 0.05
 function A.ClampTabY(y)
     local host = Host()
     local h = host and host:GetHeight() or 400
     local th = tab and tab:GetHeight() or 34
-    return math.max(-(h - th), math.min(0, tonumber(y) or 0))
+    local m = math.floor(h * TAB_MARGIN + 0.5)
+    local lo, hi = -(h - th - m), -m
+    if lo > hi then lo = hi end
+    return math.max(lo, math.min(hi, tonumber(y) or 0))
 end
 
 -- Alap hely: az ATT gombja folott 4px-szel (BOTTOM a TOP-jahoz); ATT nelkul a jobb szel teteje
@@ -1262,7 +1350,7 @@ local ev = CreateFrame("Frame")
 -- Egyenkent, pcall-lal: a kliens nem ismert esemenyre hibat dob (a Forever modern AH-janal nincs
 -- AUCTION_ITEM_LIST_UPDATE, a klasszikusnal nincs COMMODITY_*).
 for _, e in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "QUEST_LOG_UPDATE", "BAG_UPDATE_DELAYED",
-    "GET_ITEM_INFO_RECEIVED", "UI_ERROR_MESSAGE", "MAIL_CLOSED",
+    "GET_ITEM_INFO_RECEIVED", "UI_ERROR_MESSAGE", "MAIL_SHOW", "MAIL_INBOX_UPDATE", "MAIL_CLOSED",
     "AUCTION_ITEM_LIST_UPDATE",                                                   -- klasszikus AH
     "COMMODITY_SEARCH_RESULTS_UPDATED", "ITEM_SEARCH_RESULTS_UPDATED",            -- modern AH
     "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED" }) do
@@ -1288,8 +1376,13 @@ ev:SetScript("OnEvent", function(_, event, a1, a2)
         end
     elseif event == "UI_ERROR_MESSAGE" or event == "COMMODITY_PURCHASE_FAILED" then
         OnBuyError()
+    elseif event == "MAIL_SHOW" or event == "MAIL_INBOX_UPDATE" then
+        if event == "MAIL_SHOW" then mailOpen = true end
+        A.ScanMail()
+        SoonRefresh()
     elseif event == "MAIL_CLOSED" then
-        wipe(pendingMail)
+        A.ScanMail() -- utolso allapot (amit kivettel, mar nincs benne)
+        mailOpen = false
         SoonRefresh()
     else
         SoonRefresh()

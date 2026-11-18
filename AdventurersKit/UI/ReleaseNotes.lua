@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.16", date = "2026-11-18", items = {
+        "Fix: quest items you bought at the auction house stayed on the list, because they go to the mailbox "
+            .. "first. Items on their way now count as yours: the row shows \"in mail: N\" (or disappears), also after "
+            .. "/reload or relog. Opening the mailbox checks what is really still there; entries expire after 30 days.",
+        "Auction house quest items: after a successful purchase the list closes (the tab opens it again); if the "
+            .. "purchase failed or you cancel, it stays open.",
+        "Auction house quest items: dragging the tab keeps it visible and only follows the mouse up and down; it "
+            .. "stops 5% of the auction house window's height from the top and the bottom.",
+    } },
     { version = "0.7.15", date = "2026-11-18", items = {
         "Auction house quest items: the tab now sits right above All The Things' button on the auction house's "
             .. "right edge (near the top of the edge without ATT). Dragging moves it only up and down that edge, kept "
