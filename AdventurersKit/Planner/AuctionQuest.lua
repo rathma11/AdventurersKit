@@ -635,12 +635,12 @@ local function PriceOf(e)
     return plan, p.scanning and "scanning" or "ok"
 end
 
+-- Aukcios addon ara (Auctionator teljes scan / TSM / Auctioneer; Core\Prices.lua), mar a ful
+-- megnyitasakor; a sajat lekerdezes finomitja. A sajat scan ("AH scan") itt nem tipp, az a sor maga.
 local function AddonHint(e)
-    local F = NS.Farm
-    if F and F.AHPrice then
-        local v, src = F.AHPrice(e.id)
-        if v then return v, src end
-    end
+    if not NS.ItemPrice then return end
+    local _, ah, _, src, age = NS.ItemPrice(e.id)
+    if ah and src ~= "AH scan" then return ah, src, age end
 end
 
 local function ConfirmText(list)
@@ -758,8 +758,11 @@ local function RowTooltip(row)
         NS.TT.Info(tt, (L["Cheapest way: %d auctions, %d items, %s"]):format(#plan.picks, plan.covered, Money(plan.cost)))
         if plan.partial then NS.TT.Note(tt, (L["Only %d on the auction house."]):format(plan.available)) end
     end
-    local hint, src = AddonHint(e)
-    if hint then NS.TT.Info(tt, (L["%s price: %s each"]):format(src, Money(hint))) end
+    local hint, src, age = AddonHint(e)
+    if hint then
+        NS.TT.Info(tt, (L["%s: %s each"]):format(NS.PriceSourceText(src, age), Money(hint)))
+        if not plan then NS.TT.Note(tt, L["Estimate until the live lookup finishes; Buy uses live auctions only."]) end
+    end
     if (pendingMail[e.id] or 0) > 0 then
         NS.TT.Note(tt, (L["%d bought, waiting in the mailbox."]):format(pendingMail[e.id]))
     end
@@ -953,9 +956,11 @@ Refresh = function()
             r.buy:Enable()
             r.buy.text:SetFontObject("GameFontNormalSmall")
         else
-            r.price:SetText(x.state == "scanning" and ("|cff" .. hex.DIM .. "...|r")
-                or x.state == "empty" and ("|cff" .. hex.BAD .. L["none"] .. "|r") or ("|cff" .. hex.DIM .. "?|r"))
             local hint, src = AddonHint(e)
+            -- nincs meg sajat lekerdezes: az addon ara becsleskent (~, halvany); Buy csak elo adatbol
+            r.price:SetText(x.state == "empty" and ("|cff" .. hex.BAD .. L["none"] .. "|r")
+                or hint and ("|cff" .. hex.DIM .. "~" .. Money(hint * e.need) .. "|r")
+                or x.state == "scanning" and ("|cff" .. hex.DIM .. "...|r") or ("|cff" .. hex.DIM .. "?|r"))
             r.hint:SetText(hint and (("%s %s"):format(src, Money(hint))) or "")
             r.buy:Disable()
             r.buy.text:SetFontObject("GameFontDisableSmall")

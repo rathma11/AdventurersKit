@@ -125,35 +125,15 @@ end
 F.Num = Num
 
 ---------------------------------------------------------------------------
--- Aukcios ar (opcionalis: Auctionator, TSM, Auctioneer; mind pcall-lal)
+-- Aukcios ar: a kozos NS.ItemPrice (Core\Prices.lua: Auctionator, TSM, Auctioneer, sajat AH scan)
 ---------------------------------------------------------------------------
 local function AHPrice(id, link)
-    local A = rawget(_G, "Auctionator")
-    if type(A) == "table" and A.API and A.API.v1 and A.API.v1.GetAuctionPriceByItemID then
-        local ok, v = pcall(A.API.v1.GetAuctionPriceByItemID, ADDON_NAME, id)
-        if ok and tonumber(v) and tonumber(v) > 0 then return tonumber(v), "Auctionator" end
-    end
-    local T = rawget(_G, "TSM_API")
-    if type(T) == "table" and T.GetCustomPriceValue then
-        local ok, v = pcall(T.GetCustomPriceValue, "dbmarket", "i:" .. id)
-        if ok and tonumber(v) and tonumber(v) > 0 then return tonumber(v), "TSM" end
-    end
-    local Auc = rawget(_G, "AucAdvanced")
-    if type(Auc) == "table" and Auc.API and Auc.API.GetMarketValue and link then
-        local ok, v = pcall(Auc.API.GetMarketValue, link)
-        if ok and tonumber(v) and tonumber(v) > 0 then return tonumber(v), "Auctioneer" end
-    end
+    local _, ah, _, src, age = NS.ItemPrice(link or id)
+    if ah then return ah, src, age end
 end
 F.AHPrice = AHPrice
 -- van-e aukcios addon (a "Best sale" sor csak ekkor latszik)
-function F.AHSource()
-    local A = rawget(_G, "Auctionator")
-    if type(A) == "table" and A.API and A.API.v1 then return "Auctionator" end
-    local T = rawget(_G, "TSM_API")
-    if type(T) == "table" and T.GetCustomPriceValue then return "TSM" end
-    local Auc = rawget(_G, "AucAdvanced")
-    if type(Auc) == "table" and Auc.API then return "Auctioneer" end
-end
+function F.AHSource() return NS.PriceAddon() end
 
 ---------------------------------------------------------------------------
 -- Session adatok
@@ -185,12 +165,12 @@ local function ItemValue(rec, id)
     if sell == nil then return nil end
     local n = rec.n or 0
     if sell <= 0 then return 0, 0 end
-    local best = sell
+    local best, src, age = sell, "vendor", nil
     if not rec.bop then
-        local ah = AHPrice(id, rec.link)
-        if ah and ah > best then best = ah end
+        local ah, s, a = AHPrice(id, rec.link)
+        if ah and ah > best then best, src, age = ah, s, a end
     end
-    return n * sell, n * best
+    return n * sell, n * best, src, age
 end
 
 -- Osszesites: idot, XP-t, penzt, erteket es oras rataikat egy tablaba
@@ -200,12 +180,12 @@ function F.Totals(fd, now)
     local t = { elapsed = fd.elapsed or 0, xp = fd.xp or 0, money = fd.money or 0,
         vendor = 0, best = 0, pending = 0, items = {} }
     for id, rec in pairs(fd.items or {}) do
-        local v, b = ItemValue(rec, id)
+        local v, b, src, age = ItemValue(rec, id)
         if v == nil then
             t.pending = t.pending + 1
         else
             t.vendor, t.best = t.vendor + v, t.best + b
-            t.items[#t.items + 1] = { id = id, n = rec.n, link = rec.link or rec.name or ("item:" .. id), vendor = v, best = b }
+            t.items[#t.items + 1] = { id = id, n = rec.n, link = rec.link or rec.name or ("item:" .. id), vendor = v, best = b, src = src, age = age }
         end
     end
     table.sort(t.items, function(a, b)
@@ -422,7 +402,8 @@ local function TopItemsTooltip(owner)
     local src = F.AHSource()
     for i = 1, math.min(5, #t.items) do
         local it = t.items[i]
-        tt:AddDoubleLine(("%s x%d"):format(it.link, it.n or 1), F.FormatMoney(src and it.best or it.vendor), 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(("%s x%d"):format(it.link, it.n or 1), F.FormatMoney(src and it.best or it.vendor)
+            .. ((src and it.best > 0) and (" |cff888888" .. NS.PriceSourceText(it.src, it.age) .. "|r") or ""), 1, 1, 1, 1, 1, 1)
     end
     local top = F.TopKills(fd, 3)
     if top[1] then

@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.13", date = "2026-11-18", items = {
+        "Item prices come from one place: Auctionator's full auction house scan first (with its age), then TSM, "
+            .. "Auctioneer, and finally this addon's own auction house lookups. All optional.",
+        "Auction house 'Quest items' tab: the Auctionator price shows at once as an estimate (~) until the live "
+            .. "lookup finishes; the tooltip names the source and age, e.g. \"AH (Auctionator, 2d)\". Buy still uses "
+            .. "only live auctions and never pays above the confirmed price.",
+        "Farm session: the top items tooltip shows where each value comes from (vendor or AH source and age). "
+            .. "Bags: leftover quest items show their vendor and auction value in the tooltip.",
+    } },
     { version = "0.7.12", date = "2026-11-18", items = {
         "Fix: Lua error at login 'Attempt to register unknown event AUCTION_ITEM_LIST_UPDATE' (0.7.10), and the "
             .. "auction house quest items tab never showed. WoW: Forever has the modern auction house; the tab now uses it.",

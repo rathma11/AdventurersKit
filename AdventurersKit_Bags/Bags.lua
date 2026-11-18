@@ -525,6 +525,16 @@ local function GetRow(i)
         if e.bank then GameTooltip:AddLine((L["Also in the bank: %d"]):format(e.bank), 0.6, 0.8, 1) end
         if e.kind == "leftover" then
             GameTooltip:AddLine(e.noValue and L["Unsellable: /qf junk can destroy it"] or L["Can be sold to a vendor"], 0.6, 0.6, 0.6)
+            -- ertek: vendor es AH ar (Auctionator scan / TSM / sajat AH lekerdezes; Core\Prices.lua)
+            local vendor, ah, best, src, age
+            if NS.ItemPrice then vendor, ah, best, src, age = NS.ItemPrice(e.link or e.id) end
+            local money = NS.Farm and NS.Farm.FormatMoney
+            if money and((vendor or 0) > 0 or ah) then
+                local parts = {}
+                if (vendor or 0) > 0 then parts[#parts + 1] = money(vendor, true) .. " " .. NS.PriceSourceText("vendor") end
+                if ah then parts[#parts + 1] = money(ah, true) .. " " .. NS.PriceSourceText(src, age) end
+                GameTooltip:AddLine((L["Value each: %s"]):format(table.concat(parts, ", ")), 0.6, 0.6, 0.6)
+            end
         end
         GameTooltip:AddLine(L["Click: highlight it in the bag; click again: clear"], 0.5, 0.5, 0.5)
         if e.needs then GameTooltip:AddLine(L["...and select the quest (QFocus marker + macro)"], 0.5, 0.5, 0.5) end

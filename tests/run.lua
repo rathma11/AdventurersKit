@@ -1323,6 +1323,84 @@ test("globals read but not stubbed (typo / scope check)", function()
     end
 end)
 
+-- 0.7.13: shared item price (Core\Prices.lua): Auctionator present / absent / erroring, TSM and
+-- own AH scan fallbacks, per-item cache, source text.
+test("item price: Auctionator, fallbacks, cache", function()
+    local savedInfo, savedA, savedT = W.itemInfo, rawget(_G, "Auctionator"), rawget(_G, "TSM_API")
+    W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [4444] = { "Rune Thing", 0 } }
+    local AQ = NS.AHQ and NS.AHQ.prices or {}
+    local savedScan = AQ[2589]
+    AQ[2589] = nil -- an earlier AH tab test left a scan for it
+    rawset(_G, "Auctionator", nil); rawset(_G, "TSM_API", nil)
+    NS.ItemPriceFlush()
+
+    -- absent: vendor only
+    local v, ah, best, src, age = NS.ItemPrice(2589)
+    eq(v, 13, "absent: vendor") eq(ah, nil, "absent: no AH price") eq(best, 13, "absent: best = vendor")
+    eq(src, nil, "absent: no source") eq(NS.PriceAddon(), nil, "absent: no price addon")
+    eq(NS.PriceSourceText("vendor"), "vendor", "vendor source text")
+
+    -- present: price by ID + age, callerID is our registered string
+    local callers, price, registered = {}, { [2589] = 50 }, nil
+    rawset(_G, "Auctionator", { API = { v1 = {
+        GetAuctionPriceByItemID = function(caller, id) callers[#callers + 1] = caller return price[id] end,
+        GetAuctionAge = function(caller, id) return price[id] and 2 or nil end,
+        RegisterForDBUpdate = function(caller, fn) registered = fn end,
+    } } })
+    v, ah, best, src, age = NS.ItemPrice(2589)
+    eq(ah, 50, "present: AH price") eq(best, 50, "present: best = AH") eq(src, "Auctionator", "present: source")
+    eq(age, 2, "present: age in days") eq(callers[1], "AdventurersKit", "callerID")
+    eq(NS.PriceSourceText(src, age), "AH (Auctionator, 2d)", "source text with age")
+    eq(NS.PriceSourceText("Auctionator", 0), "AH (Auctionator, today)", "source text today")
+    eq(NS.PriceAddon(), "Auctionator", "price addon")
+    eq(select(3, NS.ItemPrice("|cffffffff|Hitem:2589::::::::36:::::::|h[Linen Cloth]|h|r")), 50, "item link accepted")
+    -- cache: a new scan value shows after the TTL or the Auctionator DB update callback
+    price[2589] = 70
+    eq(select(2, NS.ItemPrice(2589)), 50, "cached")
+    check(type(registered) == "function", "registered for Auctionator DB updates")
+    if registered then registered() end
+    eq(select(2, NS.ItemPrice(2589)), 70, "DB update clears the cache")
+    price[2589] = 80
+    W.time = W.time + 31
+    eq(select(2, NS.ItemPrice(2589)), 80, "cache expires")
+    -- vendor price 0 (not vendorable) still gets the AH price
+    price[4444] = 900
+    v, ah, best = NS.ItemPrice(4444)
+    eq(v, 0, "unvendorable: vendor 0") eq(best, 900, "unvendorable: AH price is the best")
+
+    -- erroring: no Lua error, falls back to TSM
+    rawset(_G, "Auctionator", { API = { v1 = {
+        GetAuctionPriceByItemID = function() error("boom") end,
+        GetAuctionPriceByItemLink = function() error("boom") end,
+        GetAuctionAge = function() error("boom") end,
+    } } })
+    local ok
+    ok, v, ah, best, src = pcall(NS.ItemPrice, 2589)
+    check(ok, "erroring Auctionator: no error") eq(ah, nil, "erroring Auctionator: no AH price") eq(best, 13, "erroring: vendor")
+    rawset(_G, "TSM_API", { GetCustomPriceValue = function(p, s) return s == "i:2589" and 60 or nil end })
+    v, ah, best, src = NS.ItemPrice(2589)
+    eq(ah, 60, "TSM fallback") eq(src, "TSM", "TSM source")
+    rawset(_G, "TSM_API", { GetCustomPriceValue = function() error("tsm boom") end })
+    ok, v, ah = pcall(NS.ItemPrice, 2589)
+    check(ok and ah == nil, "erroring TSM: no error, no price")
+
+    -- own AH tab scan as the last fallback (cheapest unit price)
+    rawset(_G, "Auctionator", nil); rawset(_G, "TSM_API", nil)
+    local A = NS.AHQ
+    if A and A.prices then
+        A.prices[2589] = { listings = { { count = 4, buyout = 200 }, { count = 1, buyout = 45 } }, time = W.time }
+        NS.ItemPriceFlush()
+        v, ah, best, src, age = NS.ItemPrice(2589)
+        eq(ah, 45, "own scan: cheapest unit") eq(src, "AH scan", "own scan source") eq(NS.PriceAgeText(age), "today", "own scan age")
+        A.prices[2589] = nil
+    end
+    AQ[2589] = savedScan
+
+    W.itemInfo = savedInfo
+    rawset(_G, "Auctionator", savedA); rawset(_G, "TSM_API", savedT)
+    NS.ItemPriceFlush()
+end)
+
 ---------------------------------------------------------------------------
 -- Report
 ---------------------------------------------------------------------------
