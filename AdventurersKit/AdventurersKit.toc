@@ -1,7 +1,8 @@
 ## Interface: 16001
 ## Title: Adventurer's Kit
+## IconTexture: Interface\Icons\INV_Misc_Map_01
 ## Notes: Questing kit: QFocus target macro, markers, route and pickup planner, city list, tooltips (Questie data)
-## Version: 0.7.13
+## Version: 0.7.14
 ## OptionalDeps: QuestFocus, Questie, TomTom, Bagnon, ForeverDungeonJournal
 ## SavedVariables: QuestFocusDB
 

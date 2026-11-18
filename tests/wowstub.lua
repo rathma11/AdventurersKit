@@ -175,6 +175,9 @@ function Obj:GetAlpha() return 1 end
 function Obj:GetFrameLevel() return 1 end
 function Obj:GetFrameStrata() return "MEDIUM" end
 function Obj:GetPoint() return "CENTER", nil, "CENTER", 0, 0 end
+-- anchors are recorded (o.__pts = { { point, relTo, relPoint, x, y }, ... }) so a test can check where something went
+function Obj:SetPoint(...) self.__pts = self.__pts or {}; self.__pts[#self.__pts + 1] = { ... }; return self end
+function Obj:ClearAllPoints() self.__pts = {}; return self end
 function Obj:GetNumPoints() return 1 end
 function Obj:SetChecked(b) self.__checked = b and true or false; return self end
 function Obj:GetChecked() return self.__checked end

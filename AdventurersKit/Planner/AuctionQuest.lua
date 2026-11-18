@@ -17,7 +17,6 @@ local MAX_PAGES = 3       -- itemenkent legfeljebb ennyi oldalt olvasunk (quest 
 local QUERY_TIMEOUT = 6   -- mp: ha addig nincs AUCTION_ITEM_LIST_UPDATE, ujra / tovabb
 local RESCAN_AGE = 300    -- mp: panel nyitasakor ennel regebbi arakat ujra lekerdezunk
 local SEARCH_PAUSE = 20   -- mp: sorra kattintott kereses utan ennyi ideig nem kerdezunk (ne irjuk felul a talalatot)
-local ICON = "Interface\\Icons\\INV_Misc_Coin_02"
 
 local function Now() return GetTime and GetTime() or 0 end
 local function Me() return UnitName and UnitName("player") or nil end
@@ -845,7 +844,7 @@ local function BuildFrame()
     f.iconTex = f:CreateTexture(nil, "ARTWORK")
     f.iconTex:SetSize(20, 20)
     f.iconTex:SetPoint("TOPLEFT", 12, -11)
-    f.iconTex:SetTexture(ICON)
+    f.iconTex:SetTexture(A.AddonIcon())
     f.iconTex:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     f.title:SetPoint("LEFT", f.iconTex, "RIGHT", 6, 0)
@@ -994,15 +993,36 @@ end
 A.Refresh = function() Refresh() end
 A.current, A.rows = current, rows
 
+-- A kozos oldalsav az AH jobb szelen (All The Things hozza letre; ha az ATT "Auction Module" ablaka
+-- nyitva van, a sav annak a jobb szelere kerul). Ha van, a fulunk ebben ul az ATT fule alatt.
+local function SideBar()
+    local sb = rawget(_G, "AuctionHouseFrameTabSideBar")
+    if type(sb) == "table" and sb.GetRight then return sb end
+end
+
+-- A panel a ful mellett. Ha a ful egy masik addon ablaka (ATT) fele kerulne, a panel a sav
+-- (= az az ablak) jobb oldalara megy, hogy ne takarja.
 local function PlaceFrame()
     if S.RestorePos(frame, "ahqPos") then return end
     frame:ClearAllPoints()
-    if tab and tab:IsShown() then
-        frame:SetPoint("TOPLEFT", tab, "TOPRIGHT", 2, 0)
-    else
+    if not (tab and tab:IsShown()) then
         frame:SetPoint("LEFT", UIParent, "LEFT", 800, 0)
+        return
+    end
+    local host, sb = Host(), SideBar()
+    local tl, sbl, sbr = tab:GetLeft(), sb and sb:GetLeft(), sb and sb:GetRight()
+    local hr = host and host:GetRight()
+    if tl and sbl and hr and sbl > hr + 20 and tl < sbl then
+        -- az ATT ablak nyitva (a sav eltolva), a ful attol balra: a panel a sav jobb oldalara
+        frame:SetPoint("TOPLEFT", sb, "TOPRIGHT", 40, 0)
+    elseif host and not (QuestFocusDB and QuestFocusDB.ahqTabPos) then
+        frame:SetPoint("TOP", host, "TOP", 0, 0)
+        frame:SetPoint("LEFT", tab, "RIGHT", 2, 0)
+    else
+        frame:SetPoint("TOPLEFT", tab, "TOPRIGHT", 2, 0)
     end
 end
+A.PlaceFrame = PlaceFrame
 
 function A.Toggle(show)
     if show == nil then show = not (frame and frame:IsShown()) end
@@ -1029,14 +1049,38 @@ local function BuildTab()
     t.tex = t:CreateTexture(nil, "ARTWORK")
     t.tex:SetPoint("TOPLEFT", 5, -5)
     t.tex:SetPoint("BOTTOMRIGHT", -5, 5)
-    t.tex:SetTexture(ICON)
+    t.tex:SetTexture(A.AddonIcon())
     t.tex:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
     t:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    t:SetScript("OnClick", function() A.Toggle() end)
+    t:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    t:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then A.ResetTabPos() else A.Toggle() end
+    end)
+    -- huzhato: a hely az AH ablak jobb felso sarkahoz kepest mentve (QuestFocusDB.ahqTabPos)
+    t:SetMovable(true)
+    t:SetClampedToScreen(true)
+    t:RegisterForDrag("LeftButton")
+    t:SetScript("OnDragStart", function(self) GameTooltip:Hide(); self:StartMoving() end)
+    t:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        if self.SetUserPlaced then pcall(self.SetUserPlaced, self, false) end
+        local host, l, top = Host(), self:GetLeft(), self:GetTop()
+        if QuestFocusDB and l and top then
+            if host and host:GetRight() and host:GetTop() then
+                QuestFocusDB.ahqTabPos = { x = math.floor(l - host:GetRight() + 0.5), y = math.floor(top - host:GetTop() + 0.5), rel = "host" }
+            else
+                QuestFocusDB.ahqTabPos = { x = math.floor(l + 0.5), y = math.floor(top + 0.5), rel = "screen" }
+            end
+        end
+        A.PlaceTab()
+        if frame and frame:IsShown() then PlaceFrame() end
+    end)
     t:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(L["Quest items"], 1, 1, 1)
+        GameTooltip:SetText(L["Adventurer's Kit: quest items"], 1, 1, 1)
         GameTooltip:AddLine(L["Quest items from your log you can buy here, with prices. Turn the tab off in Options > Auction house."], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["Click: open / close the list. Drag: move. Right click: reset the place."], 0.5, 0.5, 0.5, true)
         GameTooltip:Show()
     end)
     t:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1045,14 +1089,43 @@ local function BuildTab()
     return t
 end
 
+-- Alap hely: a kozos oldalsavban (ATT) a mar ott levo fulek alatt; sav nelkul az AH jobb
+-- szelen lejjebb (az ATT fule -52-nel ul). Mentett hely: az AH-hoz kepest (vagy a kepernyon).
+local TAB_STEP = 46
 local function PlaceTab()
-    local host = Host()
+    if not tab then return end
+    local host, sb, pos = Host(), SideBar(), QuestFocusDB and QuestFocusDB.ahqTabPos
     tab:ClearAllPoints()
-    if host then
-        tab:SetPoint("TOPLEFT", host, "TOPRIGHT", 0, -70)
+    if pos and pos.rel == "host" and host then
+        tab:SetPoint("TOPLEFT", host, "TOPRIGHT", pos.x or 0, pos.y or -130)
+    elseif pos and pos.rel == "screen" then
+        tab:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x or 0, pos.y or 0)
+    elseif sb and host then
+        local n = type(sb.Tabs) == "table" and #sb.Tabs or 1
+        tab:SetPoint("TOPLEFT", sb, "TOPRIGHT", -2, -52 - TAB_STEP * math.max(1, n))
+    elseif host then
+        tab:SetPoint("TOPLEFT", host, "TOPRIGHT", 0, -52 - TAB_STEP * 2)
     else
         tab:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 780, -170)
     end
+end
+A.PlaceTab = PlaceTab
+
+function A.ResetTabPos()
+    if QuestFocusDB then QuestFocusDB.ahqTabPos, QuestFocusDB.ahqPos = nil, nil end
+    PlaceTab()
+    if frame and frame:IsShown() then PlaceFrame() end
+end
+
+-- Az addon ikonja: a .toc IconTexture-je, kulonben a panel / macro ikonja (terkep)
+function A.AddonIcon()
+    local get = (C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" and C_AddOns.GetAddOnMetadata)
+        or rawget(_G, "GetAddOnMetadata")
+    if type(get) == "function" then
+        local ok, v = pcall(get, ADDON_NAME, "IconTexture")
+        if ok and type(v) == "string" and v ~= "" then return v end
+    end
+    return "Interface\\Icons\\INV_Misc_Map_01"
 end
 
 -- Az idozito: a lekerdezesek az AH nyitvatartasa alatt

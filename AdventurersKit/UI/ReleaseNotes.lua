@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.14", date = "2026-11-18", items = {
+        "Auction house quest items tab: it no longer sits under All The Things' button. By default it goes below "
+            .. "the other side tabs (ATT's), and moves out with them when ATT's Auction Module is open; the list opens "
+            .. "next to the tab without covering ATT's panel.",
+        "The tab can be dragged anywhere (the place is kept, relative to the auction house window); right click "
+            .. "puts it back. It shows the Adventurer's Kit icon (the map, now also in the addon list) and the tooltip "
+            .. "\"Adventurer's Kit: quest items\".",
+    } },
     { version = "0.7.13", date = "2026-11-18", items = {
         "Item prices come from one place: Auctionator's full auction house scan first (with its age), then TSM, "
             .. "Auctioneer, and finally this addon's own auction house lookups. All optional.",

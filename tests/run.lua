@@ -1304,6 +1304,37 @@ test("AH quest items: modern auction house (commodities and item auctions)", fun
     W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
 
+-- 0.7.14: All The Things puts its AH button on the shared side bar (AuctionHouseFrameTabSideBar,
+-- -52 below the top); our tab went right under it. Now it goes below the bar's tabs, can be
+-- dragged (saved relative to the AH) and right click resets; the addon icon from the .toc.
+test("AH quest items: tab next to All The Things, drag, reset, icon", function()
+    local A = NS.AHQ
+    eq(A.AddonIcon(), "Interface\\Icons\\INV_Misc_Map_01", "addon icon from the .toc IconTexture")
+    local host = CreateFrame("Frame", "AuctionHouseFrame", UIParent)
+    local sb = CreateFrame("Frame", "AuctionHouseFrameTabSideBar", host)
+    sb.Tabs = { {} } -- ATT's tab
+    QuestFocusDB.ahqTabPos, QuestFocusDB.ahqPos = nil, nil
+    W.Fire("AUCTION_HOUSE_SHOW")
+    local p = A.tab.__pts[1]
+    check(p and p[2] == sb, "default: on the side bar (moves out with ATT's panel)")
+    check(p and p[5] < -52 - 30, "below ATT's tab: " .. tostring(p and p[5]))
+    A.tab.__scripts.OnDragStop(A.tab)
+    local pos = QuestFocusDB.ahqTabPos
+    check(pos and pos.rel == "host", "dragged place saved relative to the AH")
+    check(A.tab.__pts[1][2] == host, "after the drag: anchored to the AH frame")
+    A.tab:Click("RightButton")
+    eq(QuestFocusDB.ahqTabPos, nil, "right click resets the place")
+    check(A.tab.__pts[1][2] == sb, "back on the side bar")
+    A.Toggle(true)
+    local fp = A.frame.__pts
+    check(fp[#fp][2] == A.tab or fp[#fp][2] == sb, "panel next to the tab")
+    A.Toggle(false)
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    QuestFocusDB.ahqOpen = nil
+    rawset(_G, "AuctionHouseFrame", nil)
+    rawset(_G, "AuctionHouseFrameTabSideBar", nil)
+end)
+
 test("no errors logged by the addon", function()
     for _, e in ipairs(NS.errors or {}) do check(false, "NS.errors: " .. tostring(e.msg)) end
 end)
