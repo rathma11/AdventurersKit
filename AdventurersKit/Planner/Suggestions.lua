@@ -172,8 +172,15 @@ local function YdText(d)
     return d and ("|cff99ccff%d yd|r"):format(d) or ""
 end
 
+-- Dungeon prep modban (Planner\Prep.lua) a panel a prep listaje: a javaslatok sajat frissitoi
+-- (az alabbi OnUpdate, a QUEST_LOG_UPDATE a Planner\Events.lua-ban) nem rajzolhatnak rea.
+local function PrepOwnsPanel()
+    return not state.questId and NS.PrepActive and NS.PrepActive() and NS.ShowPrep and true or false
+end
+
 NS.ShowSuggestions = function()
     NS.HideSuggestions()
+    if PrepOwnsPanel() then return true end
     if QuestFocusDB.noSuggest then return false end
     panel.title:SetText(L["What next?"])
     local y = NS.PanelChrome("list")
@@ -413,7 +420,7 @@ panel:HookScript("OnUpdate", function(_, dt)
     sugElapsed = sugElapsed + dt
     if sugElapsed < 3 then return end
     sugElapsed = 0
-    if panel:IsMouseOver() then return end
+    if panel:IsMouseOver() or PrepOwnsPanel() then return end
     if not state.questId then
         NS.ShowSuggestions()
     elseif NS.QuestieAvailable() then

@@ -418,6 +418,35 @@ test("dungeon prep: start, auto-select blocked, abort restores", function()
     eq(NS.state.questId, 102, "/qf dungeon off restores the quest")
 end)
 
+-- Regression (0.7.2): the suggestion view's own refreshers (its 3 s OnUpdate, the
+-- QUEST_LOG_UPDATE re-scan in Planner\Events.lua) drew "What next?" over the prep list.
+test("dungeon prep: suggestion view stays hidden while prepping", function()
+    local panel = NS.panel
+    local function sugShown()
+        local shown = {}
+        for text, h in pairs(panel.sugHeaders or {}) do
+            if h:IsShown() then shown[#shown + 1] = text end
+        end
+        table.sort(shown)
+        return shown
+    end
+    NS.C.ClearQuest()
+    W.Advance(4)
+    check(#sugShown() > 0, "suggestion headers shown without prep")
+    NS.StartPrep("The Deadmines")
+    W.Advance(4)                                   -- suggestion OnUpdate (3 s) + prep ticker
+    W.Fire("QUEST_LOG_UPDATE")
+    W.Fire("QUEST_ACCEPTED", 1, 100)
+    W.Advance(4)                                   -- Planner\Events.lua re-scan timer (1.5 s)
+    eq(table.concat(sugShown(), ", "), "", "no suggestion headers while prepping")
+    eq(panel.title:GetText(), "Prep: The Deadmines", "panel title stays the prep title")
+    NS.StopPrep(false, true)
+    if NS.state.questId then NS.C.ClearQuest() end
+    W.Advance(4)
+    check(#sugShown() > 0, "suggestions come back after prep")
+    eq(panel.title:GetText(), "What next?", "...with their title")
+end)
+
 test("travel route (Dijkstra) sanity", function()
     local TR = NS.TransportRoute
     local t, steps = TR({ wc = 0, wx = 0, wy = 0 }, { wc = 0, wx = 300, wy = 400 }, 7, false)

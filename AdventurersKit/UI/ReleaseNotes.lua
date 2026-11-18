@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.2", date = "2026-11-18", items = {
+        "Fix: during dungeon prep the \"What next?\" suggestions (next zone, route, pick up nearby) were sometimes "
+            .. "drawn over the prep list. Now only the prep list shows until prep ends.",
+    } },
     { version = "0.7.1", date = "2026-11-17", items = {
         "Fix: a syntax error in the dungeon boss table (since 0.6.67) kept boss order inside dungeons from working "
             .. "(the panel fell back to quest log order).",
