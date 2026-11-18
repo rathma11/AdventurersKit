@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.11", date = "2026-11-18", items = {
+        "Options > About: the addon's name, version and a short description, every feature in one sentence grouped "
+            .. "by area, the main /qf commands and a button to these release notes. The same list is in FEATURES.md.",
+    } },
     { version = "0.7.10", date = "2026-11-18", items = {
         "Auction house: a coin tab on the right of the auction house window opens \"Quest items to buy\": the "
             .. "items your quests still need that can be sold there (quest-only and soulbound items are left out), "
