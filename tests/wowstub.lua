@@ -436,7 +436,7 @@ def("IsSpellKnown", function() return false end)
 def("GetRaidTargetIndex", function() return nil end)
 def("SetRaidTarget", function() end)
 
--- Auras: W.player.auras = { { name, spellId, expires, count, source } }
+-- Auras: W.player.auras = { { name, spellId, expires, count, source } } (noSource = true: sourceUnit nil)
 local function auraAt(i)
     local a = W.player.auras[i]
     if not a then return end
@@ -448,7 +448,7 @@ def("C_UnitAuras", {
         local a = auraAt(i)
         if not a then return end
         return { name = a.name, spellId = a.spellId, expirationTime = a.expires or 0, duration = a.duration or 0,
-            applications = a.count or 1, sourceUnit = a.source or "player", icon = 134400 }
+            applications = a.count or 1, sourceUnit = (not a.noSource) and (a.source or "player") or nil, icon = 134400 }
     end,
     GetPlayerAuraBySpellID = function(id)
         for _, a in ipairs(W.player.auras) do
@@ -459,7 +459,7 @@ def("C_UnitAuras", {
 def("UnitAura", function(u, i)
     if u ~= "player" then return end
     local a = auraAt(i)
-    if a then return a.name, 134400, a.count or 1, nil, a.duration or 0, a.expires or 0, a.source or "player",
+    if a then return a.name, 134400, a.count or 1, nil, a.duration or 0, a.expires or 0, (not a.noSource) and (a.source or "player") or nil,
         nil, nil, a.spellId end
 end)
 def("UnitBuff", G.UnitAura)

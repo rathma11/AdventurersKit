@@ -175,10 +175,13 @@ local function NpcIdOf(unit)
     if kind == "Creature" or kind == "Vehicle" then return tonumber(id) end
 end
 
+-- Csak a quest adatbol megerositett NPC: ha ismert az NPC ID, annak kell egyeznie (azonos nevu
+-- mas mob nem jo); kulonben pontos nev. Ellenseges unit soha nem az escort (pl. ami rad tamad).
 local function IsEscortUnit(unit, info)
-    if not (info and unit and UnitExists(unit)) or UnitIsPlayer(unit) then return false end
+    if not (info and info.name and unit and UnitExists(unit)) or UnitIsPlayer(unit) then return false end
+    if UnitCanAttack and UnitCanAttack("player", unit) then return false end
     local id = NpcIdOf(unit)
-    if info.npcId and id == info.npcId then return true end
+    if info.npcId and id then return id == info.npcId end
     return UnitName(unit) == info.name
 end
 
@@ -391,4 +394,5 @@ end
 NS.Escort = {
     Info = EscortInfo, Decorate = Decorate, MacroBody = MacroBody, RowText = RowText, RowTooltip = RowTooltip,
     FooterText = FooterText, NameFromText = NameFromText, LooksEscort = LooksEscort,
+    IsEscortUnit = IsEscortUnit, Observe = Observe,
 }

@@ -614,6 +614,78 @@ test("travel route (Dijkstra) sanity", function()
     for _, b in ipairs(bad) do check(false, b) end
 end)
 
+test("escort: star icon only on the confirmed escort NPC", function()
+    local E = NS.Escort
+    check(E and E.Info and E.IsEscortUnit and E.Observe, "Escort exports Info / IsEscortUnit / Observe")
+    if not (E and E.IsEscortUnit) then return end
+    Q.NPC(1010, "Captive Scout", 12, { { 55, 55 } }, { friendlyToFaction = "AH" })
+    Q.NPC(1011, "Shadowmaw Panther", 12, { { 56, 56 } })
+    local esc = Q.Quest({ id = 110, name = "Free the Scout", starter = 1010, finisher = 900 })
+    esc.ObjectiveData = { { Type = "event", Text = "Escort Captive Scout to safety", Coordinates = { [12] = { { 57, 57 } } } } }
+    Q.Quest({ id = 192, name = "Panther Mastery", objectives = { Q.KillObjective(1011, 10) }, finisher = 900, starter = 900 })
+    eq(E.Info(192), nil, "a kill quest (Panther Mastery) is not an escort")
+    eq(E.Info(100), nil, "Kobold Camp Cleanup is not an escort")
+    local info = E.Info(110)
+    check(info and info.name == "Captive Scout" and info.npcId == 1010, "escort NPC from the quest data")
+    if not info then return end
+    local marks = 0
+    local realSet = SetRaidTarget
+    rawset(_G, "SetRaidTarget", function() marks = marks + 1 end)
+    local function try(u)
+        W.units.target = u
+        local r = E.IsEscortUnit("target", info)
+        E.Observe("target", info)
+        return r
+    end
+    eq(try({ name = "Young Panther", hostile = true, id = 2000, guid = "Creature-0-0-0-0-2000-1" }), false, "attacking non-quest mob")
+    eq(try({ name = "Captive Scout", hostile = true, id = 1010, guid = "Creature-0-0-0-0-1010-2" }), false, "hostile unit is never the escort")
+    eq(try({ name = "Captive Scout", hostile = false, id = 3000, guid = "Creature-0-0-0-0-3000-3" }), false, "same name, other NPC ID")
+    eq(try({ name = "Captive Scou", hostile = false, guid = "Player-1-2" }), false, "partial name")
+    eq(marks, 0, "no raid icon on any of them")
+    eq(try({ name = "Captive Scout", hostile = false, id = 1010, guid = "Creature-0-0-0-0-1010-4" }), true, "the escort NPC")
+    eq(marks, 1, "star icon on the escort")
+    rawset(_G, "SetRaidTarget", realSet)
+    W.units.target = nil
+end)
+
+test("macro ping: only out of combat (in combat it would ping any attacker)", function()
+    W.Advance(1)
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    W.units.target = nil
+    local body = NS.C.BuildMacroBody(NS.state.objectives, nil)
+    check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack; [nocombat,@target,help,nodead] assist"),
+        "ping line has [nocombat]: " .. body)
+end)
+
+test("buffs: other players' buffs are not mine", function()
+    local mine = NS.BuffsAuraMine
+    check(mine ~= nil, "Buffs exports BuffsAuraMine")
+    if not mine then return end
+    eq(mine("player", "Mark of the Wild"), true, "cast by you")
+    eq(mine("pet", "Blood Pact"), true, "your pet")
+    eq(mine("vehicle", "Some Buff"), true, "your vehicle")
+    W.units.party1 = { name = "Druidfriend", hostile = false }
+    eq(mine("party1", "Mark of the Wild"), false, "druid's Mark of the Wild")
+    eq(mine("party1", "Well Fed"), false, "food buff with a known other source")
+    eq(mine(nil, "Mark of the Wild"), false, "class spell, unknown source")
+    eq(mine(nil, "Thorns"), false, "Thorns, unknown source")
+    eq(mine(nil, "Well Fed"), true, "consumable, unknown source (XP food row needs it)")
+    eq(mine(nil, "Spicy Beefstick"), true, "item buff, unknown source")
+    -- end to end: the /qf debug aura lines
+    local T = W.time + 3600
+    W.player.auras = {
+        { name = "Mark of the Wild", spellId = 5234, duration = 1800, expires = T, source = "party1" },
+        { name = "Thorns", spellId = 8914, duration = 600, expires = T, noSource = true },
+        { name = "Well Fed", spellId = 19705, duration = 900, expires = T, noSource = true },
+    }
+    local text = table.concat(NS.BuffDebugLines(), "\n")
+    check(contains(text, "aura Mark of the Wild (5234) 1800s mine=false"), "MotW from a druid: " .. text)
+    check(contains(text, "aura Thorns (8914) 600s mine=false"), "Thorns, nil source")
+    check(contains(text, "aura Well Fed (19705) 900s mine=true"), "Well Fed, nil source")
+    W.player.auras = {}
+    W.units.party1 = nil
+end)
+
 test("TomTom is optional", function()
     W.Advance(1)
     NS.SelectQuest(101, "Wolves Across the Border", false, true) -- no TomTom: own arrow / map pin

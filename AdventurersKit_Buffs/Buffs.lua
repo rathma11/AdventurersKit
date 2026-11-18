@@ -360,6 +360,22 @@ end
 -- Ezen a kliensen harcban az aurak "secret" ertekek: addon nem olvashatja (hibat dob).
 -- Ezert csak harcon kivul olvasunk, harcban a legutobbi eredmeny (abszolut lejarati idok) megy.
 local auraCache, auraById = {}, {}
+
+-- Sajat-e az aura. A valodi forras unit dont: "player" / "pet" / "vehicle" (vagy egy token, ami
+-- te vagy, pl. "party1") = sajat; mas unit (druida, paladin...) = nem. Ha a forras nem olvashato
+-- (nil, secret, hibat dob): itemes / kaja buffnal sajat (az XP kaja sornak kell), class spellnel
+-- (Mark of the Wild, Thorns, Blessing...) nem, azt valoszinuleg mas tette rad.
+local function AuraMine(src, name)
+    -- secret ertekkel az osszehasonlitas is hibat dobhat: pcall
+    local ok, mine = pcall(function()
+        if src == "player" or src == "pet" or src == "vehicle" then return true end
+        if type(src) == "string" then return UnitIsUnit(src, "player") == true end
+    end)
+    if ok and mine ~= nil then return mine end
+    return not CLASS_SPELL_SET[name]
+end
+NS.BuffsAuraMine = AuraMine -- tests\run.lua
+
 local function ReadAuras()
     local out, byId = {}, {}
     for i = 1, 40 do
@@ -381,14 +397,7 @@ local function ReadAuras()
         if type(name) == "string" then
             -- mine: te tetted fel (vagy itembol jon); mas buffja (pl. paladin blessing / aura) nem
             -- szamit az itemes sorokhoz es nem "tanulodik meg" item buffkent
-            local mine = src == nil or src == "player" or src == "pet" or src == "vehicle"
-            if not mine and type(src) == "string" then
-                -- mas unit token is lehet te (pl. "party1"/"raid3" = te magad, vagy secret ertek)
-                local okU, same = pcall(UnitIsUnit, src, "player")
-                mine = not okU or same == true
-            elseif not mine then
-                mine = true -- nem string (pl. secret): nem tudjuk, ne zarjuk ki
-            end
+            local mine = AuraMine(src, name)
             local a = { duration = tonumber(duration) or 0, expires = tonumber(expires) or 0, count = tonumber(count) or 0,
                         index = i, spellId = tonumber(spellId), name = name, mine = mine }
             out[name] = a

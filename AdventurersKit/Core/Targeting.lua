@@ -8,7 +8,10 @@ local PlayerWorldPos, Print, state, ZoneName = C.PlayerWorldPos, C.Print, C.stat
 ---------------------------------------------------------------------------
 -- Macro
 ---------------------------------------------------------------------------
-local PING_LINE = "/ping [@target,harm,nodead] attack; [@target,help,nodead] assist"
+-- Csak harcon kivul pingel: harcban a macro nem irhato at, a [noharm][dead] sor megtartja
+-- barmelyik elo ellenseget (pl. egy rad tamado, questhez nem tartozo mobot), es azt pingelne.
+-- Harcon kivul a target valtas utan a macro ujraepul, a nem quest mob targetet eldobja.
+local PING_LINE = "/ping [nocombat,@target,harm,nodead] attack; [nocombat,@target,help,nodead] assist"
 
 -- Macro feltetellel nem lehet "tapped"-et vizsgalni, ezert harcon kivul az addon a
 -- nameplate-ek kozul kivalasztja az elo, meg senki altal meg nem tapolt quest mobot, es a

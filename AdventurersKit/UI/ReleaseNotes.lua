@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.5", date = "2026-11-18", items = {
+        "Fix: the QFocus macro no longer pings a mob that isn't a quest mob. In combat the macro can't be "
+            .. "rewritten and keeps any living enemy you target (e.g. one that attacked you), so it now only pings "
+            .. "out of combat, where it has already checked the target.",
+        "Escort: the star raid icon only goes on the escort NPC itself (its NPC ID from the quest data, or the "
+            .. "exact name), never on an enemy unit.",
+        "Fix: Buff reminder: another player's class buffs (a druid's Mark of the Wild / Thorns) no longer count "
+            .. "as yours when the game doesn't tell who cast them. Food and item buffs (XP food) still do.",
+    } },
     { version = "0.7.4", date = "2026-11-18", items = {
         "Fix: \"Dungeons for your level\" lists WoW: Forever's own dungeons again (The Drowned City, Krol'dok "
             .. "Stronghold, Alcaz Prison, Blackmaw Hold, Shaper's Terrace, Hall of Thanes, City of Dalaran, Excavation "
