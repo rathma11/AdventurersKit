@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.3", date = "2026-11-18", items = {
+        "City list: 'Hide for 20 min' button at the bottom. The list closes and won't open by itself for 20 minutes, "
+            .. "not even in the next town or after /reload. The town icon on the panel or /ak city still opens it.",
+    } },
     { version = "0.8.2", date = "2026-11-18", items = {
         "AKit macro: when it picks a quest mob by its nameplate, that mob's name is now the first by-name fallback. "
             .. "Before, a long name list could push it out of the 255-character macro, so if the nameplate line "

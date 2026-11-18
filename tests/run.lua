@@ -393,6 +393,25 @@ test("city list: auto-open option, town icon toggle", function()
     eq(city:IsShown(), true, "city list off: the icon still opens it")
     NS.ToggleCityList()
     QuestFocusDB.noCityMode = nil
+    -- "Hide for 20 min": no auto-open for 20 minutes (also in the next town), the icon still opens it
+    arrive(false)
+    arrive(true)
+    eq(city:IsShown(), true, "hide button: list is up in town")
+    city.hideBtn:GetScript("OnClick")(city.hideBtn)
+    eq(city:IsShown(), false, "hide button closes it")
+    local untilT = NS.CharDB().cityHideUntil
+    check(untilT and untilT - time() > 1190 and untilT - time() <= 1200, "hidden until now + 20 min (per character)")
+    arrive(false)
+    arrive(true)
+    eq(city:IsShown(), false, "hidden: no auto-open in the next town either")
+    NS.ToggleCityList()
+    eq(city:IsShown(), true, "hidden: the icon still opens it")
+    NS.ToggleCityList()
+    NS.CharDB().cityHideUntil = time() - 1
+    arrive(false)
+    arrive(true)
+    eq(city:IsShown(), true, "after 20 minutes it opens by itself again")
+    NS.CharDB().cityHideUntil = nil
     check(NS.ResetCityIgnore == nil and NS.CityIgnoredHere == nil, "ignore list functions are gone")
     W.bags = saveBags
     arrive(false)

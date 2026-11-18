@@ -768,10 +768,33 @@ NS.InTown = InCity -- telepulesen vagy-e (a city list kapcsolotol fuggetlenul)
 
 -- Magatol nyilik-e (Options > City list): a lista be van kapcsolva es "Open automatically in
 -- towns" is. Kulonben csak a panel ikonja / a /ak city nyitja (city.forced).
+-- "Hide for 20 min": eddig (time()) magatol nem nyilik; karakterenkent, /reload utan is el.
+local HIDE_SECS = 20 * 60
+local function HiddenUntil()
+    local t = tonumber(NS.CharDB().cityHideUntil)
+    if t and t > time() then return t end
+end
+NS.CityHiddenUntil = HiddenUntil
 local function AutoOpen()
-    return not QuestFocusDB.noCityMode and not QuestFocusDB.cityNoAuto
+    return not QuestFocusDB.noCityMode and not QuestFocusDB.cityNoAuto and not HiddenUntil()
 end
 NS.CityAutoOpen = AutoOpen
+
+-- also sor bal oldalan: elrejtes 20 percre (a panel ikonja / /ak city kozben is megnyitja)
+city.hideBtn = NS.Style.FlatButton(city, L["Hide for 20 min"], 110, 18)
+city.hideBtn:SetPoint("BOTTOMLEFT", city, "BOTTOMLEFT", 12, 12)
+city.hideBtn:SetScript("OnClick", function()
+    NS.CharDB().cityHideUntil = time() + HIDE_SECS
+    city.closedHere = true
+    city:Hide()
+    NS.Loud(NS.Print, L["City list hidden for 20 minutes. The town icon on the panel or /ak city still opens it."])
+end)
+city.hideBtn:SetScript("OnEnter", function(self)
+    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Hide for 20 min"])
+    NS.TT.Note(tt, L["Closes the list and it won't open by itself for 20 minutes, not even in the next town (also after /reload). The town icon on the panel or /ak city still opens it."])
+    NS.TT.Finish(tt)
+end)
+city.hideBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 -- ures lista (kezzel nyitva, nincs quest es teendo): egy sor szoveg a questek helyen
 city.empty = city:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -886,13 +909,12 @@ local function RefreshCityList()
     city.foot:ClearAllPoints()
     city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, top - visH - 4)
     city.foot:SetShown(n > 0)
-    -- also sor (vonal + Dungeon quests gomb) csak ha van dungeon quest a listaban
+    -- also sor: vonal + Hide for 20 min (bal) + Dungeon quests (jobb, ha van dungeon quest)
     city.sep:ClearAllPoints()
     city.sep:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 20)
     city.sep:SetPoint("TOPRIGHT", city, "TOPRIGHT", -12, top - visH - 20)
-    city.sep:SetShown(anyDungeon)
     city.dungeonBtn:SetShown(anyDungeon)
-    city.lastBottom = anyDungeon and 59 or 30
+    city.lastBottom = 59
     city:SetHeight(-top + visH + city.lastBottom)
     if not city:IsShown() and (city.forced or (town and AutoOpen() and not city.closedHere)) then city:Show() end
 end
