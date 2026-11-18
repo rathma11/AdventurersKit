@@ -147,7 +147,7 @@ local function SlashHandler(msg)
         Print(L["  /qf clear - clear selection + marker"])
         Print(L["  /qf city - city list here; /qf cityreset - clear ignored places"])
         Print(L["  /qf dungeon - dungeon list; /qf dungeon <name> - dungeon prep (quests, then the entrance); /qf dungeon off - end it"])
-        Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset"])
+        Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset | show"])
         Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])
         Print(L["  /qf selftest - quick self test (Questie data, macro, settings, tables)"])
     end

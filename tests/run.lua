@@ -733,7 +733,15 @@ test("farm session: totals, pause, summary", function()
     W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [1111] = false, [2222] = { "Quest Thing", 0 }, [3333] = { "BoP Ring", 500, 1 } }
     SlashCmdList.QUESTFOCUS("farm start")
     check(F.IsRunning(), "running after /qf farm start")
-    check(F.frame:IsShown(), "farm box shown")
+    check(F.Viewing(), "the panel shows the farm session")
+    check(NS.panel:IsShown(), "panel shown")
+    eq(NS.panel.title:GetText(), "Farm session", "panel title")
+    eq(NS.panel.statBoxes[1].label:GetText(), "TIME", "stat box 1")
+    eq(NS.panel.statBoxes[3].label:GetText(), "GOLD / HOUR", "stat box 3")
+    W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 45 experience.")
+    W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 45 experience.")
+    W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Kobold Vermin dies, you gain 40 experience.")
+    W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "You gain 300 experience.") -- quest / exploration: not a kill
     W.Fire("CHAT_MSG_MONEY", "You loot 1 Gold, 2 Silver, 3 Copper")
     W.Fire("CHAT_MSG_LOOT", "You receive loot: " .. item(2589, "Linen Cloth") .. "x3.")
     W.Fire("CHAT_MSG_LOOT", "You receive loot: " .. item(1111, "Late") .. ".")
@@ -799,20 +807,55 @@ test("farm session: totals, pause, summary", function()
     W.Advance(2, 1)
     check(fd.elapsed - e0 < 10, "a gap of 10000 s is not counted, got +" .. tostring(fd.elapsed - e0))
 
-    -- tooltip: top items
-    W.FireScript(F.frame, "OnEnter")
-    local lines = table.concat(GameTooltip.__lines or {}, "\n")
-    check(contains(lines, "[BoP Ring]") and contains(lines, "[Linen Cloth]"), "tooltip lists the top items")
-    W.FireScript(F.frame, "OnLeave")
+    eq(fd.killCount, 3, "kills from the XP messages")
+    eq(F.TopKills(fd)[1].name, "Mangy Wolf", "most killed mob")
 
-    -- stop: summary in chat, box hidden; the panel button starts / stops too
+    -- panel rows: every line is set (0.7.6 drew only the first line of the box), hover: top items
+    NS.Panel_Update()
+    local rowsText = {}
+    for _, f in ipairs(W.frames) do
+        if f.__parent == NS.panel and f.__kind == "Button" and f:IsShown() and f.text and f.text:GetText() then
+            rowsText[#rowsText + 1] = f.text:GetText()
+        end
+    end
+    local all = table.concat(rowsText, "\n")
+    for _, want in ipairs({ "XP gained", "To level", "Mobs killed", "Looted gold", "Items (vendor)", "Best sale" }) do
+        check(contains(all, want), "panel row: " .. want)
+    end
+    eq(#F.PanelLines(F.Totals(), fd), 6, "six farm rows")
+    F.RouteTooltip(NS.panel)
+    local tip = table.concat(GameTooltip.__lines or {}, "\n")
+    check(contains(tip, "[BoP Ring]") and contains(tip, "[Linen Cloth]"), "tooltip lists the top items")
+    GameTooltip:Hide()
+
+    -- stop: summary window + one line in chat, panel back to quests
     local before = #W.chat
+    W.player.level = level + 1
     SlashCmdList.QUESTFOCUS("farm stop")
     check(not F.IsRunning(), "stopped")
-    check(not F.frame:IsShown(), "box hidden after stop")
+    check(not F.Viewing(), "farm view ends with the session")
     local sawSummary = false
-    for i = before + 1, #W.chat do if contains(W.chat[i], "Farm session: ") then sawSummary = true end end
-    check(sawSummary, "summary printed")
+    for i = before + 1, #W.chat do
+        if contains(W.chat[i], "Farm session: ") and contains(W.chat[i], "3 kills") then sawSummary = true end
+    end
+    check(sawSummary, "one-line summary in chat")
+    local sf = F.SummaryFrame()
+    check(sf and sf:IsShown(), "summary window shown")
+    local sum = table.concat(F.SummaryLines(fd), "\n")
+    for _, want in ipairs({ "Duration", "Mobs killed", "Mangy Wolf x2", "XP gained", "Levels gained", "Looted gold",
+        "Items looted", "Best sale", "Gold per hour" }) do
+        check(contains(sum, want), "summary: " .. want)
+    end
+    sf.newBtn:Click()
+    check(F.IsRunning() and not sf:IsShown(), "Start new: a new session, window closed")
+    SlashCmdList.QUESTFOCUS("farm stop")
+    sf.closeBtn:Click()
+    check(not sf:IsShown(), "Close button")
+    QuestFocusDB.noFarmSummary = true
+    SlashCmdList.QUESTFOCUS("farm start")
+    SlashCmdList.QUESTFOCUS("farm stop")
+    check(not sf:IsShown(), "summary window off in Options")
+    QuestFocusDB.noFarmSummary = nil
     NS.panel.farmBtn:Click()
     check(F.IsRunning(), "panel button starts a session")
     NS.panel.farmBtn:Click()
@@ -822,6 +865,67 @@ test("farm session: totals, pause, summary", function()
     W.itemInfo = nil
     W.player.level, W.player.xp, W.money = level, 0, 0
 end)
+
+-- 0.7.8: the farm session is a pseudo-quest on the panel: the first stop of the route while it runs,
+-- next arrow to the quests, back arrow to the farm session, a quest click leaves the farm view.
+test("farm session: pseudo-quest on the route and the arrows", function()
+    local F = NS.Farm
+    W.Advance(1)
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    SlashCmdList.QUESTFOCUS("farm start")
+    check(F.Viewing(), "start shows the farm session")
+    eq(NS.state.questId, 100, "the focused quest stays (macro keeps working)")
+    check(NS.panel.farmBtn.glow and NS.panel.farmBtn.glow:IsShown(), "clock button glows while running")
+    check(NS.panel.farmBtn.stop and NS.panel.farmBtn.stop:IsShown(), "stop mark on the clock button")
+    -- farm view: the route lists the focused quest too, no farm row
+    NS.PrepareTurnInRoute()
+    local route = NS.TurnInRouteList()
+    check(#route > 0 and not route[1].farm, "farm view: no farm row on the route")
+    local has100 = false
+    for _, s in ipairs(route) do if s.qid == 100 then has100 = true end end
+    check(has100, "farm view: the focused quest is on the route")
+    check(NS.panel.prevBtn:IsShown() and NS.panel.nextBtn:IsShown(), "arrows shown in farm view")
+    -- next arrow: back to the focused quest
+    NS.NextQuest()
+    check(not F.Viewing(), "next arrow leaves the farm view")
+    check(F.IsRunning(), "the session keeps running")
+    eq(NS.state.questId, 100, "next arrow shows the focused quest")
+    -- quest view: the farm session is the first route stop
+    NS.PrepareTurnInRoute()
+    route = NS.TurnInRouteList()
+    check(route[1] and route[1].farm, "quest view: farm session first on the route")
+    for i = 2, #route do check(not route[i].farm and route[i].qid ~= 100, "route " .. i .. " is another quest") end
+    for _, s in ipairs(NS.QuestNavRoute()) do check(not s.farm, "the next arrow's route has no farm stop") end
+    check(contains(F.RouteText(1), "Farm session"), "farm route row text")
+    -- back arrow: to the farm session
+    check(NS.HasQuestHistory(), "back arrow enabled")
+    NS.PrevQuest()
+    check(F.Viewing(), "back arrow brings the farm session back")
+    eq(NS.state.questId, 100, "quest focus unchanged")
+    -- next twice: the quest, then the next route stop; back twice: the quest, the farm session
+    NS.NextQuest()
+    NS.NextQuest()
+    local second = NS.state.questId
+    check(second and second ~= 100, "second next goes to another quest")
+    NS.PrevQuest()
+    eq(NS.state.questId, 100, "back: the quest before")
+    NS.PrevQuest()
+    check(F.Viewing(), "back again: the farm session")
+    -- a quest click leaves the farm view; an automatic selection does not
+    NS.SelectQuest(101, "Wolves Across the Border", false, true)
+    check(not F.Viewing(), "clicking a quest leaves the farm view")
+    F.SetView(true)
+    check(F.Viewing(), "the farm route row (F.SetView) brings it back")
+    W.Advance(1)
+    NS.SelectQuest(102, "Investigate Echo Ridge", false, false)
+    check(F.Viewing(), "an automatic selection does not leave the farm view")
+    -- stop: the back arrow no longer offers the farm session
+    SlashCmdList.QUESTFOCUS("farm stop")
+    local sf = F.SummaryFrame()
+    if sf then sf:Hide() end
+    check(not NS.panel.farmBtn.glow:IsShown(), "no glow after stop")
+    if NS.HasQuestHistory() then NS.PrevQuest() end
+    check(not F.Viewing(), "no farm view after stop")end)
 
 test("style helpers (NS.Style, DESIGN.md)", function()
     local S = NS.Style

@@ -12,7 +12,7 @@ NS.Style = S
 ---------------------------------------------------------------------------
 S.GOLD = { 0.95, 0.78, 0.40 }            -- keret, elvalaszto, gorgetosav, lapos gomb szele
 S.BG = { 0.04, 0.04, 0.06, 0.93 }        -- nagy ablak hattere (panel, city lista)
-S.BOX_BG = { 0.04, 0.04, 0.06, 0.92 }    -- kis doboz / popup hattere (buff reminder, quest popup, farm)
+S.BOX_BG = { 0.04, 0.04, 0.06, 0.92 }    -- kis doboz / popup hattere (buff reminder, quest popup, farm osszegzes)
 S.ACCENT = { 1, 0.55, 0.25 }             -- 2px narancs csik balra (kis dobozok)
 S.HEADER = { 1, 0.6, 0.3 }               -- kis nagybetus fejlec ("BUFF REMINDER", "QFOCUS PING")
 S.TITLE = { 1, 0.86, 0.5 }               -- ablak cime (panel quest neve, city lista cime)
@@ -36,7 +36,7 @@ S.HEX = {
     NAME = "ffff00",   -- nev / parancs kiemelese chatben
     GOLD = "ffd100",   -- arany kiemeles
     DIM = "999999",    -- masodlagos ertek
-    LABEL = "aaaaaa",  -- "cimke:" a farm dobozban
+    LABEL = "aaaaaa",  -- "cimke:" (farm sorok, farm osszegzes)
 }
 S.TEXCOORD = { 0.08, 0.92, 0.08, 0.92 } -- ikonok kerete levagva
 

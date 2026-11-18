@@ -116,9 +116,19 @@ local function NextStop(route)
 end
 
 -- A verem teteje, ami meg a logban van (a tobbit eldobjuk)
+-- A farm session (Planner\Farm.lua) is lehet a veremben ("farm"): amig fut es nem az latszik.
+local function FarmBackOk()
+    return NS.Farm and NS.Farm.IsRunning() and not NS.Farm.Viewing()
+end
 local function PeekBack()
     while #history > 0 do
         local qid = history[#history]
+        if qid == "farm" then
+            if FarmBackOk() then return "farm", L["Farm session"], false end
+            table.remove(history)
+            qid = history[#history]
+            if not qid then return end
+        end
         local title, done = NS.FindQuestInLog(qid)
         if title and qid ~= state.questId then return qid, title, done end
         table.remove(history)
@@ -135,8 +145,29 @@ local function Select(qid, title, done)
     end
 end
 
+-- Planner\Farm.lua: a farm nezetrol ellepve a "vissza" nyil oda hozzon
+NS.QuestNavPushFarm = function()
+    if history[#history] ~= "farm" then
+        history[#history + 1] = "farm"
+        if #history > HISTORY_MAX then table.remove(history, 1) end
+    end
+end
+
 NS.NextQuest = function()
     Prune()
+    -- farm nezetbol: a fokuszalt questre (ha van), kulonben az utvonal elso allomasara
+    if NS.FarmViewing and NS.FarmViewing() then
+        if state.questId then
+            NS.Farm.SetView(false)
+            return
+        end
+        local s = NextStop(Route())
+        if not s then NS.Print(L["No other quest on the route."]) return end
+        NS.Farm.SetView(false)
+        SetAnchor({ qid = s.qid, done = s.done and true or false })
+        Select(s.qid, s.title, s.done)
+        return
+    end
     local s = NextStop(Route())
     if not s then
         NS.Print(L["No other quest on the route."])
@@ -159,6 +190,10 @@ NS.PrevQuest = function()
         return
     end
     table.remove(history)
+    if qid == "farm" then
+        NS.Farm.SetView(true)
+        return
+    end
     goingBack = true
     Select(qid, title, done)
     goingBack = false
@@ -194,7 +229,13 @@ NS.QuestNavTooltip = function(owner, dir)
     if dir == "next" then
         GameTooltip:SetText(L["Next quest"], 1, 1, 1)
         local s = NextStop(route)
-        if s then
+        if NS.FarmViewing and NS.FarmViewing() then
+            -- farm nezet: a fokuszalt quest (vagy az utvonal eleje); a session fut tovabb
+            if state.questId then s = { title = state.title, done = state.isComplete } end
+            if s then GameTooltip:AddLine(QuestLine(s.title, s.done, s.dist), 1, 1, 1) end
+            GameTooltip:AddLine(L["Back to your quests. The farm session keeps running; the back arrow (or its route row) brings it back."],
+                0.8, 0.8, 0.8, true)
+        elseif s then
             GameTooltip:AddLine(QuestLine(s.title, s.done, s.dist), 1, 1, 1)
             if s.deferred then
                 GameTooltip:AddLine(L["(skipped earlier: every other quest is skipped too)"], 0.6, 0.6, 0.6, true)
@@ -214,7 +255,8 @@ NS.QuestNavTooltip = function(owner, dir)
                 if s.qid == qid then dist = s.dist break end
             end
             GameTooltip:AddLine(QuestLine(title, done, dist), 1, 1, 1)
-            GameTooltip:AddLine(L["Back to the quest you focused before (like a browser's back button)."], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(qid == "farm" and L["Back to the farm session."]
+                or L["Back to the quest you focused before (like a browser's back button)."], 0.8, 0.8, 0.8, true)
         else
             GameTooltip:AddLine(L["No earlier quest to go back to."], 0.8, 0.8, 0.8)
         end

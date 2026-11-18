@@ -45,11 +45,11 @@ Normal text is the white of `GameFontHighlightSmall`. Dim text is `GameFontDisab
 
 Two kinds of frame, both from `CreateFrame("Frame", name, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)`:
 
-| | Large window (panel, city list, dungeon list, share / copy windows) | Small box (buff reminder, quest popup, ping dialog, share dialog, toast, farm box) |
+| | Large window (panel, city list, dungeon list, share / copy windows) | Small box (buff reminder, quest popup, ping dialog, share dialog, toast, farm summary) |
 |---|---|---|
 | bgFile | `Interface\\Tooltips\\UI-Tooltip-Background` | same |
 | edgeFile | `Interface\\DialogFrame\\UI-DialogBox-Border` | `Interface\\Tooltips\\UI-Tooltip-Border` |
-| edgeSize / insets | 20 / 5 | 12 / 3 (farm box: 14 / 4) |
+| edgeSize / insets | 20 / 5 | 12 / 3 |
 | tile | `tile = true, tileSize = 16` | same |
 | Accent strip | none | 2px, `TOPLEFT 4,-4` to `BOTTOMLEFT 4,4` |
 | Header | icon 20px at `TOPLEFT 12,-11`, title `GameFontNormal` in `TITLE` colour | `GameFontNormalSmall` at `TOPLEFT 12,-8` (12,-7 on one-line boxes), `HEADER` colour, text in capitals |
@@ -72,7 +72,7 @@ font effect.
 **Moving.** Every window can be dragged with the left button and is `SetClampedToScreen(true)`. Save
 the top-left corner yourself in `QuestFocusDB` (not WoW's layout cache), re-anchor
 `TOPLEFT, UIParent, BOTTOMLEFT, l, t`, and call `SetUserPlaced(false)`. The panel (`panelPos`) and
-the farm box (`farmPos`) work this way. The quest popup saves its top centre (`qpopPos`), and a
+the farm summary (`farmSumPos`) work this way. The quest popup saves its top centre (`qpopPos`), and a
 right click on it resets the place.
 
 ```lua
@@ -131,7 +131,7 @@ end of a row (buff reminder). Use `S.ClearButton(parent, size)`.
 `ButtonHilight-Square` (ADD) hover, a tooltip with a white title and a grey (0.8) description ending
 in "Same as /qf ...". From the right: X, then options 6px left of it, then dungeon and farm 7px apart:
 `[farm] [dungeon] [options] [X]`. A new one goes on the left of farm. A button that is off is
-desaturated (farm). Use `S.IconButton(parent, icon, title, desc, onClick)`.
+desaturated (farm); while it runs, the farm clock gets a green glow and a red X (stop) in the same spot. Use `S.IconButton(parent, icon, title, desc, onClick)`.
 
 **◀ ▶ arrows.** `Interface\\Buttons\\UI-SpellbookIcon-PrevPage` / `-NextPage` with `-Up`, `-Down`,
 `-Disabled`, hover `UI-Common-MouseHilight` (ADD), 18px. Use `S.ArrowButton(parent, "prev" | "next")`.
@@ -197,14 +197,15 @@ distance, and `BTN_HL` hover. The menu is in `UISpecialFrames`.
 
 ## Layout rules
 
-- **Padding:** content starts 12px in from the left and right edges (panel rows `TOPLEFT 12`, dividers 12 / -12). Text in a box starts at x 12 after the accent strip (farm box without a strip: 10). Leave 8-10px between blocks and 3-4px between a label and its sub line.
+- **Padding:** content starts 12px in from the left and right edges (panel rows `TOPLEFT 12`, dividers 12 / -12). Text in a box starts at x 12 after the accent strip. Leave 8-10px between blocks and 3-4px between a label and its sub line.
 - **Row heights:**
   - panel: `NS.RowH()` + 1px gap;
   - city list: 19;
   - city to-do and menu rows: 18;
   - buff reminder: 26 (22px icon);
   - flat buttons: 22, or 18 in a list.
-- **Fixed size, scroll instead of growing.** In quest mode the panel has a fixed height (`QuestH()`): objectives scroll inside, and "also nearby" shows 3 rows plus a "+N more" row. The footer is one line (`SetWordWrap(false)`), so the height never changes in combat. Lists (city, dungeons) have a fixed number of visible rows and scroll. Only small boxes fit their text, between a minimum and a maximum width (farm box: 190-360).
+- **Fixed size, scroll instead of growing.** In quest mode the panel has a fixed height (`QuestH()`): objectives scroll inside, and "also nearby" shows 3 rows plus a "+N more" row. The footer is one line (`SetWordWrap(false)`), so the height never changes in combat. Lists (city, dungeons) have a fixed number of visible rows and scroll. Only small boxes fit their text. The farm session uses the quest layout (stat boxes, objective-style rows, the route) instead of a box of its own.
+- **Multi-line text** (`"a\nb"` in one FontString) needs word wrap on and a fixed width (`SetWidth`). With `SetWordWrap(false)` the game draws only the first line, cut with "..." (the 0.7.6 farm box bug). `SetWordWrap(false)` is for one-line rows only.
 - **Section headers** like `OBJECTIVES` / `ALSO NEARBY (in the macro too)` / `PROGRESS`: `GameFontNormalSmall`, `SECTION` colour, capitals, at x 14, with 15px below them (`S.Section(parent, text)`).
 - **Icons before labels:**
   - 16px (14px in menus, 13px on flat buttons), 6px before the text;
@@ -216,7 +217,7 @@ distance, and `BTN_HL` hover. The menu is in `UISpecialFrames`.
 ## Behaviour conventions
 
 - **Combat:** nothing secure-sensitive in combat (macro edits, secure buttons, showing / hiding / moving secure frames). Check `InCombatLockdown()`, store what is pending, and do it on `PLAYER_REGEN_ENABLED` (see `Core\Events.lua`: `state.pendingBody`). Non-secure frames may update in combat, but must not change size.
-- **Saved data:** positions and sizes are saved in `QuestFocusDB` (`panelPos`, `panelH`, `farmPos`, `qpopPos`, `citySize`). Per-character settings go in `NS.CharDB()` (its key also in `NS.CHAR_KEYS` if it used to be account-wide).
+- **Saved data:** positions and sizes are saved in `QuestFocusDB` (`panelPos`, `panelH`, `farmSumPos`, `qpopPos`, `citySize`). Per-character settings go in `NS.CharDB()` (its key also in `NS.CHAR_KEYS` if it used to be account-wide).
 - **Options toggle:** every new popup or box gets an on / off switch in Options (`NS.AddOptionsTab` + `NS.OptFlow(page):Check(label, desc, get, set)`), with a short grey description under it.
 - **Strings:** every user-facing string goes through `L["..."]`, written in English (the key is the English text). Code comments may stay Hungarian without accents.
 - **Help text:** give every clickable thing a tooltip, and mention the matching `/qf` command ("Same as /qf ...").

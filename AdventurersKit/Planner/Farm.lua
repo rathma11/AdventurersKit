@@ -1,6 +1,8 @@
 -- Farm session: ido, XP (+ /ora, ETA a szintig), lootolt arany, lootolt itemek erteke
 -- (vendor ar, es "legjobb eladas" = max(AH ar, vendor ar), ha van aukcios addon).
--- Inditas / leallitas: a panel ikonsoraban az erme gomb, vagy /qf farm (start / stop / pause / reset).
+-- Inditas / leallitas: a panel ikonsoraban az ora gomb, vagy /qf farm (start / stop / pause / reset).
+-- Futas kozben a quest panelen latszik, mint egy quest (UI\Panel.lua: NS.FarmViewing), az utvonal
+-- elso allomasakent; leallitaskor osszegzo ablak (kill, XP, szint, arany, itemek).
 -- A futo session karakterenkent mentve (NS.CharDB().farm): /reload es ujra belepes utan folytatodik.
 -- Az eltelt idobe a kijelentkezett ido NEM szamit bele: masodpercenkent adjuk hozza a jatekban
 -- toltott idot (GetTime kulonbseg), igy offline / betoltokepernyon toltott ido kimarad.
@@ -294,154 +296,341 @@ function F.OnItemInfo(id)
     if rec then ItemPrice(rec, id) else pendingInfo[id] = nil end
 end
 
----------------------------------------------------------------------------
--- Keret: kis doboz a panel / buff emlekezteto stilusaban
----------------------------------------------------------------------------
-local GOLD = { 0.95, 0.78, 0.40 }
-local box = CreateFrame("Frame", "QuestFocusFarmFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-F.frame = box
-box:SetSize(210, 60)
-box:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -260, -200)
-box:SetFrameStrata("MEDIUM")
-box:SetMovable(true)
-box:SetClampedToScreen(true)
-box:EnableMouse(true)
-box:RegisterForDrag("LeftButton")
-box:Hide()
-if box.SetBackdrop then
-    box:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 14,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    box:SetBackdropColor(0.04, 0.04, 0.06, 0.92)
-    box:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3], 0.9)
-end
-box:SetScript("OnDragStart", function(self) self:StartMoving() end)
-box:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    local l, t = self:GetLeft(), self:GetTop()
-    if l and t and QuestFocusDB then
-        QuestFocusDB.farmPos = { l = math.floor(l + 0.5), t = math.floor(t + 0.5) }
-        self:ClearAllPoints()
-        self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
-    end
-    if self.SetUserPlaced then pcall(self.SetUserPlaced, self, false) end
-end)
-local function RestorePos()
-    local p = QuestFocusDB and QuestFocusDB.farmPos
-    if p and p.l and p.t then
-        box:ClearAllPoints()
-        box:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p.l, p.t)
-    end
+-- Kill: "X dies, you gain N experience" (CHAT_MSG_COMBAT_XP_GAIN; a combat log tiltott, mint a Pace.lua-ban)
+function F.OnKillMsg(msg)
+    local fd = DB()
+    if not (fd and fd.running) or fd.paused or type(msg) ~= "string" then return end
+    local name = msg:match("^(.-) dies")
+    if not name or name == "" then return end
+    fd.kills = fd.kills or {}
+    fd.kills[name] = (fd.kills[name] or 0) + 1
+    fd.killCount = (fd.killCount or 0) + 1
 end
 
-box.header = box:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-box.header:SetPoint("TOPLEFT", 10, -9)
-box.header:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
-
-local function SmallButton(label, tip, onClick)
-    local b = CreateFrame("Button", nil, box)
-    b:SetSize(16, 14)
-    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.text:SetPoint("CENTER")
-    b.text:SetText(label)
-    b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-    b:SetScript("OnClick", onClick)
-    b:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(type(tip) == "function" and tip() or tip, 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return b
-end
-box.stopBtn = SmallButton("|cffff6060x|r", L["Stop the farm session (summary in chat)"], function() NS.Loud(F.Stop) end)
-box.stopBtn:SetPoint("TOPRIGHT", -6, -6)
-box.pauseBtn = SmallButton("||", function() return F.IsPaused() and L["Resume"] or L["Pause"] end,
-    function() F.TogglePause() end)
-box.pauseBtn:SetPoint("RIGHT", box.stopBtn, "LEFT", -2, 0)
-
-box.body = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-box.body:SetPoint("TOPLEFT", 10, -24)
-box.body:SetJustifyH("LEFT")
-box.body:SetWordWrap(false)
-if box.body.SetSpacing then box.body:SetSpacing(2) end
-
-local function Lines(t, fd)
+-- legtobbet olt mobok: { { name, n }, ... } csokkeno sorrendben
+function F.TopKills(fd, max)
     local out = {}
-    local function add(label, value) out[#out + 1] = "|cffaaaaaa" .. label .. ":|r " .. value end
-    add(L["Time"], F.FormatTime(t.elapsed) .. (fd.paused and ("  |cffff9933" .. L["paused"] .. "|r") or ""))
-    add(L["XP"], Num(t.xp) .. (t.xpH and ("  |cff999999(" .. Num(t.xpH) .. L["/h"] .. ")|r") or ""))
-    if t.need then
-        add(L["To level"], Num(t.need) .. (t.eta and ("  |cff999999ETA " .. FormatETA(t.eta) .. "|r") or ""))
-    end
-    add(L["Looted gold"], F.FormatMoney(t.money))
-    add(L["Items (vendor)"], F.FormatMoney(t.vendor) .. (t.pending > 0 and ("  |cff999999+" .. t.pending .. "?|r") or ""))
-    local src = F.AHSource()
-    if src then
-        add(L["Best sale"], F.FormatMoney(t.money + t.best) .. "  |cff999999(" .. src .. ")|r")
-    end
-    add(L["Per hour"], t.goldH and (F.FormatMoney(t.goldH) .. (src and t.bestH and ("  |cff999999" .. L["best"] .. " "
-        .. F.FormatMoney(t.bestH, true) .. "|r") or "")) or "-")
-    if t.net then add(L["Net gold change"], F.FormatMoney(t.net)) end
-    if not src then out[#out + 1] = "|cff777777" .. L["No auction addon: vendor prices only"] .. "|r" end
+    for name, n in pairs(fd and fd.kills or {}) do out[#out + 1] = { name = name, n = n } end
+    table.sort(out, function(a, b) if a.n ~= b.n then return a.n > b.n end return a.name < b.name end)
+    while max and #out > max do out[#out] = nil end
     return out
 end
-F.Lines = Lines
 
-local function Refresh()
+---------------------------------------------------------------------------
+-- Megjelenites a quest panelen: a farm session "pszeudo-quest" (UI\Panel.lua hivja)
+---------------------------------------------------------------------------
+local S = NS.Style
+local HEX = S and S.HEX or { LABEL = "aaaaaa", DIM = "999999", WARN = "ff9933", GOOD = "33ff99" }
+F.ICON = "Interface\\Icons\\INV_Misc_PocketWatch_01"
+
+-- a farm nezet latszik a panelen (fut, es nem lapoztal el rola a nyillal / quest kattintassal)
+function F.Viewing()
     local fd = DB()
-    local btn = NS.panel and NS.panel.farmBtn
-    if btn and btn.tex then
-        local on = fd and fd.running
-        if btn.tex.SetDesaturated then btn.tex:SetDesaturated(not on) end
-        btn.tex:SetAlpha(on and 1 or 0.75)
-    end
-    if not (fd and fd.running) then box:Hide() return end
-    local t = F.Totals(fd)
-    box.header:SetText(L["FARM SESSION"])
-    box.pauseBtn.text:SetText(fd.paused and "|cff33ff99>|r" or "||")
-    local lines = Lines(t, fd)
-    box.body:SetText(table.concat(lines, "\n"))
-    -- a doboz a szoveghez igazodik (a fejlec gombjai miatt legalabb 190 szeles)
-    local w = math.max(190, math.ceil(tonumber(box.body:GetStringWidth()) or 170) + 22)
-    local h = tonumber(box.body:GetStringHeight()) or 0
-    if h < #lines * 10 then h = #lines * 13 end
-    box:SetSize(math.min(360, w), 32 + h)
-    box:Show()
+    return fd and fd.running and fd.view and true or false
 end
-F.Refresh = Refresh
+NS.FarmViewing = F.Viewing
 
-box:SetScript("OnEnter", function(self)
+local function PanelUpdate() if NS.Panel_Update then NS.Panel_Update() end end
+
+-- on: a farm nezetre valt; off: vissza a questekhez (a "vissza" nyil a farmra hoz)
+function F.SetView(on)
+    local fd = DB()
+    if not (fd and fd.running) then return end
+    on = on and true or nil
+    if fd.view == on then return end
+    fd.view = on
+    if not on and NS.QuestNavPushFarm then NS.QuestNavPushFarm() end
+    if on and QuestFocusDB then QuestFocusDB.hidePanel = false end
+    PanelUpdate()
+end
+-- Core\Selection.lua: kattintassal valasztott quest (quest log, route sor, kovetes) elviszi a farm nezetrol
+function F.OnUserSelect()
+    if F.Viewing() then F.SetView(false) end
+end
+
+local function Short(c)
+    -- statisztika dobozba: "12g 34s" / "34s 56c" / "7c"
+    c = math.floor((tonumber(c) or 0) + 0.5)
+    local g, s, cp = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
+    if g > 0 then return ("%d|cffffd700g|r %d|cffc7c7cfs|r"):format(g, s) end
+    if s > 0 then return ("%d|cffc7c7cfs|r %d|cffeda55fc|r"):format(s, cp) end
+    return ("%d|cffeda55fc|r"):format(cp)
+end
+F.Short = Short
+
+-- A panel sorai (objective stilusban): { text }, a sorrend fix, hogy a sorok ne ugraljanak
+function F.PanelLines(t, fd)
+    local function lab(s) return "|cff" .. HEX.LABEL .. s .. ":|r " end
+    local function dim(s) return "  |cff" .. HEX.DIM .. s .. "|r" end
+    local ico = function(path) return "|T" .. path .. ":12:12|t " end
+    local out = {}
+    out[#out + 1] = ico("Interface\\COMMON\\Indicator-Yellow") .. lab(L["XP gained"]) .. Num(t.xp)
+        .. (t.xpH and dim(Num(t.xpH) .. L["/h"]) or "")
+    if t.need then
+        out[#out + 1] = ico("Interface\\COMMON\\Indicator-Yellow") .. lab(L["To level"]) .. Num(t.need)
+            .. (t.eta and dim("ETA " .. FormatETA(t.eta)) or "")
+    else
+        out[#out + 1] = ico("Interface\\COMMON\\Indicator-Gray") .. lab(L["To level"]) .. L["max level"]
+    end
+    out[#out + 1] = ico("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8") .. lab(L["Mobs killed"]) .. Num(fd.killCount or 0)
+    out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_01") .. lab(L["Looted gold"]) .. F.FormatMoney(t.money)
+    out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Bag_10") .. lab(L["Items (vendor)"]) .. F.FormatMoney(t.vendor)
+        .. (t.pending > 0 and dim("+" .. t.pending .. "?") or "")
+    local src = F.AHSource()
+    if src then
+        out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_02") .. lab(L["Best sale"]) .. F.FormatMoney(t.money + t.best) .. dim(src)
+    else
+        out[#out + 1] = ico("Interface\\Icons\\INV_Misc_Coin_02") .. "|cff777777" .. L["Best sale: needs Auctionator, TSM or Auctioneer"] .. "|r"
+    end
+    return out
+end
+
+-- Statisztika dobozok: ido / XP per ora / arany + ertek per ora; csik: XP a szintig
+function F.UpdatePanelStats(panel)
+    local fd = DB()
+    if not (fd and panel and panel.statBoxes) then return end
+    local t = F.Totals(fd)
+    local b = panel.statBoxes
+    b[1].label:SetText(L["TIME"]); b[2].label:SetText(L["XP / HOUR"]); b[3].label:SetText(L["GOLD / HOUR"])
+    b[1].value:SetText(fd.paused and ("|cff" .. HEX.WARN .. F.FormatTime(t.elapsed) .. "|r") or F.FormatTime(t.elapsed))
+    b[2].value:SetText(t.xpH and Num(t.xpH) or "-")
+    b[3].value:SetText(t.goldH and Short(t.goldH) or "-")
+    local max = UnitXPMax("player") or 0
+    panel.bar:SetValue(max > 0 and (UnitXP("player") or 0) / max or 0)
+    panel.bar:SetStatusBarColor(0.58, 0.35, 0.85) -- XP lila (mint a jatek XP csikja)
+    panel.sub:SetText(fd.paused and ("|cff" .. HEX.WARN .. L["Paused"] .. "|r")
+        or (fd.started and date and (L["Running since %s"]):format(date("%H:%M", fd.started)) or L["Running"]))
+    return t
+end
+
+function F.FooterText()
+    local fd = DB()
+    if fd and fd.paused then return L["Paused: /qf farm resume"] end
+    return L["Hover a row: top items. Stop: the clock button."]
+end
+
+-- Sorok (sajat keszlet a panelen)
+local rows = {}
+local function TopItemsTooltip(owner)
     local t = F.Totals()
     if not t then return end
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText(L["Farm session: top looted items"], 1, 1, 1)
-    if #t.items == 0 then GameTooltip:AddLine(L["Nothing looted yet."], 0.8, 0.8, 0.8) end
+    local fd = DB()
+    local tt = NS.TT and NS.TT.Begin(owner, "ANCHOR_LEFT", L["Farm session"], F.FormatTime(t.elapsed))
+    if not tt then GameTooltip:SetOwner(owner, "ANCHOR_LEFT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
+    if NS.TT then NS.TT.Sub(tt, L["Top looted items"]) else tt:AddLine(L["Top looted items"], 1, 0.82, 0) end
+    if #t.items == 0 then tt:AddLine(L["Nothing looted yet."], 0.8, 0.8, 0.8) end
     local src = F.AHSource()
     for i = 1, math.min(5, #t.items) do
         local it = t.items[i]
-        GameTooltip:AddDoubleLine(("%s x%d"):format(it.link, it.n or 1),
-            F.FormatMoney(src and it.best or it.vendor), 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(("%s x%d"):format(it.link, it.n or 1), F.FormatMoney(src and it.best or it.vendor), 1, 1, 1, 1, 1, 1)
     end
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L["Drag to move. Looted gold counts only money you loot, not vendor sales or quest rewards."], 0.6, 0.6, 0.6, true)
-    GameTooltip:Show()
-end)
-box:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local top = F.TopKills(fd, 3)
+    if top[1] then
+        if NS.TT then NS.TT.Sub(tt, L["Most killed"]) else tt:AddLine(L["Most killed"], 1, 0.82, 0) end
+        for _, k in ipairs(top) do tt:AddDoubleLine(k.name, "x" .. k.n, 1, 1, 1, 0.8, 0.8, 0.8) end
+    end
+    if t.net then tt:AddLine((L["Net gold change (vendor, quests, repairs too): %s"]):format(F.FormatMoney(t.net)), 0.6, 0.6, 0.6, true) end
+    if NS.TT then
+        NS.TT.Finish(tt, L["Looted gold is only money you loot, not vendor sales or quest rewards."])
+    else
+        GameTooltip:Show()
+    end
+end
+local function GetRow(panel, i)
+    local r = rows[i]
+    if r then return r end
+    r = CreateFrame("Button", nil, panel)
+    r.text = r:CreateFontString(nil, "OVERLAY", "QuestFocusFontSmall")
+    r.text:SetAllPoints()
+    r.text:SetJustifyH("LEFT")
+    r.text:SetWordWrap(false)
+    if S then S.RowHighlight(r) end
+    r:SetScript("OnEnter", function(self) TopItemsTooltip(self) end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rows[i] = r
+    return r
+end
+
+-- y-tol rajzolja a sorokat (w szeles, rh magas), visszaadja az uj y-t
+function F.DrawPanel(panel, y, w, rh)
+    local fd = DB()
+    if not fd then return y end
+    local lines = F.PanelLines(F.Totals(fd), fd)
+    local step = rh + 1
+    for i, text in ipairs(lines) do
+        local r = GetRow(panel, i)
+        r:SetSize(w, rh)
+        r.text:SetText(text)
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        r:Show()
+        y = y - step
+    end
+    for i = #lines + 1, #rows do rows[i]:Hide() end
+    return y
+end
+function F.HidePanelRows()
+    for _, r in ipairs(rows) do r:Hide() end
+end
+
+-- masodpercenkent: csak a szovegek (a sorok helye nem valtozik)
+local function RefreshPanel()
+    local panel = NS.panel
+    if not (panel and F.Viewing() and panel:IsShown() and rows[1] and rows[1]:IsShown()) then return end
+    local fd = DB()
+    local t = F.UpdatePanelStats(panel)
+    for i, text in ipairs(F.PanelLines(t, fd)) do
+        if rows[i] then rows[i].text:SetText(text) end
+    end
+    panel.footer:SetText(F.FooterText())
+end
+
+-- Az utvonal elso sora (Planner\Suggestions.lua): a futo session, ha nem az latszik
+function F.RouteEntry()
+    local fd = DB()
+    if not (fd and fd.running) or fd.view then return nil end
+    return { farm = true, title = L["Farm session"] }
+end
+function F.RouteText(i)
+    local t = F.Totals()
+    local fd = DB()
+    local extra = t and (F.FormatTime(t.elapsed) .. (t.goldH and ("  " .. F.FormatMoney(t.goldH, true) .. L["/h"]) or "")) or ""
+    return ("%d. |T%s:12:12|t |cff33ff99%s|r  |cff999999%s%s|r"):format(i, F.ICON, L["Farm session"], extra,
+        fd and fd.paused and ("  " .. L["paused"]) or "")
+end
+F.RouteTooltip = TopItemsTooltip
+
+---------------------------------------------------------------------------
+-- A panel ora gombja: allo: szurke ora; fut: zold fenyes + piros X (stop) ugyanott
+---------------------------------------------------------------------------
+local function UpdateButton()
+    local btn = NS.panel and NS.panel.farmBtn
+    if not (btn and btn.tex) then return end
+    local on = F.IsRunning()
+    if not btn.glow then
+        btn.glow = btn:CreateTexture(nil, "BACKGROUND")
+        btn.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        btn.glow:SetBlendMode("ADD")
+        btn.glow:SetVertexColor(0.2, 1, 0.3, 0.9)
+        btn.glow:SetPoint("CENTER")
+        btn.glow:SetSize(30, 30)
+        btn.stop = btn:CreateTexture(nil, "OVERLAY")
+        btn.stop:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+        btn.stop:SetSize(11, 11)
+        btn.stop:SetPoint("BOTTOMRIGHT", 4, -4)
+    end
+    if btn.tex.SetDesaturated then btn.tex:SetDesaturated(not on) end
+    btn.tex:SetAlpha(on and 1 or 0.8)
+    btn.glow:SetShown(on)
+    btn.stop:SetShown(on)
+end
+F.UpdateButton = UpdateButton
+
+---------------------------------------------------------------------------
+-- Osszegzo ablak leallitaskor (DESIGN.md: kis "box" dialog)
+---------------------------------------------------------------------------
+local sum
+local function SummaryFrame()
+    if sum then return sum end
+    sum = S.Box("AdventurersKitFarmSummary", 320, 200, L["FARM SESSION SUMMARY"], "DIALOG")
+    sum:SetPoint("TOP", UIParent, "TOP", 0, -160)
+    S.Draggable(sum, "farmSumPos")
+    sum.body = sum:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    sum.body:SetPoint("TOPLEFT", 12, -26)
+    sum.body:SetWidth(296)
+    sum.body:SetJustifyH("LEFT")
+    sum.body:SetJustifyV("TOP")
+    if sum.body.SetSpacing then sum.body:SetSpacing(3) end
+    sum.closeBtn = S.FlatButton(sum, L["Close"], 90, 22)
+    sum.closeBtn:SetPoint("BOTTOMRIGHT", -12, 10)
+    sum.closeBtn:SetScript("OnClick", function() sum:Hide() end)
+    sum.newBtn = S.FlatButton(sum, L["Start new"], 110, 22)
+    sum.newBtn:SetPoint("RIGHT", sum.closeBtn, "LEFT", -6, 0)
+    sum.newBtn:SetScript("OnClick", function() sum:Hide(); NS.Loud(F.Start) end)
+    sum.newBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Start new"], 1, 1, 1)
+        GameTooltip:AddLine(L["Starts a new farm session from zero. Same as /qf farm start."], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    sum.newBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    if UISpecialFrames then table.insert(UISpecialFrames, "AdventurersKitFarmSummary") end
+    return sum
+end
+
+-- Az osszegzes sorai (az ablak es a teszt is ezt hasznalja)
+function F.SummaryLines(fd)
+    fd = fd or DB()
+    local t = fd and F.Totals(fd)
+    if not t then return {} end
+    local out = {}
+    local function row(label, value) out[#out + 1] = "|cff" .. HEX.LABEL .. label .. ":|r " .. value end
+    local function dim(s) return "  |cff" .. HEX.DIM .. s .. "|r" end
+    row(L["Duration"], F.FormatTime(t.elapsed))
+    local top = F.TopKills(fd, 3)
+    local tk = {}
+    for i, k in ipairs(top) do tk[i] = k.name .. " x" .. k.n end
+    row(L["Mobs killed"], Num(fd.killCount or 0) .. (tk[1] and dim(table.concat(tk, ", ")) or ""))
+    row(L["XP gained"], Num(t.xp) .. (t.xpH and dim(Num(t.xpH) .. L["/h"]) or ""))
+    local lv = (UnitLevel("player") or 0) - (fd.startLevel or UnitLevel("player") or 0)
+    if lv > 0 then row(L["Levels gained"], ("|cff%s+%d|r  (%d)"):format(HEX.GOOD, lv, UnitLevel("player") or 0)) end
+    row(L["Looted gold"], F.FormatMoney(t.money))
+    local nItems = 0
+    for _, it in pairs(fd.items or {}) do nItems = nItems + (it.n or 0) end
+    row(L["Items looted"], Num(nItems) .. dim((L["vendor %s"]):format(F.FormatMoney(t.vendor, true))))
+    local src = F.AHSource()
+    if src then row(L["Best sale"], F.FormatMoney(t.money + t.best) .. dim(src)) end
+    for i = 1, math.min(3, #t.items) do
+        local it = t.items[i]
+        out[#out + 1] = "   " .. it.link .. " x" .. (it.n or 1) .. dim(F.FormatMoney(src and it.best or it.vendor, true))
+    end
+    row(L["Gold per hour"], t.goldH and (F.FormatMoney(t.goldH) .. (src and t.bestH and dim(L["best"] .. " " .. F.FormatMoney(t.bestH, true)) or ""))
+        or "-")
+    return out
+end
+
+-- egy sor a chatbe
+function F.ChatLine(fd)
+    fd = fd or DB()
+    local t = fd and F.Totals(fd)
+    if not t then return "" end
+    return (L["Farm session: %s, %d kills, %s XP (%s/h), looted gold %s, items %s (vendor), %s per hour"]):format(
+        F.FormatTime(t.elapsed), fd.killCount or 0, Num(t.xp), t.xpH and Num(t.xpH) or "-", F.FormatMoney(t.money),
+        F.FormatMoney(t.vendor), t.goldH and F.FormatMoney(t.goldH) or "-")
+end
+
+function F.ShowSummary(fd)
+    local f = SummaryFrame()
+    S.RestorePos(f, "farmSumPos")
+    f.body:SetText(table.concat(F.SummaryLines(fd), "\n"))
+    local h = tonumber(f.body:GetStringHeight()) or 0
+    local n = #F.SummaryLines(fd)
+    if h < n * 10 then h = n * 15 end
+    f:SetHeight(26 + h + 12 + 22 + 10)
+    f:Show()
+end
+F.SummaryFrame = function() return sum end
 
 ---------------------------------------------------------------------------
 -- Inditas / leallitas
 ---------------------------------------------------------------------------
-local ticker
+local ticker, tickN = nil, 0
 local function EnsureTicker()
     local fd = DB()
     if fd and fd.running then
         if not ticker then
             lastTick = GetTime()
-            ticker = C_Timer.NewTicker(1, function() Accumulate() Refresh() end)
+            ticker = C_Timer.NewTicker(1, function()
+                Accumulate()
+                tickN = tickN + 1
+                -- 10 mp-enkent a teljes panel (az utvonal sorrendje, quest modban a farm sor ideje),
+                -- kozben csak a farm nezet szovegei
+                if tickN % 10 == 0 and NS.panel and NS.panel:IsShown() and not NS.panel:IsMouseOver() then
+                    PanelUpdate()
+                else
+                    RefreshPanel()
+                end
+            end)
         end
     elseif ticker then
         ticker:Cancel()
@@ -451,42 +640,28 @@ end
 
 function F.Start()
     local c = NS.CharDB()
-    local fd = { running = true, elapsed = 0, xp = 0, money = 0, items = {}, moneyStart = GetMoney() or 0,
-        started = time and time() or 0 }
+    local fd = { running = true, view = true, elapsed = 0, xp = 0, money = 0, items = {}, kills = {}, killCount = 0,
+        moneyStart = GetMoney() or 0, started = time and time() or 0, startLevel = UnitLevel("player") or 1 }
     BaselineXP(fd)
     rawset(c, "farm", fd)
     lastTick = GetTime()
-    NS.Print(L["Farm session started. /qf farm stop shows a summary."])
+    if QuestFocusDB then QuestFocusDB.hidePanel = false end
+    NS.Print(L["Farm session started. Click the clock button (or /qf farm) to stop it."])
     EnsureTicker()
-    Refresh()
-end
-
-function F.Summary(fd)
-    fd = fd or DB()
-    local t = fd and F.Totals(fd)
-    if not t then return {} end
-    local out = {}
-    out[#out + 1] = (L["Farm session: %s, %s XP (%s/h), looted gold %s, items %s (vendor)"]):format(
-        F.FormatTime(t.elapsed), Num(t.xp), t.xpH and Num(t.xpH) or "-", F.FormatMoney(t.money), F.FormatMoney(t.vendor))
-    local src = F.AHSource()
-    if src then out[#out + 1] = (L["  Best sale (%s): %s"]):format(src, F.FormatMoney(t.money + t.best)) end
-    if t.goldH then out[#out + 1] = (L["  Per hour: %s"]):format(F.FormatMoney(t.goldH)) end
-    if t.items[1] then
-        local top = {}
-        for i = 1, math.min(3, #t.items) do top[i] = t.items[i].link .. "x" .. (t.items[i].n or 1) end
-        out[#out + 1] = L["  Top: "] .. table.concat(top, ", ")
-    end
-    return out
+    UpdateButton()
+    PanelUpdate()
 end
 
 function F.Stop()
     local fd = DB()
     if not (fd and fd.running) then NS.Print(L["No farm session is running."]) return end
     Accumulate()
-    for _, l in ipairs(F.Summary(fd)) do NS.Print(l) end
-    fd.running = false
+    NS.Print(F.ChatLine(fd))
+    fd.running, fd.view = false, nil
     EnsureTicker()
-    Refresh()
+    UpdateButton()
+    PanelUpdate()
+    if not (QuestFocusDB and QuestFocusDB.noFarmSummary) then F.ShowSummary(fd) end
 end
 
 function F.TogglePause()
@@ -497,7 +672,7 @@ function F.TogglePause()
     if not fd.paused then BaselineXP(fd) end -- szunet alatti XP nem szamit
     lastTick = GetTime()
     NS.Print(fd.paused and L["Farm session paused."] or L["Farm session resumed."])
-    Refresh()
+    RefreshPanel()
 end
 
 function F.Toggle()
@@ -505,20 +680,22 @@ function F.Toggle()
 end
 NS.FarmToggle = function() NS.Loud(F.Toggle) end
 
--- /qf farm [start | stop | pause | resume | reset]
+-- /qf farm [start | stop | pause | resume | reset | show]
 function F.Command(arg)
     arg = (arg or ""):lower()
     if arg == "" then F.Toggle()
     elseif arg == "start" then
         if F.IsRunning() then NS.Print(L["A farm session is already running (/qf farm reset starts over)."]) else F.Start() end
     elseif arg == "stop" then F.Stop()
+    elseif arg == "show" then
+        if F.IsRunning() then F.SetView(true) else NS.Print(L["No farm session is running."]) end
     elseif arg == "pause" or arg == "resume" then
         if (arg == "pause") ~= (F.IsPaused() and true or false) then F.TogglePause() end
     elseif arg == "reset" then
-        if F.IsRunning() then Accumulate() for _, l in ipairs(F.Summary()) do NS.Print(l) end end
+        if F.IsRunning() then Accumulate() NS.Print(F.ChatLine()) end
         F.Start()
     else
-        NS.Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset"])
+        NS.Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset | show"])
     end
 end
 NS.FarmCommand = F.Command
@@ -531,22 +708,24 @@ ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_XP_UPDATE")
 ev:RegisterEvent("CHAT_MSG_MONEY")
 ev:RegisterEvent("CHAT_MSG_LOOT")
+ev:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
 ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 ev:RegisterEvent("PLAYER_LOGOUT")
 ev:SetScript("OnEvent", function(_, event, a1)
     if event == "PLAYER_LOGIN" then
-        RestorePos()
         local fd = DB()
         -- belepeskor / reload utan: az XP alapvonal ujra (offline nem jon XP), az ido innen megy tovabb
         if fd and fd.running then BaselineXP(fd) end
         EnsureTicker()
-        Refresh()
+        UpdateButton()
     elseif event == "PLAYER_XP_UPDATE" then
         F.OnXP()
     elseif event == "CHAT_MSG_MONEY" then
         F.OnMoneyMsg(a1)
     elseif event == "CHAT_MSG_LOOT" then
         F.OnLootMsg(a1)
+    elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
+        F.OnKillMsg(a1)
     elseif event == "GET_ITEM_INFO_RECEIVED" then
         F.OnItemInfo(a1)
     elseif event == "PLAYER_LOGOUT" then

@@ -77,7 +77,9 @@ MakeRow = function(parent)
     r:SetScript("OnClick", function(self)
         local d = self.data
         if not d then return end
-        if d.kind == "route" then
+        if d.kind == "farm" then
+            if NS.Farm then NS.Farm.SetView(true) end
+        elseif d.kind == "route" then
             NS.SelectQuest(d.qid, d.title, d.done, true)
         elseif d.kind == "pickup" then
             NS.SetWaypoint(d.point, d.point.name or d.name)
@@ -95,7 +97,9 @@ MakeRow = function(parent)
         local d = self.data
         if not d then return end
         local TT = NS.TT
-        if d.kind == "route" then
+        if d.kind == "farm" then
+            if NS.Farm then NS.Farm.RouteTooltip(self) end
+        elseif d.kind == "route" then
             local objs = d.objs
             if not objs then
                 local q = NS.GetQuestieQuest(d.qid)
@@ -175,6 +179,8 @@ end
 -- Dungeon prep modban (Planner\Prep.lua) a panel a prep listaje: a javaslatok sajat frissitoi
 -- (az alabbi OnUpdate, a QUEST_LOG_UPDATE a Planner\Events.lua-ban) nem rajzolhatnak rea.
 local function PrepOwnsPanel()
+    -- a farm nezet (Planner\Farm.lua) is a sajat frissitojevel rajzol
+    if NS.FarmViewing and NS.FarmViewing() then return true end
     return not state.questId and NS.PrepActive and NS.PrepActive() and NS.ShowPrep and true or false
 end
 
@@ -242,7 +248,8 @@ NS.ShowSuggestions = function()
         for _, r in ipairs(routeRows) do r:Hide() end
         for i, s in ipairs(route) do
             local r = RouteRow(i)
-            r.data = { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs, deferred = s.deferred }
+            r.data = s.farm and { kind = "farm" }
+            or { kind = "route", qid = s.qid, title = s.title, done = s.done, objs = s.objs, deferred = s.deferred }
             local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
             local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
             local eta = not s.done and NS.QuestEta(s.objs)
@@ -309,7 +316,8 @@ local function TurnInRoute()
     if not ok or type(list) ~= "table" then return {} end
     local out = {}
     for _, s in ipairs(list) do
-        if s.qid ~= state.questId and #out < ROUTE_ALL then out[#out + 1] = s end
+        -- farm nezetben a fokuszalt quest is az utvonalon van (a kovetkezo nyil oda visz)
+        if (s.qid ~= state.questId or (NS.FarmViewing and NS.FarmViewing())) and #out < ROUTE_ALL then out[#out + 1] = s end
     end
     return out
 end
@@ -320,12 +328,13 @@ local function TurnInKey(list)
     local t = { #list }
     for i, s in ipairs(list) do
         if i > TURNIN_ROUTE then break end
-        t[#t + 1] = s.qid .. ":" .. math.floor((s.dist or 0) / 25) .. (s.deferred and "d" or "")
+        t[#t + 1] = tostring(s.qid or "farm") .. ":" .. math.floor((s.dist or 0) / 25) .. (s.deferred and "d" or "")
     end
     return table.concat(t, ",")
 end
 
 local function RouteText(i, s)
+    if s.farm then return NS.Farm.RouteText(i) end
     local name = s.done and ("|cffffff00" .. L["Turn in: "] .. "|r" .. (s.title or "?")) or (s.title or "?")
     local leg = YdText(s.dist and math.floor(s.dist + 0.5)) -- tolad legvonalban
     local eta = not s.done and NS.QuestEta(s.objs)
@@ -365,16 +374,17 @@ NS.PrepareTurnInRoute = function()
     if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then tiRoute = {} return 0 end
     tiRoute = TurnInRoute()
     tiKey = TurnInKey(tiRoute)
+    -- a futo farm session az utvonal elso allomasa (ha nem az latszik a panelen)
+    local farm = NS.Farm and NS.Farm.RouteEntry()
+    if farm then table.insert(tiRoute, 1, farm) end
     return #tiRoute
 end
+NS.TurnInRouteList = function() return tiRoute end -- tesztek
 
 -- prepared: a PrepareTurnInRoute ebben a frissitesben mar lefutott (nem szamoljuk ujra)
 NS.ShowTurnInPickups = function(y, maxRows, prepared)
     if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then return y end
-    if not prepared then
-        tiRoute = TurnInRoute()
-        tiKey = TurnInKey(tiRoute)
-    end
+    if not prepared then NS.PrepareTurnInRoute() end
     if #tiRoute == 0 then return y end
     local rowH, w = NS.RowH(), NS.PW() - 24
     local visible = math.max(0, math.min(#tiRoute, maxRows or TURNIN_ROUTE))

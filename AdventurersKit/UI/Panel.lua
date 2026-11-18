@@ -229,10 +229,11 @@ local optBtn = ToolButton("Interface\\Icons\\INV_Misc_Gear_01", L["Options"],
     L["Opens the Adventurer's Kit options. Same as /qf options."],
     function() if NS.C.OpenOptions then NS.C.OpenOptions() end end)
 -- farm session (Planner\Farm.lua): ido, XP/ora, lootolt arany es itemek erteke
-local farmBtn = ToolButton("Interface\\Icons\\INV_Misc_Coin_02", L["Farm session"],
+-- ora ikon; futas kozben zold fenyes + piros X (stop) ugyanott (Farm.lua: UpdateButton)
+local farmBtn = ToolButton("Interface\\Icons\\INV_Misc_PocketWatch_01", L["Farm session"],
     function()
-        return (NS.Farm and NS.Farm.IsRunning() and L["A farm session is running. Click: stop it (summary in chat). Same as /qf farm."]
-            or L["Starts a farm session: time, XP per hour and ETA to level, looted gold and item value (vendor, and auction price if Auctionator / TSM is installed). Same as /qf farm."])
+        return (NS.Farm and NS.Farm.IsRunning() and L["A farm session is running. Click: stop it and show the summary. Same as /qf farm."]
+            or L["Starts a farm session on this panel: time, XP per hour and ETA to level, kills, looted gold and item value (vendor, and auction price if Auctionator / TSM is installed). Same as /qf farm."])
     end,
     function() if NS.FarmToggle then NS.FarmToggle() end end)
 farmBtn.tex:SetDesaturated(true)
@@ -411,7 +412,8 @@ grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 -- Visszaadja, honnan kezdodhet a tartalom (y).
 local function PanelChrome(mode, sectionText)
     -- Varosban nincs statisztika (ott nem harcolsz), kiveve leadas modban (utazas dobozok)
-    local quest = mode == "quest" and (state.isComplete or not (NS.InCity and NS.InCity()))
+    -- a farm session (Planner\Farm.lua) mindig statisztikaval
+    local quest = mode == "farm" or (mode == "quest" and (state.isComplete or not (NS.InCity and NS.InCity())))
     panel.stats:SetShown(quest)
     panel.bar:SetShown(quest)
     local y = (quest and -112 or -56) - HEAD
@@ -438,7 +440,7 @@ end
 -- Tartalom utan: elvalaszto + lablec, panel magassag
 -- isList: javaslat mod, ott a felhasznalo altal huzott magassag is szamit (tobb sor fer ki);
 -- quest modban a magassag fix (QuestH), a fogantyu nem latszik.
-local function PanelFinish(y, isList)
+local function PanelFinish(y, isList, fixed)
     -- A panel teteje maradjon a helyen (ne a kozepe korul nojon/zsugorodjon)
     AnchorTopLeft()
     -- a meretezo fogantyu mindig a tartalom (sorok, gorgetheto lista) folott legyen
@@ -447,7 +449,7 @@ local function PanelFinish(y, isList)
     local fh = RowH()
     local h = -y + 8 + fh + 12
     if isList and tonumber(QuestFocusDB.panelH) then h = math.max(h, QuestFocusDB.panelH) end
-    if not isList and state.questId then h = QuestH() end
+    if not isList and (state.questId or fixed) then h = QuestH() end
     panel:SetHeight(h)
     -- a lablec mindig a panel aljan
     panel.footer:ClearAllPoints()
@@ -746,6 +748,7 @@ panel:HookScript("OnUpdate", function(_, dt)
     statsElapsed = statsElapsed + dt
     if statsElapsed < 2 then return end
     statsElapsed = 0
+    if NS.FarmViewing and NS.FarmViewing() then return end -- a farm nezet a sajat tickeret frissiti
     if state.questId then UpdateStats() end
 end)
 
@@ -902,6 +905,52 @@ local function Panel_Update()
         panel:Hide()
         return
     end
+    local F = NS.Farm
+    if F and F.Viewing() then
+        -- Farm session (Planner\Farm.lua): ugy latszik, mint egy quest. Cim ora ikonnal, a stat
+        -- dobozok ido / XP per ora / arany per ora, a sorok objective stilusban, alatta az utvonal.
+        -- A nyilak: a kovetkezo a questekre visz, a vissza nyil onnan ide hoz (Planner\QuestNav.lua).
+        if NS.HidePrep then NS.HidePrep() end
+        if NS.HideSuggestions then NS.HideSuggestions() end
+        for i = 1, #panel.lines do panel.lines[i]:Hide() end
+        panel.objScroll:Hide()
+        for i = 1, #panel.extraRows do panel.extraRows[i]:Hide() end
+        panel.extraHeader:Hide()
+        if panel.extraMore then panel.extraMore:Hide() end
+        if panel.hsRow then panel.hsRow:Hide() end
+        if panel.escortRow then panel.escortRow:Hide() end
+        clearBtn:Hide() -- (az OnHide a nyilakat is elrejti: utana mutatjuk)
+        mapBtn:Hide()
+        prevBtn:Show(); nextBtn:Show()
+        if prevBtn.SetEnabled then prevBtn:SetEnabled(false) end -- a farm az utvonal elso allomasa
+        iconFrame:Show()
+        panel.icon:SetTexture(F.ICON)
+        panel.title:ClearAllPoints()
+        panel.title:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 8, -1)
+        panel.title:SetText(L["Farm session"])
+        panel.title:SetWidth(PW() - 100)
+        panel.title:SetWidth(math.min(math.ceil(panel.title:GetStringWidth()) + 2, PW() - 100))
+        local y = PanelChrome("farm", L["FARM SESSION"])
+        F.UpdatePanelStats(panel)
+        local rh = RowH()
+        y = F.DrawPanel(panel, y, PW() - 24, rh)
+        local routeN = 0
+        if NS.PrepareTurnInRoute then
+            local ok, n = pcall(NS.PrepareTurnInRoute)
+            if ok and n then routeN = n end
+        end
+        if routeN > 0 and NS.ShowTurnInPickups then
+            local avail = QuestH() - (8 + rh + 12) - (-y) - 19
+            local rRows = math.max(0, math.min(routeN, math.floor(avail / rh)))
+            local ok, ny = pcall(NS.ShowTurnInPickups, y, rRows, true)
+            if ok and ny then y = ny end
+        end
+        panel.footer:SetText(F.FooterText())
+        PanelFinish(y, false, true)
+        ShowPanel()
+        return
+    end
+    if F then F.HidePanelRows() end
     -- dungeon prep mod (Planner\Prep.lua): a fokusz torles gomb ott a prep mod vege, kozvetlenul
     -- a cim utan (nyilak / terkep nelkul)
     local prepMode = not state.questId and NS.PrepActive and NS.PrepActive() and NS.ShowPrep and true or false

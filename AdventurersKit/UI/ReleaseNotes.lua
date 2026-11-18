@@ -5,6 +5,19 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.8", date = "2026-11-18", items = {
+        "Farm session on the quest panel: it shows like a quest, titled \"Farm session\" with a clock. The boxes show "
+            .. "time, XP per hour and gold per hour; the rows show XP gained, XP to level with an ETA, mobs killed, "
+            .. "looted gold, item value at vendor price and the best sale value. Hover a row for the top items.",
+        "Farm session: it is the first stop of the route while it runs. The next arrow goes to your quests (the "
+            .. "session keeps running), the back arrow or its route row brings it back. Clicking a quest also switches.",
+        "Farm session: the clock button glows green and shows a red X while a session runs; click it to stop. "
+            .. "Stopping opens a summary window (duration, kills and top mobs, XP, levels, looted gold, items, gold per "
+            .. "hour) with Start new / Close, and prints one line to chat. Switch the window off in Options > Route & "
+            .. "progress. /qf farm show brings the session back to the panel.",
+        "Fix: the separate farm box (0.7.6) showed only its first line, cut with \"...\". It is gone; the panel shows "
+            .. "the session instead.",
+    } },
     { version = "0.7.7", date = "2026-11-18", items = {
         "Behind the scenes: the addon's look (dark background, gold border, orange strip, flat gold buttons, "
             .. "thin gold scrollbar) is now written down with shared building blocks, so new windows match the "

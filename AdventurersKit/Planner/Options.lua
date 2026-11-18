@@ -48,6 +48,12 @@ rt:Check(L["Ask to share dungeon quests on entering"],
     .. L["dungeon quests with the party (tick the ones you want). Only out of combat, once per entry."],
     function() return not QuestFocusDB.noShareAsk end,
     function(v) QuestFocusDB.noShareAsk = not v end)
+rt:Header(L["Farm session"])
+rt:Check(L["Summary window when a farm session stops"],
+    L["Stopping a farm session (the clock button or /qf farm stop) opens a window with the duration, kills, XP, "]
+    .. L["levels, looted gold, item value and gold per hour. A one-line summary goes to chat either way."],
+    function() return not QuestFocusDB.noFarmSummary end,
+    function(v) QuestFocusDB.noFarmSummary = not v or nil end)
 pageRoute:HookScript("OnShow", function() rt:Refresh() end)
 
 ---------------------------------------------------------------------------
