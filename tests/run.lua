@@ -1304,30 +1304,50 @@ test("AH quest items: modern auction house (commodities and item auctions)", fun
     W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
 
--- 0.7.14: All The Things puts its AH button on the shared side bar (AuctionHouseFrameTabSideBar,
--- -52 below the top); our tab went right under it. Now it goes below the bar's tabs, can be
--- dragged (saved relative to the AH) and right click resets; the addon icon from the .toc.
-test("AH quest items: tab next to All The Things, drag, reset, icon", function()
+-- 0.7.14 / 0.7.15: All The Things puts its AH button on the shared side bar
+-- (AuctionHouseFrameTabSideBar, -52 below the top). Our tab sits right above it by default, drags
+-- only up and down that edge (clamped to the AH height, saved as ahqTabY), right click resets.
+-- Inside the AH the list uses the AH's own look (ButtonFrameTemplate, UIPanelButtonTemplate).
+test("AH quest items: tab above All The Things' button, vertical drag, AH look", function()
     local A = NS.AHQ
     eq(A.AddonIcon(), "Interface\\Icons\\INV_Misc_Map_01", "addon icon from the .toc IconTexture")
     local host = CreateFrame("Frame", "AuctionHouseFrame", UIParent)
+    host:SetSize(800, 600)
     local sb = CreateFrame("Frame", "AuctionHouseFrameTabSideBar", host)
-    sb.Tabs = { {} } -- ATT's tab
-    QuestFocusDB.ahqTabPos, QuestFocusDB.ahqPos = nil, nil
+    local att = CreateFrame("Frame", nil, sb)
+    sb.Tabs = { att } -- ATT's button
+    QuestFocusDB.ahqTabY, QuestFocusDB.ahqPos = nil, nil
     W.Fire("AUCTION_HOUSE_SHOW")
     local p = A.tab.__pts[1]
-    check(p and p[2] == sb, "default: on the side bar (moves out with ATT's panel)")
-    check(p and p[5] < -52 - 30, "below ATT's tab: " .. tostring(p and p[5]))
+    check(p and p[1] == "BOTTOMLEFT" and p[2] == att and p[3] == "TOPLEFT" and p[5] > 0, "default: right above ATT's button")
+    -- vertical drag: only the y offset changes, clamped to the AH height
+    W.cursorX, W.cursorY = 0, 0
+    A.tab.__scripts.OnDragStart(A.tab)
+    W.cursorX, W.cursorY = 300, -100 -- sideways movement is ignored
+    A.tab.__scripts.OnUpdate(A.tab, 0.1)
+    p = A.tab.__pts[1]
+    check(p[2] == sb and p[1] == "TOPLEFT" and p[3] == "TOPRIGHT", "stays on the edge column")
+    eq(p[4], -2, "x does not follow the mouse")
+    eq(p[5], -100, "y follows the mouse")
+    W.cursorY = -5000
+    A.tab.__scripts.OnUpdate(A.tab, 0.1)
+    eq(A.tab.__pts[1][5], -(600 - 34), "clamped to the AH height")
     A.tab.__scripts.OnDragStop(A.tab)
-    local pos = QuestFocusDB.ahqTabPos
-    check(pos and pos.rel == "host", "dragged place saved relative to the AH")
-    check(A.tab.__pts[1][2] == host, "after the drag: anchored to the AH frame")
+    eq(QuestFocusDB.ahqTabY, -566, "vertical offset saved")
     A.tab:Click("RightButton")
-    eq(QuestFocusDB.ahqTabPos, nil, "right click resets the place")
-    check(A.tab.__pts[1][2] == sb, "back on the side bar")
+    eq(QuestFocusDB.ahqTabY, nil, "right click resets the place")
+    check(A.tab.__pts[1][2] == att, "back above ATT's button")
+    rawset(_G, "AuctionHouseFrameTabSideBar", nil)
+    A.PlaceTab()
+    p = A.tab.__pts[1]
+    check(p[2] == host and p[5] == -52, "no ATT: near the top of the AH's right edge")
     A.Toggle(true)
     local fp = A.frame.__pts
-    check(fp[#fp][2] == A.tab or fp[#fp][2] == sb, "panel next to the tab")
+    check(fp[#fp][2] == A.tab, "panel opens beside the tab")
+    check(A.frame.blizz and A.frame.__template == "ButtonFrameTemplate", "panel uses the AH's frame template")
+    check(A.frame.buyAll.blizz and A.frame.rescan.blizz, "Buy all / Rescan prices: the AH's red buttons")
+    check(A.frame.buyAll.__template == "UIPanelButtonTemplate", "UIPanelButtonTemplate")
+    W.cursorX, W.cursorY = nil, nil
     A.Toggle(false)
     W.Fire("AUCTION_HOUSE_CLOSED")
     QuestFocusDB.ahqOpen = nil

@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.15", date = "2026-11-18", items = {
+        "Auction house quest items: the tab now sits right above All The Things' button on the auction house's "
+            .. "right edge (near the top of the edge without ATT). Dragging moves it only up and down that edge, kept "
+            .. "within the window's height; right click puts it back.",
+        "Auction house quest items: the list looks like the auction house itself: the Blizzard window frame and the "
+            .. "red buttons (row Buy, Rescan prices, Buy all). It opens beside the tab, not over ATT's button or panel.",
+    } },
     { version = "0.7.14", date = "2026-11-18", items = {
         "Auction house quest items tab: it no longer sits under All The Things' button. By default it goes below "
             .. "the other side tabs (ATT's), and moves out with them when ATT's Auction Module is open; the list opens "

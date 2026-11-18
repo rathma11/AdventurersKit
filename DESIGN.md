@@ -216,6 +216,7 @@ distance, and `BTN_HL` hover. The menu is in `UISpecialFrames`.
 
 ## Behaviour conventions
 
+- **Inside Blizzard frames (AH), match the host frame's controls instead of NS.Style flat buttons.** A window that sits next to a Blizzard frame and belongs to it uses that frame's look. For example, the AH quest items list (`Planner\AuctionQuest.lua`) uses `ButtonFrameTemplate` (portrait and button bar hidden, as Auctionator does) and `UIPanelButtonTemplate` red buttons. Create them with `pcall` and fall back to `NS.Style` if a template is missing on the client. Small boxes, popups and everything outside Blizzard frames keep the NS.Style look.
 - **Combat:** nothing secure-sensitive in combat (macro edits, secure buttons, showing / hiding / moving secure frames). Check `InCombatLockdown()`, store what is pending, and do it on `PLAYER_REGEN_ENABLED` (see `Core\Events.lua`: `state.pendingBody`). Non-secure frames may update in combat, but must not change size.
 - **Saved data:** positions and sizes are saved in `QuestFocusDB` (`panelPos`, `panelH`, `farmSumPos`, `qpopPos`, `citySize`). Per-character settings go in `NS.CharDB()` (its key also in `NS.CHAR_KEYS` if it used to be account-wide).
 - **Options toggle:** every new popup or box gets an on / off switch in Options (`NS.AddOptionsTab` + `NS.OptFlow(page):Check(label, desc, get, set)`), with a short grey description under it.

@@ -768,6 +768,29 @@ local function RowTooltip(row)
     NS.TT.Finish(tt, L["Click: search for it in the auction house"], L["Buy: buy the cheapest auctions after a confirmation"])
 end
 
+-- Az AH-n belul az AH sajat kinezete (DESIGN.md): Blizzard ablak keret (ButtonFrameTemplate,
+-- portre es gombsav nelkul, mint az Auctionator ablakai) es piros UIPanelButtonTemplate gombok.
+-- Ha egy sablon nincs a kliensen: a mi stilusunk (NS.Style) a tartalek.
+local function AHButton(parent, text, w, h)
+    local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate")
+    if not (ok and b) then
+        b = S.FlatButton(parent, text, w, h)
+        return b
+    end
+    b:SetSize(w, h)
+    b:SetText(text)
+    b.blizz = true
+    b.text = b.GetFontString and b:GetFontString() or b.text
+    return b
+end
+A.AHButton = AHButton
+
+-- Engedelyezes / tiltas: a Blizzard gomb maga kezeli a szurke kinezetet, a lapos gombnal mi
+local function SetBtnEnabled(b, on)
+    if on then b:Enable() else b:Disable() end
+    if not b.blizz and b.text then b.text:SetFontObject(on and "GameFontNormalSmall" or "GameFontDisableSmall") end
+end
+
 local function MakeRow(parent, i)
     local r = CreateFrame("Button", nil, parent)
     r:SetHeight(ROW_H)
@@ -778,7 +801,7 @@ local function MakeRow(parent, i)
     r.icon:SetSize(24, 24)
     r.icon:SetPoint("LEFT", 2, 0)
     r.icon:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
-    r.buy = S.FlatButton(r, L["Buy"], 40, 18)
+    r.buy = AHButton(r, L["Buy"], 46, 20)
     r.buy:SetPoint("RIGHT", -2, 0)
     r.buy:SetScript("OnClick", function(self)
         local x = self:GetParent().data
@@ -835,31 +858,53 @@ end
 
 local function BuildFrame()
     if frame then return frame end
-    local f = CreateFrame("Frame", "AdventurersKitAHQuest", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    local ok, f = pcall(CreateFrame, "Frame", "AdventurersKitAHQuest", UIParent, "ButtonFrameTemplate")
+    local blizz = ok and f and true or false
+    if not blizz then
+        f = CreateFrame("Frame", "AdventurersKitAHQuest", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    end
+    f.blizz = blizz
     f:SetSize(W, H)
     f:SetFrameStrata("HIGH")
     f:Hide()
-    S.Backdrop(f, "window")
     S.Draggable(f, "ahqPos")
-    f.iconTex = f:CreateTexture(nil, "ARTWORK")
-    f.iconTex:SetSize(20, 20)
-    f.iconTex:SetPoint("TOPLEFT", 12, -11)
-    f.iconTex:SetTexture(A.AddonIcon())
-    f.iconTex:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.title:SetPoint("LEFT", f.iconTex, "RIGHT", 6, 0)
-    f.title:SetTextColor(S.TITLE[1], S.TITLE[2], S.TITLE[3])
-    f.title:SetText(L["Quest items to buy"])
-    f.close = S.CloseButton(f, true)
-    f.close:SetScript("OnClick", function() A.Toggle(false) end)
-    local line = S.Divider(f, 0.35)
-    line:SetPoint("TOPLEFT", 12, -36)
-    line:SetPoint("TOPRIGHT", -12, -36)
+    local top -- a tartalom teteje (a cimsor alatt)
+    if blizz then
+        local hidePortrait, hideBar = rawget(_G, "ButtonFrameTemplate_HidePortrait"), rawget(_G, "ButtonFrameTemplate_HideButtonBar")
+        if type(hidePortrait) == "function" then pcall(hidePortrait, f) end
+        if type(hideBar) == "function" then pcall(hideBar, f) end
+        local title = L["Quest items to buy"]
+        if type(f.SetTitle) == "function" and pcall(f.SetTitle, f, title) then
+            -- kesz
+        elseif type(rawget(f, "TitleText")) == "table" then
+            f.TitleText:SetText(title)
+        end
+        -- a sablon X-e csak elrejt: a bezaras ugyanaz, mint nalunk
+        if type(rawget(f, "CloseButton")) == "table" then f.CloseButton:SetScript("OnClick", function() A.Toggle(false) end) end
+        top = -30
+    else
+        S.Backdrop(f, "window")
+        f.iconTex = f:CreateTexture(nil, "ARTWORK")
+        f.iconTex:SetSize(20, 20)
+        f.iconTex:SetPoint("TOPLEFT", 12, -11)
+        f.iconTex:SetTexture(A.AddonIcon())
+        f.iconTex:SetTexCoord(S.TEXCOORD[1], S.TEXCOORD[2], S.TEXCOORD[3], S.TEXCOORD[4])
+        f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        f.title:SetPoint("LEFT", f.iconTex, "RIGHT", 6, 0)
+        f.title:SetTextColor(S.TITLE[1], S.TITLE[2], S.TITLE[3])
+        f.title:SetText(L["Quest items to buy"])
+        f.close = S.CloseButton(f, true)
+        f.close:SetScript("OnClick", function() A.Toggle(false) end)
+        local line = S.Divider(f, 0.35)
+        line:SetPoint("TOPLEFT", 12, -36)
+        line:SetPoint("TOPRIGHT", -12, -36)
+        top = -42
+    end
     f.section = S.Section(f, L["STILL NEEDED (QUEST LOG)"])
-    f.section:SetPoint("TOPLEFT", 14, -42)
+    f.section:SetPoint("TOPLEFT", 14, top)
 
     f.scroll = CreateFrame("ScrollFrame", nil, f)
-    f.scroll:SetPoint("TOPLEFT", 12, -60)
+    f.scroll:SetPoint("TOPLEFT", 12, top - 18)
     f.scroll:SetPoint("BOTTOMRIGHT", -18, 74)
     f.child = CreateFrame("Frame", nil, f.scroll)
     f.child:SetSize(W - 30, 10)
@@ -891,7 +936,7 @@ local function BuildFrame()
     f.total:SetPoint("RIGHT", -14, 0)
     f.total:SetJustifyH("LEFT")
     f.total:SetWordWrap(false)
-    f.buyAll = S.FlatButton(f, L["Buy all"], 100, 22)
+    f.buyAll = AHButton(f, L["Buy all"], 110, 22)
     f.buyAll:SetPoint("BOTTOMRIGHT", -12, 10)
     f.buyAll:SetScript("OnClick", function()
         local list = {}
@@ -905,7 +950,7 @@ local function BuildFrame()
         GameTooltip:Show()
     end)
     f.buyAll:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    f.rescan = S.FlatButton(f, L["Rescan prices"], 100, 22)
+    f.rescan = AHButton(f, L["Rescan prices"], 120, 22)
     f.rescan:SetPoint("BOTTOMLEFT", 12, 10)
     f.rescan:SetScript("OnClick", function()
         pauseUntil = 0
@@ -952,8 +997,7 @@ Refresh = function()
             local hint, src = AddonHint(e)
             r.hint:SetText(plan.partial and ((L["only %d"]):format(plan.available))
                 or (hint and (("%s %s"):format(src, Money(hint))) or (L["%s each"]):format(Money(plan.lowestUnit))))
-            r.buy:Enable()
-            r.buy.text:SetFontObject("GameFontNormalSmall")
+            SetBtnEnabled(r.buy, true)
         else
             local hint, src = AddonHint(e)
             -- nincs meg sajat lekerdezes: az addon ara becsleskent (~, halvany); Buy csak elo adatbol
@@ -961,8 +1005,7 @@ Refresh = function()
                 or hint and ("|cff" .. hex.DIM .. "~" .. Money(hint * e.need) .. "|r")
                 or x.state == "scanning" and ("|cff" .. hex.DIM .. "...|r") or ("|cff" .. hex.DIM .. "?|r"))
             r.hint:SetText(hint and (("%s %s"):format(src, Money(hint))) or "")
-            r.buy:Disable()
-            r.buy.text:SetFontObject("GameFontDisableSmall")
+            SetBtnEnabled(r.buy, false)
         end
         r:Show()
     end
@@ -987,8 +1030,7 @@ Refresh = function()
     end
     f.total:SetText(("|cff%s%s|r %s"):format(hex.LABEL, L["Total if you buy all:"], priced > 0 and Money(total) or "-")
         .. (empty > 0 and ("  |cff" .. hex.DIM .. (L["(%d not on the AH)"]):format(empty) .. "|r") or ""))
-    if priced > 0 then f.buyAll:Enable(); f.buyAll.text:SetFontObject("GameFontNormalSmall")
-    else f.buyAll:Disable(); f.buyAll.text:SetFontObject("GameFontDisableSmall") end
+    SetBtnEnabled(f.buyAll, priced > 0)
 end
 A.Refresh = function() Refresh() end
 A.current, A.rows = current, rows
@@ -1000,8 +1042,9 @@ local function SideBar()
     if type(sb) == "table" and sb.GetRight then return sb end
 end
 
--- A panel a ful mellett. Ha a ful egy masik addon ablaka (ATT) fele kerulne, a panel a sav
--- (= az az ablak) jobb oldalara megy, hogy ne takarja.
+-- A panel a ful jobb oldalan, teteje az AH tetejevel egy vonalban. A ful a jobb szel oszlopaban ul
+-- (ugyanott, ahol az ATT gombja), es ha az ATT "Auction Module" ablaka nyitva van, az egesz oszlop
+-- annak a jobb szelere kerul: igy a panel sem az ATT gombjat, sem az ablakat nem takarja.
 local function PlaceFrame()
     if S.RestorePos(frame, "ahqPos") then return end
     frame:ClearAllPoints()
@@ -1009,13 +1052,8 @@ local function PlaceFrame()
         frame:SetPoint("LEFT", UIParent, "LEFT", 800, 0)
         return
     end
-    local host, sb = Host(), SideBar()
-    local tl, sbl, sbr = tab:GetLeft(), sb and sb:GetLeft(), sb and sb:GetRight()
-    local hr = host and host:GetRight()
-    if tl and sbl and hr and sbl > hr + 20 and tl < sbl then
-        -- az ATT ablak nyitva (a sav eltolva), a ful attol balra: a panel a sav jobb oldalara
-        frame:SetPoint("TOPLEFT", sb, "TOPRIGHT", 40, 0)
-    elseif host and not (QuestFocusDB and QuestFocusDB.ahqTabPos) then
+    local host = Host()
+    if host then
         frame:SetPoint("TOP", host, "TOP", 0, 0)
         frame:SetPoint("LEFT", tab, "RIGHT", 2, 0)
     else
@@ -1056,22 +1094,25 @@ local function BuildTab()
     t:SetScript("OnClick", function(_, button)
         if button == "RightButton" then A.ResetTabPos() else A.Toggle() end
     end)
-    -- huzhato: a hely az AH ablak jobb felso sarkahoz kepest mentve (QuestFocusDB.ahqTabPos)
-    t:SetMovable(true)
-    t:SetClampedToScreen(true)
+    -- huzhato, de csak fel-le az AH jobb szelen; a fuggoleges hely mentve (QuestFocusDB.ahqTabY)
     t:RegisterForDrag("LeftButton")
-    t:SetScript("OnDragStart", function(self) GameTooltip:Hide(); self:StartMoving() end)
+    t:SetScript("OnDragStart", function(self)
+        GameTooltip:Hide()
+        local edge = A.TabEdge()
+        if not (edge and edge:GetTop() and self:GetTop()) then return end
+        local _, cy = GetCursorPosition()
+        local sc = UIParent:GetEffectiveScale() or 1
+        self.drag = { cy = (cy or 0) / sc, y0 = self:GetTop() - edge:GetTop(), sc = sc }
+        self:SetScript("OnUpdate", function(s)
+            local _, y = GetCursorPosition()
+            s.dragY = A.ClampTabY(s.drag.y0 + (y or 0) / s.drag.sc - s.drag.cy)
+            A.PlaceTab(s.dragY)
+        end)
+    end)
     t:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        if self.SetUserPlaced then pcall(self.SetUserPlaced, self, false) end
-        local host, l, top = Host(), self:GetLeft(), self:GetTop()
-        if QuestFocusDB and l and top then
-            if host and host:GetRight() and host:GetTop() then
-                QuestFocusDB.ahqTabPos = { x = math.floor(l - host:GetRight() + 0.5), y = math.floor(top - host:GetTop() + 0.5), rel = "host" }
-            else
-                QuestFocusDB.ahqTabPos = { x = math.floor(l + 0.5), y = math.floor(top + 0.5), rel = "screen" }
-            end
-        end
+        self:SetScript("OnUpdate", nil)
+        if self.drag and self.dragY and QuestFocusDB then QuestFocusDB.ahqTabY = math.floor(self.dragY + 0.5) end
+        self.drag, self.dragY = nil, nil
         A.PlaceTab()
         if frame and frame:IsShown() then PlaceFrame() end
     end)
@@ -1080,7 +1121,7 @@ local function BuildTab()
         GameTooltip:SetText(L["Adventurer's Kit: quest items"], 1, 1, 1)
         GameTooltip:AddLine(L["Quest items from your log you can buy here, with prices. Turn the tab off in Options > Auction house."], 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(L["Click: open / close the list. Drag: move. Right click: reset the place."], 0.5, 0.5, 0.5, true)
+        GameTooltip:AddLine(L["Click: open / close the list. Drag: move it up or down the edge. Right click: reset the place."], 0.5, 0.5, 0.5, true)
         GameTooltip:Show()
     end)
     t:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1089,30 +1130,56 @@ local function BuildTab()
     return t
 end
 
--- Alap hely: a kozos oldalsavban (ATT) a mar ott levo fulek alatt; sav nelkul az AH jobb
--- szelen lejjebb (az ATT fule -52-nel ul). Mentett hely: az AH-hoz kepest (vagy a kepernyon).
-local TAB_STEP = 46
-local function PlaceTab()
+-- A ful oszlopa: a kozos oldalsav (ATT; az ATT ablaka mellett kint van), kulonben az AH jobb szele.
+-- Vissza: a frame, amihez igazodunk, es az x eltolas (az ATT fule is -2-vel ul a savon).
+function A.TabEdge()
+    local sb, host = SideBar(), Host()
+    if sb and host then return sb, -2 end
+    if host then return host, 0 end
+end
+
+-- Az ATT gombja (a sav elso fule, ami nem a mienk): alapbol kozvetlenul folotte ulunk
+function A.ATTButton()
+    local sb = SideBar()
+    if not (sb and type(sb.Tabs) == "table") then return end
+    for _, b in ipairs(sb.Tabs) do
+        if type(b) == "table" and b ~= tab and b.GetTop and (not b.IsShown or b:IsShown()) then return b end
+    end
+end
+
+-- Fuggoleges eltolas az oszlop tetejehez kepest, az AH magassagan belul tartva
+function A.ClampTabY(y)
+    local host = Host()
+    local h = host and host:GetHeight() or 400
+    local th = tab and tab:GetHeight() or 34
+    return math.max(-(h - th), math.min(0, tonumber(y) or 0))
+end
+
+-- Alap hely: az ATT gombja folott 4px-szel (BOTTOM a TOP-jahoz); ATT nelkul a jobb szel teteje
+-- kozeleben (-52, a cimsor alatt). Huzas utan a mentett fuggoleges hely (ahqTabY) szamit.
+local TAB_DEFAULT_Y, TAB_GAP = -52, 4
+local function PlaceTab(dragY)
     if not tab then return end
-    local host, sb, pos = Host(), SideBar(), QuestFocusDB and QuestFocusDB.ahqTabPos
+    local edge, x = A.TabEdge()
+    local y = dragY or (QuestFocusDB and QuestFocusDB.ahqTabY)
     tab:ClearAllPoints()
-    if pos and pos.rel == "host" and host then
-        tab:SetPoint("TOPLEFT", host, "TOPRIGHT", pos.x or 0, pos.y or -130)
-    elseif pos and pos.rel == "screen" then
-        tab:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x or 0, pos.y or 0)
-    elseif sb and host then
-        local n = type(sb.Tabs) == "table" and #sb.Tabs or 1
-        tab:SetPoint("TOPLEFT", sb, "TOPRIGHT", -2, -52 - TAB_STEP * math.max(1, n))
-    elseif host then
-        tab:SetPoint("TOPLEFT", host, "TOPRIGHT", 0, -52 - TAB_STEP * 2)
-    else
+    if not edge then
         tab:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 780, -170)
+    elseif y then
+        tab:SetPoint("TOPLEFT", edge, "TOPRIGHT", x, A.ClampTabY(y))
+    else
+        local att = A.ATTButton()
+        if att then
+            tab:SetPoint("BOTTOMLEFT", att, "TOPLEFT", 0, TAB_GAP)
+        else
+            tab:SetPoint("TOPLEFT", edge, "TOPRIGHT", x, TAB_DEFAULT_Y)
+        end
     end
 end
 A.PlaceTab = PlaceTab
 
 function A.ResetTabPos()
-    if QuestFocusDB then QuestFocusDB.ahqTabPos, QuestFocusDB.ahqPos = nil, nil end
+    if QuestFocusDB then QuestFocusDB.ahqTabY, QuestFocusDB.ahqTabPos, QuestFocusDB.ahqPos = nil, nil, nil end
     PlaceTab()
     if frame and frame:IsShown() then PlaceFrame() end
 end
