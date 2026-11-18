@@ -1047,7 +1047,7 @@ test("farm session: totals, pause, summary", function()
     for i = before + 1, #W.chat do if contains(W.chat[i], "per hour") and contains(W.chat[i], "(AH)") then sawAH = true end end
     check(sawAH, "chat line marks gold per hour as AH")
     local hit
-    for _, it in ipairs(sf.items) do if it.hit and it.hit:IsShown() then hit = it.hit break end end
+    for _, it in ipairs(sf.items) do if it.hit and it.hit:IsShown() and it.hit.tipKind == "gold" then hit = it.hit break end end
     check(hit ~= nil, "summary LOOT rows are hoverable")
     if hit then
         W.FireScript(hit, "OnEnter")
@@ -1127,7 +1127,54 @@ test("farm session: live counters, rested XP, summary groups", function()
     check(t.baseH and math.abs(t.baseH - 250 / (t.elapsed / 3600)) < 1, "base pace without rested")
     check(t.eta and math.abs(t.eta - F.EtaSeconds(t.need, t.baseH, 2875)) < 1, "ETA uses the base pace and the pool")
 
+    -- 0.8.7: XP breakdown tooltip: kill XP (base / rested), quests and other, pace (overall, last 5 min),
+    -- XP per kill, kills to level, ETA with / without rested, rested pool in kills, level progress
+    W.player.xp = 900; W.Fire("PLAYER_XP_UPDATE", "player") -- a quest turn-in: XP without a kill line
+    t = F.Totals()
+    local s = F.XPStats(t, fd)
+    eq(s.killXP, 500, "kill XP from the kill lines")
+    eq(s.rested, 250, "rested part of the kill XP")
+    eq(s.baseKill, 250, "base kill XP")
+    eq(s.other, 300, "quests and other XP")
+    eq(s.perKill, 250, "XP per kill")
+    eq(s.basePerKill, 125, "base XP per kill")
+    eq(s.killsToLevel, math.ceil((9100 - 2875) / 125), "kills to level (rested doubles the first ones)")
+    eq(s.poolKills, 23, "rested pool lasts ~23 kills")
+    eq(s.cur, 900, "level progress: current")
+    check(s.pct and math.abs(s.pct - 9) < 0.01, "level progress %")
+    check(s.sessionPct and math.abs(s.sessionPct - 8) < 0.01, "session XP as % of the level")
+    check(s.etaRested and s.etaNoRested and s.etaNoRested > s.etaRested, "ETA without rested is longer")
+    eq(s.recentH, nil, "last 5 min pace needs 2 minutes of samples")
+    W.Advance(150, 5)
+    s = F.XPStats(F.Totals(), fd)
+    check(s.recentH ~= nil, "last 5 min pace after 2+ minutes")
+    W.FireScript(b[2], "OnEnter")
+    local xtip = table.concat(GameTooltip.__lines or {}, "\n")
+    for _, want in ipairs({ "XP breakdown", "from kills", "rested bonus", "quests and other", "XP per hour, last 5 min",
+        "XP per kill", "Kills to level", "Time to level", "without the rested XP", "Rested XP left", "This session" }) do
+        check(contains(xtip, want), "XP tooltip: " .. want)
+    end
+    GameTooltip:Hide()
+    local row1
+    for _, f in ipairs(W.frames) do
+        if f.__parent == NS.panel and f.__kind == "Button" and f:IsShown() and f.text and contains(f.text:GetText(), "XP gained") then row1 = f end
+    end
+    if check(row1, "XP row on the panel") then
+        W.FireScript(row1, "OnEnter")
+        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "Kills to level"), "XP row hover: XP breakdown")
+        GameTooltip:Hide()
+    end
+
     SlashCmdList.QUESTFOCUS("farm stop")
+    local xhit
+    for _, it in ipairs(F.SummaryFrame().items) do
+        if it.hit and it.hit:IsShown() and it.hit.tipKind == "xp" then xhit = it.hit break end
+    end
+    if check(xhit, "summary XP rows are hoverable") then
+        W.FireScript(xhit, "OnEnter")
+        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "XP breakdown"), "summary hover: XP breakdown")
+        GameTooltip:Hide()
+    end
     local data = F.SummaryData(fd)
     local secs, divs = {}, 0
     for _, e in ipairs(data) do

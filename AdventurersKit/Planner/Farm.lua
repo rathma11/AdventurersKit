@@ -305,6 +305,65 @@ function F.OnKillMsg(msg)
     fd.kills[name] = (fd.kills[name] or 0) + 1
     fd.killCount = (fd.killCount or 0) + 1
     fd.rested = (fd.rested or 0) + F.ParseRested(msg)
+    -- kill XP (a rested bonusszal egyutt): a tobbi XP (quest leadas, felfedezes) = osszes - kill XP
+    fd.killXP = (fd.killXP or 0) + (tonumber(msg:match("you gain (%d+) experience")) or 0)
+end
+
+---------------------------------------------------------------------------
+-- XP minta az utolso ~5 perc tempojahoz: 30 mp-enkent { eltelt ido, XP } (csak memoriaban)
+---------------------------------------------------------------------------
+local xpSamples = {}
+local RECENT = 300
+function F.SampleXP(fd)
+    fd = fd or DB()
+    if not (fd and fd.running) then return end
+    local e = fd.elapsed or 0
+    local last = xpSamples[#xpSamples]
+    if last and e - last.e < 30 then return end
+    xpSamples[#xpSamples + 1] = { e = e, xp = fd.xp or 0 }
+    while #xpSamples > 2 and e - xpSamples[2].e >= RECENT do table.remove(xpSamples, 1) end
+end
+function F.ResetSamples() wipe(xpSamples) end
+-- XP / ora az utolso ~5 percben (legalabb 2 perc minta kell), kulonben nil
+function F.RecentXPH(fd)
+    fd = fd or DB()
+    local first = xpSamples[1]
+    if not (fd and first) then return nil end
+    local span = (fd.elapsed or 0) - first.e
+    if span < 120 then return nil end
+    return ((fd.xp or 0) - first.xp) / span * 3600, span
+end
+
+-- XP adatok a tooltiphez: kill XP (alap / rested), quest es egyeb XP, kill atlag, killek a szintig,
+-- ETA rested poollal es anelkul, a rested pool hany killig tart, szint haladas, session a szint %-aban
+function F.XPStats(t, fd)
+    fd = fd or DB()
+    local s = {}
+    local kills = fd and fd.killCount or 0
+    s.killXP = math.min(t.xp, fd and fd.killXP or 0)
+    s.rested = math.min(t.rested or 0, s.killXP)
+    s.baseKill = s.killXP - s.rested
+    s.other = math.max(0, t.xp - s.killXP)
+    s.kills = kills
+    if kills > 0 then
+        s.perKill = s.killXP / kills
+        s.basePerKill = s.baseKill / kills
+    end
+    s.cur, s.max = UnitXP("player") or 0, UnitXPMax("player") or 0
+    s.pct = s.max > 0 and s.cur / s.max * 100 or nil
+    s.sessionPct = s.max > 0 and t.xp / s.max * 100 or nil
+    s.pool = t.restedLeft or 0
+    if t.need and s.basePerKill and s.basePerKill > 0 then
+        -- rested killnel a bonus = alap XP (dupla), amig van pool: killek = (need - min(pool, need/2)) / alap
+        s.killsToLevel = math.ceil((t.need - math.min(s.pool, t.need / 2)) / s.basePerKill)
+        if s.pool > 0 then s.poolKills = math.ceil(s.pool / s.basePerKill) end
+    end
+    s.recentH = F.RecentXPH(fd)
+    if t.need then
+        s.etaRested = t.eta
+        if t.baseH and t.baseH > 0 then s.etaNoRested = t.need / t.baseH * 3600 end
+    end
+    return s
 end
 
 -- legtobbet olt mobok: { { name, n }, ... } csokkeno sorrendben
@@ -406,6 +465,12 @@ function F.UpdatePanelStats(panel)
         b[3]:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
     b[3]:EnableMouse(true)
+    if not b[2].qfFarmTip then
+        b[2].qfFarmTip = true
+        b[2]:SetScript("OnEnter", function(self) if F.Viewing() and F.XPTooltip then F.XPTooltip(self) end end)
+        b[2]:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    b[2]:EnableMouse(true)
     local max = UnitXPMax("player") or 0
     panel.bar:SetValue(max > 0 and (UnitXP("player") or 0) / max or 0)
     panel.bar:SetStatusBarColor(0.58, 0.35, 0.85) -- XP lila (mint a jatek XP csikja)
@@ -456,6 +521,56 @@ function F.GoldBreakdown(tt, t)
     if not h then tt:AddLine(L["Per hour values come after the first minute."], 0.6, 0.6, 0.6, true) end
 end
 
+-- XP bontas a tooltipbe (elo nezet: XP doboz, XP / szint / kill sorok; osszegzo: TIME AND XP sorok)
+function F.XPBreakdown(tt, t, fd)
+    local s = F.XPStats(t, fd)
+    local h = t.elapsed >= 60 and (t.elapsed / 3600) or nil
+    local function line(label, value, r, g, b) tt:AddDoubleLine(label, value, r or 1, g or 1, b or 1, 1, 1, 1) end
+    local function dim(x) return "  |cff999999" .. x .. "|r" end
+    local function rate(v) return h and dim(Num(v / h) .. L["/h"]) or "" end
+    if NS.TT then NS.TT.Sub(tt, L["XP breakdown"]) else tt:AddLine(L["XP breakdown"], 1, 0.82, 0) end
+    line(L["XP gained"], Num(t.xp) .. rate(t.xp), 1, 0.86, 0.5)
+    line(L["  from kills"], Num(s.killXP) .. rate(s.killXP))
+    line(L["    base"], Num(s.baseKill))
+    if s.rested > 0 then line(L["    rested bonus"], Num(s.rested), 0.6, 0.75, 1) end
+    line(L["  quests and other"], Num(s.other) .. rate(s.other))
+
+    if NS.TT then NS.TT.Sub(tt, L["Pace"]) else tt:AddLine(L["Pace"], 1, 0.82, 0) end
+    line(L["XP per hour"], t.xpH and Num(t.xpH) or L["after the first minute"])
+    line(L["XP per hour, last 5 min"], s.recentH and Num(s.recentH) or L["after 2 minutes"])
+    line(L["Kills"], Num(s.kills) .. (h and dim(Num(s.kills / h) .. L["/h"]) or ""))
+    if s.perKill then
+        line(L["XP per kill"], Num(s.perKill) .. (s.rested > 0 and dim((L["base %s"]):format(Num(s.basePerKill))) or ""))
+    end
+
+    if NS.TT then NS.TT.Sub(tt, L["Level"]) else tt:AddLine(L["Level"], 1, 0.82, 0) end
+    line((L["Level %d"]):format(UnitLevel("player") or 0),
+        ("%s / %s"):format(Num(s.cur), Num(s.max)) .. (s.pct and dim(("%.1f%%"):format(s.pct)) or ""))
+    if s.sessionPct then line(L["This session"], ("%.1f%%"):format(s.sessionPct) .. dim(L["of a level"])) end
+    if t.need then
+        line(L["XP to level"], Num(t.need))
+        line(L["Kills to level"], s.killsToLevel and Num(s.killsToLevel) or "?")
+        line(L["Time to level"], s.etaRested and FormatETA(s.etaRested) or "?")
+        if s.pool > 0 and s.etaNoRested then line(L["  without the rested XP"], FormatETA(s.etaNoRested), 0.75, 0.75, 0.75) end
+    else
+        line(L["XP to level"], L["max level"])
+    end
+    line(L["Rested XP left"], Num(s.pool) .. (s.poolKills and dim((L["~%d kills"]):format(s.poolKills)) or ""),
+        0.6, 0.75, 1)
+    tt:AddLine(L["Kill XP comes from the kill lines in chat; quests and other = the rest. The time to level uses your "]
+        .. L["pace without rested XP, plus the rested XP you have left (it doubles kill XP until it runs out)."],
+        0.6, 0.6, 0.6, true)
+end
+local function XPTooltip(owner, t, anchor)
+    t = t or F.Totals()
+    if not t then return end
+    local tt = NS.TT and NS.TT.Begin(owner, anchor or "ANCHOR_LEFT", L["Farm session"], F.FormatTime(t.elapsed))
+    if not tt then GameTooltip:SetOwner(owner, anchor or "ANCHOR_LEFT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
+    F.XPBreakdown(tt, t, DB())
+    if NS.TT then NS.TT.Finish(tt) else GameTooltip:Show() end
+end
+F.XPTooltip = XPTooltip
+
 -- Sorok (sajat keszlet a panelen)
 local rows = {}
 local function TopItemsTooltip(owner)
@@ -494,7 +609,8 @@ local function GetRow(panel, i)
     r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
     if S then S.RowHighlight(r) end
-    r:SetScript("OnEnter", function(self) TopItemsTooltip(self) end)
+    -- az elso harom sor (XP, szint, kill) az XP bontast mutatja, a tobbi (arany, itemek) az aranyat
+    r:SetScript("OnEnter", function(self) if i <= 3 then XPTooltip(self) else TopItemsTooltip(self) end end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     rows[i] = r
     return r
@@ -523,6 +639,8 @@ function F.HidePanelRows()
     -- quest modban a 3. stat doboz nem a farm tooltipje
     local b3 = NS.panel and NS.panel.statBoxes and NS.panel.statBoxes[3]
     if b3 and b3.qfFarmTip then b3:EnableMouse(false) end
+    local b2 = NS.panel and NS.panel.statBoxes and NS.panel.statBoxes[2]
+    if b2 and b2.qfFarmTip then b2:EnableMouse(false) end
 end
 
 -- masodpercenkent: csak a szovegek (a sorok helye nem valtozik)
@@ -593,26 +711,27 @@ function F.SummaryData(fd)
     local function div() out[#out + 1] = { div = true } end
     local function dim(s) return "|cff" .. HEX.DIM .. s .. "|r" end
     local short = t.elapsed < 60 -- egy perc alatt nincs ora rata
+    -- TIME AND XP es a kill sor: hoverre XP bontas (tip = "xp"); a LOOT sorok: arany (tip = "gold")
+    local function xrow(label, value, sub) row(label, value, sub); out[#out].tip = "xp" end
 
     sec(L["TIME AND XP"])
-    row(L["Duration"], F.FormatTime(t.elapsed))
-    row(L["XP gained"], Num(t.xp))
-    if (t.rested or 0) > 0 then row(L["of it rested bonus"], Num(t.rested), true) end
-    row(L["XP per hour"], t.xpH and Num(t.xpH) or dim(short and L["- (under 1 min)"] or "-"))
+    xrow(L["Duration"], F.FormatTime(t.elapsed))
+    xrow(L["XP gained"], Num(t.xp))
+    if (t.rested or 0) > 0 then xrow(L["of it rested bonus"], Num(t.rested), true) end
+    xrow(L["XP per hour"], t.xpH and Num(t.xpH) or dim(short and L["- (under 1 min)"] or "-"))
     local lv = (UnitLevel("player") or 0) - (fd.startLevel or UnitLevel("player") or 0)
-    if lv > 0 then row(L["Levels gained"], ("|cff%s+%d|r  (%d)"):format(HEX.GOOD, lv, UnitLevel("player") or 0)) end
-    if t.need then row(L["To level"], Num(t.need) .. (t.eta and ("  " .. dim("ETA " .. FormatETA(t.eta))) or "")) end
-    if (t.restedLeft or 0) > 0 then row(L["Rested XP left"], Num(t.restedLeft)) end
+    if lv > 0 then xrow(L["Levels gained"], ("|cff%s+%d|r  (%d)"):format(HEX.GOOD, lv, UnitLevel("player") or 0)) end
+    if t.need then xrow(L["To level"], Num(t.need) .. (t.eta and ("  " .. dim("ETA " .. FormatETA(t.eta))) or "")) end
+    if (t.restedLeft or 0) > 0 then xrow(L["Rested XP left"], Num(t.restedLeft)) end
     div()
 
     sec(L["KILLS"])
-    row(L["Mobs killed"], Num(fd.killCount or 0))
+    xrow(L["Mobs killed"], Num(fd.killCount or 0))
     for _, k in ipairs(F.TopKills(fd, 3)) do row(k.name, "x" .. k.n, true) end
     div()
 
-    -- a LOOT csoport sorai hoverre az arany bontast mutatjak (tip = true)
     sec(L["LOOT"])
-    local function trow(label, value, sub) row(label, value, sub); out[#out].tip = true end
+    local function trow(label, value, sub) row(label, value, sub); out[#out].tip = "gold" end
     trow(L["Raw gold looted"], F.FormatMoney(t.money))
     local nItems = 0
     for _, it in pairs(fd.items or {}) do nItems = nItems + (it.n or 0) end
@@ -720,6 +839,7 @@ local function SumItem(i, kind)
             it.hit:SetScript("OnEnter", function(self)
                 local t = sum.totals
                 if not t then return end
+                if self.tipKind == "xp" then XPTooltip(self, t, "ANCHOR_RIGHT") return end
                 local tt = NS.TT and NS.TT.Begin(self, "ANCHOR_RIGHT", L["Farm session"], F.FormatTime(t.elapsed))
                 if not tt then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
                 F.GoldBreakdown(tt, t)
@@ -764,6 +884,7 @@ function F.ShowSummary(fd)
             it.hit:ClearAllPoints()
             it.hit:SetPoint("TOPLEFT", f, "TOPLEFT", 10, y + 1)
             it.hit:SetSize(SUM_W - 20, ROW_H)
+            it.hit.tipKind = e.tip
             it.hit:SetShown(e.tip and true or false)
             y = y - ROW_H
         end
@@ -791,6 +912,7 @@ local function EnsureTicker()
             lastTick = GetTime()
             ticker = C_Timer.NewTicker(1, function()
                 Accumulate()
+                F.SampleXP() -- az utolso 5 perc XP tempojahoz
                 tickN = tickN + 1
                 -- 10 mp-enkent a teljes panel (az utvonal sorrendje, quest modban a farm sor ideje),
                 -- kozben csak a farm nezet szovegei
@@ -813,6 +935,7 @@ function F.Start()
         moneyStart = GetMoney() or 0, started = time and time() or 0, startLevel = UnitLevel("player") or 1 }
     BaselineXP(fd)
     rawset(c, "farm", fd)
+    F.ResetSamples()
     lastTick = GetTime()
     if QuestFocusDB then QuestFocusDB.hidePanel = false end
     NS.Print(L["Farm session started. Click the clock button (or /ak farm) to stop it."])

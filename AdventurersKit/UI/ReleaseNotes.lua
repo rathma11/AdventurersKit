@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.7", date = "2026-11-18", items = {
+        "Farm session: XP tooltip. Hover the XP box or the XP / level / kill rows on the panel, or the Time and XP "
+            .. "rows in the summary: XP gained split into kill XP (base and rested bonus) and quests / other, XP per "
+            .. "hour overall and over the last 5 minutes, kills and XP per kill, kills and time to level (with and "
+            .. "without your rested XP), rested XP left and about how many kills it lasts, level progress, and this "
+            .. "session as a % of a level.",
+    } },
     { version = "0.8.6", date = "2026-11-18", items = {
         "Money shows with the little gold / silver / copper coin icons instead of the letters g s c, sized to the "
             .. "text: farm session panel, summary and tooltips, the AH quest items tab and its purchase confirmation, "
