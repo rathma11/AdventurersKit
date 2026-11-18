@@ -823,6 +823,25 @@ test("farm session: totals, pause, summary", function()
     W.player.level, W.player.xp, W.money = level, 0, 0
 end)
 
+test("style helpers (NS.Style, DESIGN.md)", function()
+    local S = NS.Style
+    if not check(S, "NS.Style exists") then return end
+    eq(S.GOLD[1] .. "," .. S.GOLD[2] .. "," .. S.GOLD[3], "0.95,0.78,0.4", "gold")
+    local f = S.Box("AdventurersKitStyleTestBox", 250, 60, "TEST")
+    check(f.accent and f.header and f.close, "box has accent, header, close")
+    S.Backdrop(f, "window")
+    local b = S.FlatButton(f, "x", 90, 18)
+    check(b.text and b.bg, "flat button")
+    local seg = S.Segmented(f, { { "a", "A" }, { "b", "B" } })
+    seg:Select("b")
+    eq(seg.value, "b", "segmented select")
+    check(S.Divider(f) and S.ClearButton(f) and S.ArrowButton(f, "next") and S.RowHighlight(b)
+        and S.ResizeGrip(f) and S.Section(f, "S") and S.IconButton(f, "Interface\\Icons\\INV_Misc_Gear_01", "t", "d"),
+        "other helpers")
+    S.Draggable(f, "styleTestPos")
+    check(not S.RestorePos(f, "styleTestPos"), "no saved position yet")
+end)
+
 test("events and timers smoke", function()
     local events = {
         { "QUEST_ACCEPTED", 5, 104 }, { "QUEST_LOG_UPDATE" }, { "UNIT_QUEST_LOG_CHANGED", "player" },

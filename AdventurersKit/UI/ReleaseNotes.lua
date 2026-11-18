@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.7", date = "2026-11-18", items = {
+        "Behind the scenes: the addon's look (dark background, gold border, orange strip, flat gold buttons, "
+            .. "thin gold scrollbar) is now written down with shared building blocks, so new windows match the "
+            .. "quest panel. Nothing changes in game yet.",
+    } },
     { version = "0.7.6", date = "2026-11-18", items = {
         "Farm session: a new coin button on the quest panel (or /qf farm) starts a small \"Farm session\" box: "
             .. "time, XP gained and XP per hour, XP to level with an ETA, looted gold, looted items at vendor price, "
