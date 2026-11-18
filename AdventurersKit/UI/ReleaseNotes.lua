@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.6", date = "2026-11-18", items = {
+        "Money shows with the little gold / silver / copper coin icons instead of the letters g s c, sized to the "
+            .. "text: farm session panel, summary and tooltips, the AH quest items tab and its purchase confirmation, "
+            .. "and the bag item tooltip. The chat lines use the icons too.",
+    } },
     { version = "0.8.5", date = "2026-11-18", items = {
         "Farm session: gold per hour says how it is counted. With Auctionator / TSM / Auctioneer it uses AH prices "
             .. "(\"GOLD/H (AH)\", \"Gold per hour (AH)\"), otherwise vendor prices. An item with no AH price, a soulbound "

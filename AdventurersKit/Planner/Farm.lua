@@ -88,20 +88,8 @@ function F.ParseLoot(msg)
     end
 end
 
--- rez -> "1g 02s 03c" (szines betukkel)
-function F.FormatMoney(c, plain)
-    c = math.floor((tonumber(c) or 0) + 0.5)
-    local neg = c < 0
-    if neg then c = -c end
-    local g, s, cp = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
-    local G, S, C = "g", "s", "c"
-    if not plain then G, S, C = "|cffffd700g|r", "|cffc7c7cfs|r", "|cffeda55fc|r" end
-    local t
-    if g > 0 then t = ("%d%s %02d%s %02d%s"):format(g, G, s, S, cp, C)
-    elseif s > 0 then t = ("%d%s %02d%s"):format(s, S, cp, C)
-    else t = ("%d%s"):format(cp, C) end
-    return (neg and "-" or "") .. t
-end
+-- rez -> penz ermeikonokkal (a kozos NS.FormatMoney, Core\Prices.lua); plain: "1g 2s 3c" szoveg
+function F.FormatMoney(c, plain) return NS.FormatMoney(c, plain) end
 
 function F.FormatTime(sec)
     sec = math.max(0, math.floor(tonumber(sec) or 0))
@@ -360,14 +348,8 @@ function F.OnUserSelect()
     if F.Viewing() then F.SetView(false) end
 end
 
-local function Short(c)
-    -- statisztika dobozba: "12g 34s" / "34s 56c" / "7c"
-    c = math.floor((tonumber(c) or 0) + 0.5)
-    local g, s, cp = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
-    if g > 0 then return ("%d|cffffd700g|r %d|cffc7c7cfs|r"):format(g, s) end
-    if s > 0 then return ("%d|cffc7c7cfs|r %d|cffeda55fc|r"):format(s, cp) end
-    return ("%d|cffeda55fc|r"):format(cp)
-end
+-- statisztika dobozba roviden, ermeikonokkal: "12[g] 34[s]" / "34[s] 56[c]" / "7[c]"
+local function Short(c) return NS.FormatMoney(c, nil, true) end
 F.Short = Short
 
 -- A panel sorai (objective stilusban): { text }, a sorrend fix, hogy a sorok ne ugraljanak
@@ -452,7 +434,7 @@ function F.GoldBreakdown(tt, t)
     local src = F.AHSource()
     local h = t.elapsed >= 60 and (t.elapsed / 3600) or nil
     local function line(label, v, r, g, b)
-        tt:AddDoubleLine(label, F.FormatMoney(v) .. (h and ("  |cff999999" .. F.FormatMoney(v / h, true) .. L["/h"] .. "|r") or ""),
+        tt:AddDoubleLine(label, F.FormatMoney(v) .. (h and ("  |cff999999" .. F.FormatMoney(v / h) .. L["/h"] .. "|r") or ""),
             r or 1, g or 1, b or 1, 1, 1, 1)
     end
     if NS.TT then NS.TT.Sub(tt, L["Gold breakdown"]) else tt:AddLine(L["Gold breakdown"], 1, 0.82, 0) end
@@ -564,7 +546,7 @@ end
 function F.RouteText(i)
     local t = F.Totals()
     local fd = DB()
-    local extra = t and (F.FormatTime(t.elapsed) .. (t.goldH and ("  " .. F.FormatMoney(t.goldH, true) .. L["/h"]) or "")) or ""
+    local extra = t and (F.FormatTime(t.elapsed) .. (t.goldH and ("  " .. F.FormatMoney(t.goldH) .. L["/h"]) or "")) or ""
     return ("%d. |T%s:12:12|t |cff33ff99%s|r  |cff999999%s%s|r"):format(i, F.ICON, L["Farm session"], extra,
         fd and fd.paused and ("  " .. L["paused"]) or "")
 end

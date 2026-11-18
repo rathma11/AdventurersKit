@@ -528,11 +528,11 @@ local function GetRow(i)
             -- ertek: vendor es AH ar (Auctionator scan / TSM / sajat AH lekerdezes; Core\Prices.lua)
             local vendor, ah, best, src, age
             if NS.ItemPrice then vendor, ah, best, src, age = NS.ItemPrice(e.link or e.id) end
-            local money = NS.Farm and NS.Farm.FormatMoney
+            local money = NS.FormatMoney -- ermeikonokkal (Core Prices.lua: NS.FormatMoney)
             if money and((vendor or 0) > 0 or ah) then
                 local parts = {}
-                if (vendor or 0) > 0 then parts[#parts + 1] = money(vendor, true) .. " " .. NS.PriceSourceText("vendor") end
-                if ah then parts[#parts + 1] = money(ah, true) .. " " .. NS.PriceSourceText(src, age) end
+                if (vendor or 0) > 0 then parts[#parts + 1] = money(vendor) .. " " .. NS.PriceSourceText("vendor") end
+                if ah then parts[#parts + 1] = money(ah) .. " " .. NS.PriceSourceText(src, age) end
                 GameTooltip:AddLine((L["Value each: %s"]):format(table.concat(parts, ", ")), 0.6, 0.6, 0.6)
             end
         end

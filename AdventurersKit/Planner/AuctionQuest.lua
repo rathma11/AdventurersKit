@@ -22,25 +22,11 @@ local function Now() return GetTime and GetTime() or 0 end
 local function Me() return UnitName and UnitName("player") or nil end
 
 ---------------------------------------------------------------------------
--- Penz szovegkent: "1g 2s 3c" (a megerosito szovegben), ikonokkal a listaban
+-- Penz: mindenhol ermeikonokkal (kozos NS.FormatMoney, Core\Prices.lua); A.FormatCoins: sima
+-- "1g 2s 3c" szoveg (tesztek)
 ---------------------------------------------------------------------------
-function A.FormatCoins(c)
-    c = math.floor((tonumber(c) or 0) + 0.5)
-    local g, s, cp = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
-    local parts = {}
-    if g > 0 then parts[#parts + 1] = g .. "g" end
-    if s > 0 then parts[#parts + 1] = s .. "s" end
-    if cp > 0 or #parts == 0 then parts[#parts + 1] = cp .. "c" end
-    return table.concat(parts, " ")
-end
-local function Money(c)
-    local f = rawget(_G, "GetCoinTextureString")
-    if type(f) == "function" then
-        local ok, s = pcall(f, math.floor((tonumber(c) or 0) + 0.5))
-        if ok and type(s) == "string" then return s end
-    end
-    return A.FormatCoins(c)
-end
+function A.FormatCoins(c) return NS.FormatMoney(c, true) end
+local function Money(c) return NS.FormatMoney(c) end
 
 ---------------------------------------------------------------------------
 -- Mi kell meg: a quest log item objective-jei (Questie), ami meg hianyzik es AH-n lehet.
@@ -569,7 +555,7 @@ function A.OnCommodityPrice(unit, total)
     else
         local C = Modern()
         if C and type(C.CancelCommoditiesPurchase) == "function" then pcall(C.CancelCommoditiesPurchase) end
-        BuyNextItem((L["%s now costs %s, more than you confirmed; skipped."]):format(st.name, A.FormatCoins(total)))
+        BuyNextItem((L["%s now costs %s, more than you confirmed; skipped."]):format(st.name, Money(total)))
     end
     if UpdatePopup then UpdatePopup() end
 end
@@ -720,11 +706,11 @@ end
 local function ConfirmText(list)
     if #list == 1 then
         local x = list[1]
-        return (L["Buy %d x %s for %s?"]):format(x.plan.covered, x.entry.name, A.FormatCoins(x.plan.cost))
+        return (L["Buy %d x %s for %s?"]):format(x.plan.covered, x.entry.name, Money(x.plan.cost))
     end
     local cost, n = 0, 0
     for _, x in ipairs(list) do cost, n = cost + x.plan.cost, n + #x.plan.picks end
-    return (L["Buy all: %d items (%d auctions) for %s?"]):format(#list, n, A.FormatCoins(cost))
+    return (L["Buy all: %d items (%d auctions) for %s?"]):format(#list, n, Money(cost))
 end
 A.ConfirmText = ConfirmText
 
@@ -883,7 +869,7 @@ UpdatePopup = function()
         end
     end
     if buy.done then
-        p.step:SetText((L["Bought %d auctions for %s."]):format(buy.bought, A.FormatCoins(buy.spentAll))
+        p.step:SetText((L["Bought %d auctions for %s."]):format(buy.bought, Money(buy.spentAll))
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or "")
             .. (buy.bought > 0 and ("\n|cff" .. hex.DIM .. L["Bought items arrive in your mailbox."] .. "|r") or ""))
         BtnText(p.ok, L["Close"])
@@ -905,9 +891,9 @@ UpdatePopup = function()
     end
     p.cancel:Show()
     local st, l = buy.items[buy.cur], buy.ready
-    local head = ("|cff" .. hex.LABEL .. L["Spent: "] .. "|r%s / %s"):format(A.FormatCoins(buy.spentAll), A.FormatCoins(buy.capAll))
+    local head = ("|cff" .. hex.LABEL .. L["Spent: "] .. "|r%s / %s"):format(Money(buy.spentAll), Money(buy.capAll))
     if st and l then
-        p.step:SetText(head .. "\n" .. (L["Next: %d x %s for %s"]):format(l.count, st.name, A.FormatCoins(l.buyout))
+        p.step:SetText(head .. "\n" .. (L["Next: %d x %s for %s"]):format(l.count, st.name, Money(l.buyout))
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or ""))
         BtnText(p.ok, (buy.bought == 0 and buy.cur == 1) and L["Accept"]
             or (l.commodity and L["Buy"] or (L["Buy (%d left)"]):format(math.max(1, st.need - st.got))))
@@ -935,7 +921,7 @@ local function OpenConfirm(list)
     local x = list[1]
     if #buy.items == 1 then
         p.text:SetText(ConfirmText(list) .. "\n|cff" .. S.HEX.DIM
-            .. (L["(%s each)"]):format(A.FormatCoins(math.floor(x.plan.cost / math.max(1, x.plan.covered) + 0.5))) .. "|r")
+            .. (L["(%s each)"]):format(Money(math.floor(x.plan.cost / math.max(1, x.plan.covered) + 0.5))) .. "|r")
         p.icon:SetTexture(x.entry.icon or 134400)
     else
         p.text:SetText(ConfirmText(list))

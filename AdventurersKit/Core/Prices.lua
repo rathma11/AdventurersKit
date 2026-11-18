@@ -146,6 +146,34 @@ function NS.PriceAgeText(age)
     return ("%dd"):format(math.floor(age))
 end
 
+---------------------------------------------------------------------------
+-- Penz kiirasa: arany / ezust / rez ikonnal (a kliens ermeikonjai), a betu ("g s c") helyett.
+-- Az ikon magassaga 0 = a szoveg sormagassaga, igy minden betumerethez illik.
+-- NS.FormatMoney(c)         -> "1[arany] 2[ezust] 3[rez]" (a nulla reszek kimaradnak, mint a jatekban)
+-- NS.FormatMoney(c, true)   -> "1g 2s 3c" sima szoveg (tesztek / ahol ikon nem jelenhet meg)
+-- NS.FormatMoney(c, nil, true) -> rovid: aranynal csak arany + ezust, ezustnel ezust + rez (stat doboz)
+---------------------------------------------------------------------------
+local COIN = {
+    g = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t",
+    s = "|TInterface\\MoneyFrame\\UI-SilverIcon:0:0:2:0|t",
+    c = "|TInterface\\MoneyFrame\\UI-CopperIcon:0:0:2:0|t",
+}
+NS.COIN_ICONS = COIN
+function NS.FormatMoney(c, plain, short)
+    c = math.floor((tonumber(c) or 0) + 0.5)
+    local neg = c < 0
+    if neg then c = -c end
+    local g, s, cp = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
+    local function part(n, k) return n .. (plain and k or COIN[k]) end
+    local parts = {}
+    if g > 0 then parts[#parts + 1] = part(g, "g") end
+    if s > 0 then parts[#parts + 1] = part(s, "s") end
+    if cp > 0 then parts[#parts + 1] = part(cp, "c") end
+    if #parts == 0 then parts[1] = part(0, "c") end
+    if short and #parts > 2 then parts[3] = nil end
+    return (neg and "-" or "") .. table.concat(parts, " ")
+end
+
 -- Forras szovegkent a tooltipekbe: "AH (Auctionator, 2d)", "vendor"
 function NS.PriceSourceText(src, age)
     if not src or src == "vendor" then return NS.L["vendor"] end
