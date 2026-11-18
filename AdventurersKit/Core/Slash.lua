@@ -41,6 +41,9 @@ local function SlashHandler(msg)
     elseif msg:match("^dungeons?%s") then
         -- /qf dungeon <nev> (reszleges nev is): dungeon prep mod; /qf dungeon off: vege
         if NS.PrepCommand then NS.PrepCommand(raw:match("^%S+%s+(.+)$")) end
+    elseif msg == "farm" or msg:match("^farm%s") then
+        -- Planner\Farm.lua: /qf farm (start / stop), /qf farm pause | resume | reset
+        if NS.FarmCommand then NS.FarmCommand(msg:match("^farm%s+(%S+)")) end
     elseif msg == "export" then
         if NS.OpenShareSettings then NS.OpenShareSettings("export") end
     elseif msg == "import" then
@@ -144,6 +147,7 @@ local function SlashHandler(msg)
         Print(L["  /qf clear - clear selection + marker"])
         Print(L["  /qf city - city list here; /qf cityreset - clear ignored places"])
         Print(L["  /qf dungeon - dungeon list; /qf dungeon <name> - dungeon prep (quests, then the entrance); /qf dungeon off - end it"])
+        Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset"])
         Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])
         Print(L["  /qf selftest - quick self test (Questie data, macro, settings, tables)"])
     end

@@ -703,6 +703,126 @@ test("TomTom is optional", function()
     NS.SelectQuest(101, "Wolves Across the Border", false, true)
 end)
 
+-- 0.7.6: farm session (Planner\Farm.lua): looted money / item parsing, XP across a level up,
+-- vendor and "best sale" (auction addon) totals, pause, rates, summary, panel button.
+test("farm session: parsing", function()
+    local F = NS.Farm
+    eq(F.ParseMoney("You loot 1 Gold, 2 Silver, 3 Copper"), 10203, "loot money")
+    eq(F.ParseMoney("Your share of the loot is 45 Silver, 6 Copper."), 4506, "group share")
+    eq(F.ParseMoney("You loot 7 Copper"), 7, "copper only")
+    eq(F.ParseMoney("nothing here"), 0, "no money")
+    eq(("3 Golds"):match(F.FormatToPattern("%d |4Gold:Golds;")), "3", "plural escape in the format")
+    eq(("Hans gets 5"):match(F.FormatToPattern("%1$s gets %2$d")), "Hans", "positional %1$s")
+    local link = "|cffffffff|Hitem:2589::::::::36:::::::|h[Linen Cloth]|h|r"
+    local id, l, n = F.ParseLoot("You receive loot: " .. link .. "x3.")
+    eq(id, 2589, "multiple: item id") eq(n, 3, "multiple: count") eq(l, link, "multiple: link")
+    id, l, n = F.ParseLoot("You receive loot: " .. link .. ".")
+    eq(id, 2589, "single: item id") eq(n, 1, "single: count")
+    eq(F.ParseLoot("You receive item: " .. link .. "."), nil, "pushed item (bought / quest reward) is not loot")
+    eq(F.ParseLoot("Bob receives loot: " .. link .. "."), nil, "someone else's loot")
+    eq(F.FormatMoney(10203, true), "1g 02s 03c", "money format")
+    eq(F.FormatMoney(506, true), "5s 06c", "money format (silver)")
+    eq(F.FormatTime(3725), "1:02:05", "time format")
+end)
+
+test("farm session: totals, pause, summary", function()
+    local F = NS.Farm
+    local function item(id, name) return "|cffffffff|Hitem:" .. id .. "::::::::36:::::::|h[" .. name .. "]|h|r" end
+    W.money, W.player.xp, W.player.xpMax = 5000, 100, 1000
+    local level = W.player.level
+    W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [1111] = false, [2222] = { "Quest Thing", 0 }, [3333] = { "BoP Ring", 500, 1 } }
+    SlashCmdList.QUESTFOCUS("farm start")
+    check(F.IsRunning(), "running after /qf farm start")
+    check(F.frame:IsShown(), "farm box shown")
+    W.Fire("CHAT_MSG_MONEY", "You loot 1 Gold, 2 Silver, 3 Copper")
+    W.Fire("CHAT_MSG_LOOT", "You receive loot: " .. item(2589, "Linen Cloth") .. "x3.")
+    W.Fire("CHAT_MSG_LOOT", "You receive loot: " .. item(1111, "Late") .. ".")
+    W.Fire("CHAT_MSG_LOOT", "You receive loot: " .. item(2222, "Quest Thing") .. ".")
+    W.Fire("CHAT_MSG_LOOT", "You receive item: " .. item(2589, "Linen Cloth") .. ".") -- bought: not counted
+    W.player.xp = 400; W.Fire("PLAYER_XP_UPDATE", "player")      -- +300
+    W.player.xp = 50; W.Fire("PLAYER_XP_UPDATE", "player")       -- level up before UnitLevel updates: +600 +50
+    W.player.level = level + 1
+    W.player.xp = 80; W.Fire("PLAYER_XP_UPDATE", "player")       -- +30
+    local t = F.Totals()
+    eq(t.xp, 980, "XP across a level up")
+    eq(t.money, 10203, "looted gold")
+    eq(t.vendor, 39, "vendor value (3 x 13c; quest item 0)")
+    eq(t.pending, 1, "item info not cached yet")
+    W.itemInfo[1111] = { "Late", 100 }
+    W.Fire("GET_ITEM_INFO_RECEIVED", 1111, true)
+    t = F.Totals()
+    eq(t.pending, 0, "item info arrived")
+    eq(t.vendor, 139, "vendor value after item info")
+    eq(t.best, t.vendor, "no auction addon: best = vendor")
+    check(F.AHSource() == nil, "no auction addon")
+
+    -- auction addon (Auctionator API): best = max(AH, vendor); unsellable and BoP stay vendor
+    rawset(_G, "Auctionator", { API = { v1 = { GetAuctionPriceByItemID = function(caller, itemID)
+        return ({ [2589] = 50, [2222] = 99, [3333] = 100000, [1111] = 20 })[itemID]
+    end } } })
+    W.Fire("CHAT_MSG_LOOT", "You receive loot: " .. item(3333, "BoP Ring") .. ".")
+    t = F.Totals()
+    eq(t.vendor, 639, "vendor value with the BoP ring")
+    eq(t.best, 3 * 50 + 100 + 0 + 500, "best sale: AH for cloth, vendor for the rest")
+    eq(t.items[1].id, 3333, "top item by value")
+
+    -- time: 1 hour in game; pause stops time, loot and XP
+    W.Advance(3600, 5)
+    t = F.Totals()
+    check(math.abs(t.elapsed - 3600) < 6, "elapsed ~1 h, got " .. tostring(t.elapsed))
+    check(t.xpH and math.abs(t.xpH - 980) < 3, "XP per hour")
+    eq(t.need, 920, "XP to level")
+    check(t.eta and math.abs(t.eta - 920 / 980 * 3600) < 15, "ETA at the current rate")
+    check(t.goldH and math.abs(t.goldH - (10203 + 639)) < 5, "gold + vendor per hour")
+    W.money = 7000
+    eq(F.Totals().net, 2000, "net gold change")
+    SlashCmdList.QUESTFOCUS("farm pause")
+    check(F.IsPaused(), "paused")
+    local e0 = F.Totals().elapsed
+    W.Fire("CHAT_MSG_MONEY", "You loot 9 Gold")
+    W.player.xp = 180; W.Fire("PLAYER_XP_UPDATE", "player")
+    W.Advance(20, 1)
+    eq(F.Totals().elapsed, e0, "time stands while paused")
+    eq(F.Totals().money, 10203, "no loot while paused")
+    eq(F.Totals().xp, 980, "no XP while paused")
+    SlashCmdList.QUESTFOCUS("farm resume")
+    check(not F.IsPaused(), "resumed")
+    W.player.xp = 200; W.Fire("PLAYER_XP_UPDATE", "player")
+    eq(F.Totals().xp, 1000, "XP after resume counts from the resume point")
+
+    -- saved per character; a long gap (loading screen / offline) adds at most a few seconds
+    local fd = rawget(NS.CharDB(), "farm")
+    check(fd and fd.running and fd.items[2589].n == 3, "session saved in the character DB")
+    e0 = fd.elapsed
+    W.time = W.time + 10000
+    W.Fire("PLAYER_LOGIN")
+    W.Advance(2, 1)
+    check(fd.elapsed - e0 < 10, "a gap of 10000 s is not counted, got +" .. tostring(fd.elapsed - e0))
+
+    -- tooltip: top items
+    W.FireScript(F.frame, "OnEnter")
+    local lines = table.concat(GameTooltip.__lines or {}, "\n")
+    check(contains(lines, "[BoP Ring]") and contains(lines, "[Linen Cloth]"), "tooltip lists the top items")
+    W.FireScript(F.frame, "OnLeave")
+
+    -- stop: summary in chat, box hidden; the panel button starts / stops too
+    local before = #W.chat
+    SlashCmdList.QUESTFOCUS("farm stop")
+    check(not F.IsRunning(), "stopped")
+    check(not F.frame:IsShown(), "box hidden after stop")
+    local sawSummary = false
+    for i = before + 1, #W.chat do if contains(W.chat[i], "Farm session: ") then sawSummary = true end end
+    check(sawSummary, "summary printed")
+    NS.panel.farmBtn:Click()
+    check(F.IsRunning(), "panel button starts a session")
+    NS.panel.farmBtn:Click()
+    check(not F.IsRunning(), "panel button stops it")
+
+    rawset(_G, "Auctionator", nil)
+    W.itemInfo = nil
+    W.player.level, W.player.xp, W.money = level, 0, 0
+end)
+
 test("events and timers smoke", function()
     local events = {
         { "QUEST_ACCEPTED", 5, 104 }, { "QUEST_LOG_UPDATE" }, { "UNIT_QUEST_LOG_CHANGED", "player" },

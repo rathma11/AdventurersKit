@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Adventurer's Kit
 ## Notes: Questing kit: QFocus target macro, markers, route and pickup planner, city list, tooltips (Questie data)
-## Version: 0.7.5
+## Version: 0.7.6
 ## OptionalDeps: QuestFocus, Questie, TomTom, Bagnon, ForeverDungeonJournal
 ## SavedVariables: QuestFocusDB
 
@@ -39,6 +39,7 @@ Planner\Prep.lua
 Planner\PrepInside.lua
 Planner\PrepShare.lua
 Planner\QuestNav.lua
+Planner\Farm.lua
 Planner\Events.lua
 Planner\Options.lua
 

@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.6", date = "2026-11-18", items = {
+        "Farm session: a new coin button on the quest panel (or /qf farm) starts a small \"Farm session\" box: "
+            .. "time, XP gained and XP per hour, XP to level with an ETA, looted gold, looted items at vendor price, "
+            .. "and with Auctionator / TSM / Auctioneer a \"best sale\" value (auction or vendor price, whichever is "
+            .. "higher). Hover it for the top 5 items; /qf farm stop prints a summary. /qf farm pause | resume | reset.",
+        "Farm session: looted gold only counts money you loot (not vendor sales or quest rewards; those show in "
+            .. "\"Net gold change\"). The session survives /reload and relog; time while logged out is not counted.",
+        "Panel: the icon order is now farm, dungeons, options, close (options sits next to the X).",
+    } },
     { version = "0.7.5", date = "2026-11-18", items = {
         "Fix: the QFocus macro no longer pings a mob that isn't a quest mob. In combat the macro can't be "
             .. "rewritten and keeps any living enemy you target (e.g. one that attacked you), so it now only pings "

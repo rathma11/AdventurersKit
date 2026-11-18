@@ -199,7 +199,7 @@ panel.mapBtn = mapBtn
 clearBtn:HookScript("OnShow", function() mapBtn:Show(); prevBtn:Show(); nextBtn:Show() end)
 clearBtn:HookScript("OnHide", function() mapBtn:Hide(); prevBtn:Hide(); nextBtn:Hide() end)
 
--- Ikonsor gombjai (jobbrol balra, az X mellett): dungeon, options
+-- Ikonsor gombjai (jobbrol balra, az X mellett): options, dungeon, farm
 local function ToolButton(icon, title, desc, onClick)
     local b = CreateFrame("Button", nil, panel)
     b:SetSize(16, 16)
@@ -228,10 +228,20 @@ local dungeonBtn = ToolButton("Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", L
 local optBtn = ToolButton("Interface\\Icons\\INV_Misc_Gear_01", L["Options"],
     L["Opens the Adventurer's Kit options. Same as /qf options."],
     function() if NS.C.OpenOptions then NS.C.OpenOptions() end end)
-panel.dungeonBtn, panel.optBtn = dungeonBtn, optBtn
+-- farm session (Planner\Farm.lua): ido, XP/ora, lootolt arany es itemek erteke
+local farmBtn = ToolButton("Interface\\Icons\\INV_Misc_Coin_02", L["Farm session"],
+    function()
+        return (NS.Farm and NS.Farm.IsRunning() and L["A farm session is running. Click: stop it (summary in chat). Same as /qf farm."]
+            or L["Starts a farm session: time, XP per hour and ETA to level, looted gold and item value (vendor, and auction price if Auctionator / TSM is installed). Same as /qf farm."])
+    end,
+    function() if NS.FarmToggle then NS.FarmToggle() end end)
+farmBtn.tex:SetDesaturated(true)
+panel.dungeonBtn, panel.optBtn, panel.farmBtn = dungeonBtn, optBtn, farmBtn
+-- sorrend balrol: [farm] [dungeon] [options] [X]
 -- az X gomb kepe kitolt a keretebol: tobb hely kell, kulonben osszeernek
-dungeonBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
-optBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -7, 0)
+optBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
+dungeonBtn:SetPoint("RIGHT", optBtn, "LEFT", -7, 0)
+farmBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -7, 0)
 
 local function Divider(y)
     local t = panel:CreateTexture(nil, "ARTWORK")

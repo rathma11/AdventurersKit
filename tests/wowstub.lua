@@ -405,6 +405,10 @@ def("UnitIsPlayer", function(u) return u == "player" end)
 def("UnitHealth", function() return 100 end)
 def("UnitHealthMax", function() return 100 end)
 def("UnitLevel", function(u) if u == "player" then return W.player.level end return 10 end)
+def("UnitXP", function(u) return u == "player" and (W.player.xp or 0) or 0 end)
+def("UnitXPMax", function(u) return u == "player" and (W.player.xpMax or 1000) or 0 end)
+def("GetMaxPlayerLevel", function() return 60 end)
+def("GetMoney", function() return W.money or 0 end)
 def("UnitClass", function() return W.player.class:sub(1, 1) .. W.player.class:sub(2):lower(), W.player.class, 1 end)
 def("UnitRace", function() return "Human", "Human" end)
 def("UnitFactionGroup", function() return W.player.faction, W.player.faction end)
@@ -578,7 +582,16 @@ def("GetInventoryItemCount", function() return 0 end)
 def("GetWeaponEnchantInfo", function() return false end)
 def("C_Item", {
     GetItemCount = function(id) return W.items and W.items[id] or 0 end,
-    GetItemInfo = function(id) return "Item " .. tostring(id), nil, 1, 1, 1, "Consumable", "Food & Drink", 20, "", 134400 end,
+    -- W.itemInfo[id] = { name, sellPrice, bindType } overrides it; false = not cached yet (returns nil)
+    GetItemInfo = function(id)
+        local o = W.itemInfo and W.itemInfo[tonumber(id) or tonumber(tostring(id):match("item:(%d+)"))]
+        if o == false then return nil end
+        if o then
+            return o[1], "|cffffffff|Hitem:" .. tostring(id) .. "|h[" .. o[1] .. "]|h|r", 1, 1, 1, "Trade Goods",
+                "Trade Goods", 20, "", 134400, o[2], 7, 0, o[3] or 0
+        end
+        return "Item " .. tostring(id), nil, 1, 1, 1, "Consumable", "Food & Drink", 20, "", 134400
+    end,
     GetItemInfoInstant = function(id) return id, "Consumable", "Food & Drink", "", 134400, 0, 5 end,
     GetItemIconByID = function() return 134400 end,
     GetItemSpell = function() return nil end,
