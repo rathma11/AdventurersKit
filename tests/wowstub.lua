@@ -654,6 +654,44 @@ def("PlaceAuctionBid", function(kind, i, amount)
     end
 end)
 
+-- Modern (retail) AH, as on WoW: Forever: C_AuctionHouse. Not installed by default (the classic
+-- stubs above are); W.InstallModernAH() / W.RemoveModernAH(). Uses W.ahAll too: a row with
+-- `unit` is a commodity row { itemId, unit, count, own }, else an item auction
+-- { itemId, buyout, count, auctionID, own }. Calls are recorded in W.ahQueries / W.ahStarts / W.ahBids.
+function W.InstallModernAH()
+    local function rows(id, commodity)
+        local out = {}
+        for _, a in ipairs(W.ahAll) do
+            if a.itemId == id and ((a.unit ~= nil) == commodity) then out[#out + 1] = a end
+        end
+        return out
+    end
+    W.ahStarts, W.ahCancelled = {}, 0
+    rawset(G, "C_AuctionHouse", {
+        MakeItemKey = function(id) return { itemID = id } end,
+        IsThrottledMessageSystemReady = function() return W.ahCanQuery end,
+        SendSearchQuery = function(key, sorts, split) W.ahQueries[#W.ahQueries + 1] = { itemID = key.itemID, split = split } end,
+        GetNumCommoditySearchResults = function(id) return #rows(id, true) end,
+        GetCommoditySearchResultInfo = function(id, i)
+            local a = rows(id, true)[i]
+            if a then return { unitPrice = a.unit, quantity = a.count, numOwnerItems = a.own and a.count or 0 } end
+        end,
+        GetNumItemSearchResults = function(key) return #rows(key.itemID, false) end,
+        GetItemSearchResultInfo = function(key, i)
+            local a = rows(key.itemID, false)[i]
+            if a then return { buyoutPrice = a.buyout, quantity = a.count, auctionID = a.auctionID, containsOwnerItem = a.own or false } end
+        end,
+        StartCommoditiesPurchase = function(id, qty) W.ahStarts[#W.ahStarts + 1] = { itemID = id, quantity = qty } end,
+        ConfirmCommoditiesPurchase = function(id, qty) W.ahBids[#W.ahBids + 1] = { commodity = true, itemID = id, quantity = qty } end,
+        CancelCommoditiesPurchase = function() W.ahCancelled = W.ahCancelled + 1 end,
+        PlaceBid = function(auctionID, amount)
+            W.ahBids[#W.ahBids + 1] = { auctionID = auctionID, amount = amount }
+            for k, a in ipairs(W.ahAll) do if a.auctionID == auctionID then table.remove(W.ahAll, k) break end end
+        end,
+    })
+end
+function W.RemoveModernAH() rawset(G, "C_AuctionHouse", nil) end
+
 -- optional addons that must stay absent unless a test installs them
 def("TomTom", nil)
 def("Bagnon", nil)

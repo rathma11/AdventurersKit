@@ -194,6 +194,65 @@ function A.ReadList(id, name, page)
     return mine, other, tonumber(total) or n
 end
 
+-- Modern (retail) AH: a Forever kliens ezt hasznalja (C_AuctionHouse). A klasszikus "list" API
+-- (QueryAuctionItems, AUCTION_ITEM_LIST_UPDATE) ott nincs; az csak tartalek mas klienseken.
+local function Modern()
+    local C = rawget(_G, "C_AuctionHouse")
+    if type(C) == "table" and type(C.SendSearchQuery) == "function" and type(C.MakeItemKey) == "function" then return C end
+end
+A.Modern = Modern
+
+-- Commodity (darabra vett aru, pl. Linen Cloth): barmennyi darab veheto, a legolcsobb egysegektol
+-- kezdve. listing = { count, unit, commodity = true }. Vissza: mint A.Plan (picks: hasznalt sorok).
+function A.PlanCommodity(listings, need, me)
+    need = math.floor(tonumber(need) or 0)
+    local cand = {}
+    for _, l in ipairs(listings or {}) do
+        if (tonumber(l.unit) or 0) > 0 and (tonumber(l.count) or 0) > 0 and not (me and l.owner == me) then cand[#cand + 1] = l end
+    end
+    if need <= 0 or #cand == 0 then return nil end
+    table.sort(cand, function(a, b) return a.unit < b.unit end)
+    local plan = { commodity = true, lowestUnit = cand[1].unit, picks = {}, cost = 0, covered = 0, available = 0 }
+    for _, l in ipairs(cand) do plan.available = plan.available + l.count end
+    for _, l in ipairs(cand) do
+        if plan.covered >= need then break end
+        local take = math.min(l.count, need - plan.covered)
+        plan.picks[#plan.picks + 1] = l
+        plan.cost = plan.cost + take * l.unit
+        plan.covered = plan.covered + take
+        plan.maxUnit = l.unit
+    end
+    plan.partial = plan.covered < need or nil
+    return plan
+end
+
+-- Modern keresesi eredmenyek. kind: "commodity" (key = itemID) vagy "item" (key = itemKey)
+function A.ReadModern(kind, key)
+    local C, mine = Modern(), {}
+    if not C then return mine end
+    if kind == "commodity" then
+        local ok, n = pcall(C.GetNumCommoditySearchResults, key)
+        for i = 1, (ok and tonumber(n) or 0) do
+            local ok2, r = pcall(C.GetCommoditySearchResultInfo, key, i)
+            if ok2 and type(r) == "table" then
+                local cnt = (tonumber(r.quantity) or 0) - (tonumber(r.numOwnerItems) or 0) -- a sajatodat nem veszed meg
+                if cnt > 0 and (tonumber(r.unitPrice) or 0) > 0 then
+                    mine[#mine + 1] = { count = cnt, unit = r.unitPrice, buyout = r.unitPrice * cnt, commodity = true }
+                end
+            end
+        end
+    else
+        local ok, n = pcall(C.GetNumItemSearchResults, key)
+        for i = 1, (ok and tonumber(n) or 0) do
+            local ok2, r = pcall(C.GetItemSearchResultInfo, key, i)
+            if ok2 and type(r) == "table" and not r.containsOwnerItem then
+                mine[#mine + 1] = { count = tonumber(r.quantity) or 1, buyout = tonumber(r.buyoutPrice) or 0, auctionID = r.auctionID }
+            end
+        end
+    end
+    return mine
+end
+
 ---------------------------------------------------------------------------
 -- Lekerdezes sor (CanSendAuctionQuery throttling)
 ---------------------------------------------------------------------------
@@ -206,14 +265,27 @@ local ahOpen = false
 local buy           -- futo vasarlas (lent)
 
 local function CanQuery()
+    local C = Modern()
+    if C then
+        if type(C.IsThrottledMessageSystemReady) ~= "function" then return true end
+        local ok, ready = pcall(C.IsThrottledMessageSystemReady)
+        return ok and ready and true or false
+    end
     if type(CanSendAuctionQuery) ~= "function" or type(QueryAuctionItems) ~= "function" then return false end
     local ok, can = pcall(CanSendAuctionQuery)
     return ok and can and true or false
 end
 
 local function Send(q, purpose)
-    -- QueryAuctionItems(text, minLevel, maxLevel, page, usable, quality, getAll, exactMatch)
-    local ok = pcall(QueryAuctionItems, q.name, nil, nil, q.page or 0, false, -1, false, true)
+    local C, ok = Modern(), false
+    if C then
+        -- egy item osszes aukcioja, ar szerint; a sajatjaid kulon sorban (splitOwnedItems)
+        local ok1, key = pcall(C.MakeItemKey, q.id)
+        if ok1 and key then ok = pcall(C.SendSearchQuery, key, { { sortOrder = 0, reverseSort = false } }, true) end
+    else
+        -- QueryAuctionItems(text, minLevel, maxLevel, page, usable, quality, getAll, exactMatch)
+        ok = type(QueryAuctionItems) == "function" and pcall(QueryAuctionItems, q.name, nil, nil, q.page or 0, false, -1, false, true)
+    end
     if not ok then return false end
     active = { id = q.id, name = q.name, page = q.page or 0, purpose = purpose, sent = Now(), tries = q.tries or 0 }
     return true
@@ -243,10 +315,17 @@ local function FinishScan(id)
 end
 
 -- AUCTION_ITEM_LIST_UPDATE a sajat lekerdezesunkre
-local function OnList()
+local function OnList(modernKind, key)
     if not active then return end
     local q = active
-    local mine, other, total = A.ReadList(q.id, q.name, q.page)
+    local mine, other, total
+    if modernKind then
+        local id = modernKind == "commodity" and tonumber(key) or (type(key) == "table" and tonumber(key.itemID))
+        if id ~= q.id then return end -- mas kereses eredmenye (pl. az AH sajat listaja)
+        mine, other, total = A.ReadModern(modernKind, key), 0, 0
+    else
+        mine, other, total = A.ReadList(q.id, q.name, q.page)
+    end
     if #mine == 0 and other > 0 then
         -- mas kereses eredmenye (pl. kozben te kerestel): meg egyszer, aztan feladjuk
         active = nil
@@ -292,6 +371,7 @@ local function Tick()
             if Refresh then Refresh() end
         end
     end
+    if buy and buy.waitPrice and now - buy.waitPrice > QUERY_TIMEOUT and BuyTimeout then BuyTimeout() end
     if active or not CanQuery() then return end
     if buy and buy.wantQuery then
         local st = buy.items[buy.cur]
@@ -321,6 +401,15 @@ end
 function A.Search(name)
     if not name then return end
     pauseUntil = Now() + SEARCH_PAUSE
+    -- modern AH (Forever): a Buy ful keresoje; idezojelben = pontos egyezes
+    local ahf = rawget(_G, "AuctionHouseFrame")
+    local bar = type(ahf) == "table" and rawget(ahf, "SearchBar")
+    if type(bar) == "table" and type(rawget(bar, "SearchBox")) == "table" and bar.StartSearch then
+        local mode = rawget(_G, "AuctionHouseFrameDisplayMode")
+        if ahf.SetDisplayMode and type(mode) == "table" and mode.Buy then pcall(ahf.SetDisplayMode, ahf, mode.Buy) end
+        bar.SearchBox:SetText('"' .. name .. '"')
+        if pcall(bar.StartSearch, bar) then return "Blizzard" end
+    end
     local box, search = rawget(_G, "BrowseName"), rawget(_G, "AuctionFrameBrowse_Search")
     if type(box) == "table" and box.SetText and type(search) == "function" then
         local browse, tab1 = rawget(_G, "AuctionFrameBrowse"), rawget(_G, "AuctionFrameTab1")
@@ -361,7 +450,7 @@ local function StartBuy(list)
             b.items[#b.items + 1] = {
                 id = e.id, name = e.name, need = math.min(e.need, plan.covered), cap = plan.cost,
                 maxUnit = plan.maxUnit, spent = 0, got = 0, pages = pages, pageIdx = 1, count = plan.covered,
-                auctions = #plan.picks,
+                auctions = #plan.picks, commodity = plan.commodity,
             }
             b.capAll = b.capAll + plan.cost
         end
@@ -376,8 +465,42 @@ local function BuyNextItem(reason)
     local st = buy.items[buy.cur]
     if reason and st then buy.note = reason end
     buy.cur = buy.cur + 1
-    buy.ready = nil
-    if buy.items[buy.cur] then buy.wantQuery = 1 else buy.done = true end
+    buy.ready, buy.waitPrice, buy.needStart = nil, nil, nil
+    local nxt = buy.items[buy.cur]
+    if not nxt then buy.done = true
+    elseif nxt.commodity then buy.needStart = true -- az ar kerese is kattintasra megy (mint a Blizzard UI-ban)
+    else buy.wantQuery = 1 end
+end
+
+-- Commodity: ar kerese a szervertol (StartCommoditiesPurchase); kattintasbol hivjuk.
+-- Valasz: COMMODITY_PRICE_UPDATED (egysegar, osszesen) vagy COMMODITY_PRICE_UNAVAILABLE.
+function A.StartCommodity()
+    local C, st = Modern(), buy and buy.items[buy.cur]
+    if not (C and st and st.commodity) then return end
+    buy.needStart, buy.ready = nil, nil
+    st.qty = st.need - st.got
+    if type(C.StartCommoditiesPurchase) ~= "function" or not pcall(C.StartCommoditiesPurchase, st.id, st.qty) then
+        BuyNextItem(L["The game refused the purchase."])
+    else
+        buy.waitPrice = Now()
+    end
+    if UpdatePopup then UpdatePopup() end
+end
+
+function A.OnCommodityPrice(unit, total)
+    if not (buy and buy.waitPrice) then return end
+    local st = buy.items[buy.cur]
+    buy.waitPrice = nil
+    if not st then return end
+    total = tonumber(total) or ((tonumber(unit) or 0) * (st.qty or 0))
+    if total > 0 and st.spent + total <= st.cap then
+        buy.ready = { commodity = true, count = st.qty, buyout = total }
+    else
+        local C = Modern()
+        if C and type(C.CancelCommoditiesPurchase) == "function" then pcall(C.CancelCommoditiesPurchase) end
+        BuyNextItem((L["%s now costs %s, more than you confirmed; skipped."]):format(st.name, A.FormatCoins(total)))
+    end
+    if UpdatePopup then UpdatePopup() end
 end
 
 BuyOnList = function(mine, q)
@@ -403,7 +526,12 @@ BuyQueryNeeded = function(tries)
     if tries > 3 then BuyNextItem(L["The auction house did not answer; skipped."]) else buy.wantQuery = tries end
     if UpdatePopup then UpdatePopup() end
 end
-BuyTimeout = function(q) BuyQueryNeeded((q.tries or 1) + 1) end
+-- q nelkul: a commodity ar nem jott meg idoben
+BuyTimeout = function(q)
+    if q then BuyQueryNeeded((q.tries or 1) + 1) return end
+    BuyNextItem(L["The auction house did not answer; skipped."])
+    if UpdatePopup then UpdatePopup() end
+end
 
 -- Egy kattintas: a kivalasztott aukcio megvetele (PlaceAuctionBid kattintast ker)
 function A.BuyClick()
@@ -411,12 +539,15 @@ function A.BuyClick()
     if buy.done then return "done" end
     local st, l = buy.items[buy.cur], buy.ready
     if not (st and l) then return "wait" end
-    -- az index meg ugyanazt az aukciot mutatja? (kozben frissulhetett a lista)
-    local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemId = GetAuctionItemInfo("list", l.idx)
-    if (tonumber(itemId) and tonumber(itemId) ~= st.id) or tonumber(count) ~= l.count or tonumber(buyout) ~= l.buyout then
-        buy.ready, buy.wantQuery = nil, 1
-        if UpdatePopup then UpdatePopup() end
-        return "stale"
+    local C = Modern()
+    if not C and l.idx then
+        -- klasszikus: az index meg ugyanazt az aukciot mutatja? (kozben frissulhetett a lista)
+        local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemId = GetAuctionItemInfo("list", l.idx)
+        if (tonumber(itemId) and tonumber(itemId) ~= st.id) or tonumber(count) ~= l.count or tonumber(buyout) ~= l.buyout then
+            buy.ready, buy.wantQuery = nil, 1
+            if UpdatePopup then UpdatePopup() end
+            return "stale"
+        end
     end
     if st.spent + l.buyout > st.cap then -- soha nem a megerositett ar folott
         BuyNextItem()
@@ -429,9 +560,18 @@ function A.BuyClick()
         if UpdatePopup then UpdatePopup() end
         return "money"
     end
-    if type(PlaceAuctionBid) ~= "function" or not pcall(PlaceAuctionBid, "list", l.idx, l.buyout) then
+    local ok
+    if l.commodity then
+        ok = C and type(C.ConfirmCommoditiesPurchase) == "function" and pcall(C.ConfirmCommoditiesPurchase, st.id, l.count)
+    elseif l.auctionID then
+        ok = C and type(C.PlaceBid) == "function" and pcall(C.PlaceBid, l.auctionID, l.buyout)
+    else
+        ok = type(PlaceAuctionBid) == "function" and pcall(PlaceAuctionBid, "list", l.idx, l.buyout)
+    end
+    if not ok then
         buy.note = L["The game refused the purchase."]
-        buy.ready, buy.wantQuery = nil, 1
+        buy.ready = nil
+        if l.commodity then BuyNextItem() else buy.wantQuery = 1 end
         if UpdatePopup then UpdatePopup() end
         return "error"
     end
@@ -449,7 +589,7 @@ end
 -- Hibauzenet a vasarlas utan (elkelt kozben, nincs eleg penz): visszavonjuk a szamolast
 local function OnBuyError()
     local last = buy and buy.last
-    if not (last and Now() - last.t < 2) then return end
+    if not (last and Now() - last.t < 5) then return end
     local st, l = last.st, last.l
     st.spent, st.got = st.spent - l.buyout, st.got - l.count
     buy.spentAll, buy.bought = buy.spentAll - l.buyout, buy.bought - 1
@@ -470,7 +610,7 @@ A.StopBuy = StopBuy
 -- UI: ful az AH mellett + panel + megerosito ablak
 ---------------------------------------------------------------------------
 local W, H, ROW_H = 330, 400, 34
-local HOSTS = { "AuctionFrame", "AuctionHouseFrame" }
+local HOSTS = { "AuctionHouseFrame", "AuctionFrame" } -- modern (Forever), klasszikus
 local tab, frame
 local rows = {}
 local current = {} -- a lathato sorok: { entry, plan }
@@ -489,7 +629,8 @@ local function PriceOf(e)
     if not p then return nil, "none" end
     if p.scanning and not p.listings then return nil, "scanning" end
     if not p.listings then return nil, "none" end
-    local plan = A.Plan(p.listings, e.need, Me())
+    local isCom = p.listings[1] and p.listings[1].commodity
+    local plan = (isCom and A.PlanCommodity or A.Plan)(p.listings, e.need, Me())
     if not plan then return nil, p.scanning and "scanning" or "empty" end
     return plan, p.scanning and "scanning" or "ok"
 end
@@ -534,12 +675,13 @@ local function BuildPopup()
     p.hint:SetWidth(296)
     p.hint:SetJustifyH("LEFT")
     p.hint:SetWordWrap(true)
-    p.hint:SetText(L["One auction per click: the game only allows one purchase per click."])
+    p.hint:SetText(L["One purchase per click: the game needs a click for every purchase."])
     p.ok = S.FlatButton(p, L["Buy"], 180, 22)
     p.ok.text:SetFontObject("GameFontNormal")
     p.ok:SetPoint("BOTTOMLEFT", 12, 10)
     p.ok:SetScript("OnClick", function()
         if buy and buy.done then StopBuy() return end
+        if buy and buy.needStart then A.StartCommodity() return end
         A.BuyClick()
     end)
     p.cancel = S.FlatButton(p, L["Cancel"], 100, 22)
@@ -571,7 +713,12 @@ UpdatePopup = function()
     if st and l then
         p.step:SetText(head .. "\n" .. (L["Next: %d x %s for %s"]):format(l.count, st.name, A.FormatCoins(l.buyout))
             .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or ""))
-        p.ok.text:SetText((L["Buy (%d left)"]):format(math.max(1, st.need - st.got)))
+        p.ok.text:SetText(l.commodity and L["Buy"] or (L["Buy (%d left)"]):format(math.max(1, st.need - st.got)))
+        p.ok:Enable()
+    elseif st and buy.needStart then
+        p.step:SetText(head .. "\n" .. (L["Next: %d x %s"]):format(st.need - st.got, st.name)
+            .. (buy.note and ("\n|cff" .. hex.WARN .. buy.note .. "|r") or ""))
+        p.ok.text:SetText(L["Get current price"])
         p.ok:Enable()
     else
         p.step:SetText(head .. "\n|cff" .. hex.DIM .. (L["Looking up %s..."]):format(st and st.name or "?") .. "|r"
@@ -587,8 +734,12 @@ local function OpenConfirm(list)
     if not StartBuy(list) then return end
     local p = BuildPopup()
     p.text:SetText(ConfirmText(list))
-    buy.wantQuery = 1 -- friss lista a vasarlas elott (az indexek csak igy jok)
     p:Show()
+    if buy.items[1].commodity then
+        A.StartCommodity() -- most kattintottal (Buy): az ar kerese mehet rogton
+    else
+        buy.wantQuery = 1 -- friss lista a vasarlas elott (az indexek / aukciok csak igy jok)
+    end
     UpdatePopup()
 end
 A.OpenConfirm = OpenConfirm
@@ -963,18 +1114,34 @@ local function SoonRefresh()
 end
 
 local ev = CreateFrame("Frame")
-for _, e in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "AUCTION_ITEM_LIST_UPDATE", "QUEST_LOG_UPDATE",
-    "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "UI_ERROR_MESSAGE", "MAIL_CLOSED" }) do
-    ev:RegisterEvent(e)
+-- Egyenkent, pcall-lal: a kliens nem ismert esemenyre hibat dob (a Forever modern AH-janal nincs
+-- AUCTION_ITEM_LIST_UPDATE, a klasszikusnal nincs COMMODITY_*).
+for _, e in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "QUEST_LOG_UPDATE", "BAG_UPDATE_DELAYED",
+    "GET_ITEM_INFO_RECEIVED", "UI_ERROR_MESSAGE", "MAIL_CLOSED",
+    "AUCTION_ITEM_LIST_UPDATE",                                                   -- klasszikus AH
+    "COMMODITY_SEARCH_RESULTS_UPDATED", "ITEM_SEARCH_RESULTS_UPDATED",            -- modern AH
+    "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED" }) do
+    pcall(ev.RegisterEvent, ev, e)
 end
-ev:SetScript("OnEvent", function(_, event)
+ev:SetScript("OnEvent", function(_, event, a1, a2)
     if event == "AUCTION_HOUSE_SHOW" then
         OnShowAH()
     elseif event == "AUCTION_HOUSE_CLOSED" then
         OnCloseAH()
     elseif event == "AUCTION_ITEM_LIST_UPDATE" then
         OnList()
-    elseif event == "UI_ERROR_MESSAGE" then
+    elseif event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
+        OnList("commodity", a1)
+    elseif event == "ITEM_SEARCH_RESULTS_UPDATED" then
+        OnList("item", a1)
+    elseif event == "COMMODITY_PRICE_UPDATED" then
+        A.OnCommodityPrice(a1, a2)
+    elseif event == "COMMODITY_PRICE_UNAVAILABLE" then
+        if buy and buy.waitPrice then
+            BuyNextItem(L["The auction house has no price for it right now; skipped."])
+            UpdatePopup()
+        end
+    elseif event == "UI_ERROR_MESSAGE" or event == "COMMODITY_PURCHASE_FAILED" then
         OnBuyError()
     elseif event == "MAIL_CLOSED" then
         wipe(pendingMail)

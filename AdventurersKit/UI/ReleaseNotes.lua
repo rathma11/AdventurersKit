@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.12", date = "2026-11-18", items = {
+        "Fix: Lua error at login 'Attempt to register unknown event AUCTION_ITEM_LIST_UPDATE' (0.7.10), and the "
+            .. "auction house quest items tab never showed. WoW: Forever has the modern auction house; the tab now uses it.",
+        "Auction house quest items: stackable goods (commodities, e.g. cloth) are bought in one go for the missing "
+            .. "count: the Buy click asks the server for the current price, the next click buys. If the price went above "
+            .. "what you confirmed, it is cancelled and skipped. Other items are bought one auction per click, by auction.",
+        "Clicking a row searches the item in the auction house's Buy tab (exact name).",
+    } },
     { version = "0.7.11", date = "2026-11-18", items = {
         "Options > About: the addon's name, version and a short description, every feature in one sentence grouped "
             .. "by area, the main /qf commands and a button to these release notes. The same list is in FEATURES.md.",

@@ -1228,6 +1228,82 @@ test("AH quest items: needed items, scan, buy one auction per click", function()
     W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
 
+-- 0.7.11: WoW: Forever has the modern auction house (C_AuctionHouse); AUCTION_ITEM_LIST_UPDATE
+-- does not exist there (registering it was a Lua error at load).
+test("AH quest items: modern auction house (commodities and item auctions)", function()
+    local A = NS.AHQ
+    eq(A.PlanCommodity({ { unit = 40, count = 3 }, { unit = 60, count = 10 } }, 4).cost, 180, "commodity: 3 x 40 + 1 x 60")
+    eq(A.PlanCommodity({ { unit = 40, count = 3 } }, 5).partial, true, "commodity: not enough")
+    W.InstallModernAH()
+    check(A.Modern() ~= nil, "modern AH detected")
+    Q.SetLog({ { qid = 100 }, { qid = 104 } })
+    W.itemInfo = { [2589] = { "Linen Cloth", 13 }, [2592] = { "Wool Cloth", 33 },
+        [5000] = { "Quest Thing", 0, 4 }, [5001] = { "BoP Thing", 0, 1 } }
+    W.items = { [2589] = 2 }
+    W.ahAll = {
+        { itemId = 2589, unit = 40, count = 3 },
+        { itemId = 2589, unit = 60, count = 10 },
+        { itemId = 2589, unit = 30, count = 2, own = true },          -- mine: not bought
+        { itemId = 2592, buyout = 300, count = 1, auctionID = 11 },
+        { itemId = 2592, buyout = 2000, count = 20, auctionID = 12 },
+        { itemId = 2592, buyout = 100, count = 1, auctionID = 13, own = true },
+    }
+    W.ahQueries, W.ahBids = {}, {}
+    local function respond()
+        W.Advance(0.5)
+        local q = W.ahQueries[#W.ahQueries]
+        if not q then return end
+        if q.itemID == 2589 then W.Fire("COMMODITY_SEARCH_RESULTS_UPDATED", 2589)
+        else W.Fire("ITEM_SEARCH_RESULTS_UPDATED", { itemID = q.itemID }) end
+    end
+    W.Fire("AUCTION_HOUSE_SHOW")
+    A.Toggle(true)
+    A.Scan(A.NeededItems(), true)
+    for _ = 1, 4 do respond() end
+    A.Refresh()
+    eq(A.current[1].plan and A.current[1].plan.cost, 180, "linen (commodity): cheapest 4 units, own ones left out")
+    eq(A.current[2].plan and A.current[2].plan.cost, 300, "wool (item): the single one, own auction left out")
+
+    -- commodity: the Buy click asks the price at once, the next click confirms
+    local nq = #W.ahQueries
+    A.rows[1].buy:Click()
+    local pop = rawget(_G, "AdventurersKitAHBuy")
+    eq(#W.ahStarts, 1, "price asked in the Buy click")
+    eq(W.ahStarts[1].quantity, 4, "for the missing count")
+    W.Fire("COMMODITY_PRICE_UPDATED", 45, 180)
+    check(pop.ok:IsEnabled(), "ready at the confirmed price")
+    pop.ok:Click()
+    eq(#W.ahBids, 1, "confirmed")
+    check(W.ahBids[1].commodity and W.ahBids[1].quantity == 4, "commodity purchase of 4")
+    check(A.buy and A.buy.done, "done")
+    pop.ok:Click()
+    eq(#W.ahQueries, nq, "no search needed for a commodity")
+
+    -- Buy all: the commodity price went up -> cancelled and skipped; wool bought by auction ID
+    W.Fire("MAIL_CLOSED")
+    A.Refresh()
+    A.frame.buyAll:Click()
+    eq(#W.ahStarts, 2, "first item: price asked")
+    W.Fire("COMMODITY_PRICE_UPDATED", 50, 200)
+    eq(W.ahCancelled, 1, "dearer than confirmed: cancelled")
+    eq(#W.ahBids, 1, "nothing bought for it")
+    respond()
+    check(pop.ok:IsEnabled(), "wool ready")
+    pop.ok:Click()
+    eq(#W.ahBids, 2, "wool bought")
+    eq(W.ahBids[2].auctionID, 11, "the cheapest auction that is not mine")
+    eq(W.ahBids[2].amount, 300, "at its buyout")
+    check(A.buy and A.buy.done, "buy all done")
+    pop.ok:Click()
+
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    W.RemoveModernAH()
+    QuestFocusDB.ahqOpen = nil
+    W.Fire("MAIL_CLOSED")
+    Q.SetLog({ { qid = 100 }, { qid = 101 }, { qid = 102 }, { qid = 103, complete = true } })
+    W.items, W.itemInfo, W.ahAll = {}, nil, {}
+end)
+
 test("no errors logged by the addon", function()
     for _, e in ipairs(NS.errors or {}) do check(false, "NS.errors: " .. tostring(e.msg)) end
 end)
