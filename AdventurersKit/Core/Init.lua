@@ -85,10 +85,10 @@ NS.Print, NS.PrintAlways, NS.Loud = Print, PrintAlways, Loud
 ---------------------------------------------------------------------------
 -- Karakterenkenti beallitasok: QuestFocusDB.chars["Nev-Realm"]. Ide kerulnek a buff
 -- kapcsolok (noBuff_*), a valasztott itemek / sajat buffok / percek / class buff valasztasok
--- es a city list kihagyott helyei. Ami itt nincs, a kozos QuestFocusDB-bol olvas (__index).
+-- Ami itt nincs, a kozos QuestFocusDB-bol olvas (__index).
 -- Elso alkalommal karakterenkent a korabbi kozos ertekek masolatabol indul.
 ---------------------------------------------------------------------------
-NS.CHAR_KEYS = { "buffItems", "customBuffs", "buffWarn", "classPref", "cityIgnore" }
+NS.CHAR_KEYS = { "buffItems", "customBuffs", "buffWarn", "classPref" }
 local function DeepCopy(v)
     if type(v) ~= "table" then return v end
     local t = {}

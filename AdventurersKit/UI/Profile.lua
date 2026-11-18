@@ -1,7 +1,7 @@
 -- Beallitasok exportja / importja (Options > Share settings, /qf export, /qf import).
 -- Szoveg: "AK1:" + sajat, hossz-prefixes formatum. Importnal SAJAT parser olvassa (nincs
 -- loadstring), igy egy kapott szoveg nem futtathat kodot.
--- Ami nem megy at: allapot (panel helye, ignore lista, tempo statisztika, utolso quest...).
+-- Ami nem megy at: allapot (panel helye, tempo statisztika, utolso quest...).
 -- Karakterfuggo reszek ellenorizve: item valasztasok csak ha a taskadban megvan,
 -- class beallitasok csak azonos classnal.
 local ADDON_NAME, NS = ...
@@ -14,7 +14,7 @@ local PREFIX = "AK1:"
 local PLAIN = {
     "quietChat", "showErrors", "hideMinimap", "fontSize", "panelW", "panelH", "panelScale",
     "macroIcons", "startAttack", "noPing", "pingMode", "noArrow", "noEscortIcon", "nearbyRadius", "noNearbyQuests",
-    "noSuggest", "noToast", "noQuestPopup", "noCityMode", "pickupAbove", "pickupBelow",
+    "noSuggest", "noToast", "noQuestPopup", "noCityMode", "cityNoAuto", "pickupAbove", "pickupBelow",
     "zoneFocus", "noZonePrompt", "zoneAutoFollow", "modules",
     "noBagGlow", "noBagList", "noUseButton",
     "noBuffAlert", "noBuffWarn", "noFoodPrompt", "buffWarn",
@@ -287,7 +287,7 @@ local function Open(mode)
     else
         win.text = nil
         win.title:SetText(L["Import settings"])
-        win.hint:SetText(L["Paste the text with Ctrl+V, then Import. Items you don't have stay automatic; it does not change your panel position or ignore list."])
+        win.hint:SetText(L["Paste the text with Ctrl+V, then Import. Items you don't have stay automatic; it does not change your panel position."])
         action:SetText(L["Import"])
         box:SetText("")
         win:Show()
@@ -303,7 +303,7 @@ NS.OpenShareSettings = Open
 local page = NS.AddOptionsTab(L["Share settings"], 75)
 local fl = NS.OptFlow(page)
 fl:Header(L["Share settings"])
-fl:Text(L["Send your Adventurer's Kit settings to someone else, or load theirs. Not shared: panel position, city ignore list, your kill pace and other personal data."], 2)
+fl:Text(L["Send your Adventurer's Kit settings to someone else, or load theirs. Not shared: panel position, your kill pace and other personal data."], 2)
 fl:Button(L["Export"], 140,
     L["Shows your settings as text; copy it (Ctrl+C) and send it. Also: /qf export"],
     function() Open("export") end)

@@ -129,8 +129,8 @@ end of a row (buff reminder). Use `S.ClearButton(parent, size)`.
 
 **Icon buttons in the panel's top row.** 16px, icon cropped with `SetTexCoord(0.08, 0.92, 0.08, 0.92)`,
 `ButtonHilight-Square` (ADD) hover, a tooltip with a white title and a grey (0.8) description ending
-in "Same as /qf ...". From the right: X, then options 6px left of it, then dungeon and farm 7px apart:
-`[farm] [dungeon] [options] [X]`. A new one goes on the left of farm. A button that is off is
+in "Same as /qf ...". From the right: X, then options 6px left of it, then dungeon, city and farm 7px apart:
+`[farm] [city] [dungeon] [options] [X]`. A new one goes on the left of farm. A button that is off is
 desaturated (farm); while it runs, the farm clock gets a green glow and a red X (stop) in the same spot. Use `S.IconButton(parent, icon, title, desc, onClick)`.
 
 **◀ ▶ arrows.** `Interface\\Buttons\\UI-SpellbookIcon-PrevPage` / `-NextPage` with `-Up`, `-Down`,

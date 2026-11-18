@@ -237,12 +237,26 @@ local farmBtn = ToolButton("Interface\\Icons\\INV_Misc_PocketWatch_01", L["Farm 
     end,
     function() if NS.FarmToggle then NS.FarmToggle() end end)
 farmBtn.tex:SetDesaturated(true)
-panel.dungeonBtn, panel.optBtn, panel.farmBtn = dungeonBtn, optBtn, farmBtn
--- sorrend balrol: [farm] [dungeon] [options] [X]
+-- city list (Planner\City.lua): ki / be, telepulesen kivul is. Ikon: a frakcio fovarosa
+-- (mage teleport ikon); a frakcio belepes utan biztos, ezert az ikon ott frissul.
+local CITY_ICON = { Alliance = "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
+    Horde = "Interface\\Icons\\Spell_Arcane_TeleportOrgrimmar" }
+local cityBtn = ToolButton(CITY_ICON.Alliance, L["City list"],
+    L["Quests to pick up nearby, errands (repair, sell, ammo, XP food) and Directions (bank, AH, trainers...). Click: open / close, also outside towns. Whether it opens by itself in towns: Options > City list. Same as /qf city."],
+    function() if NS.ToggleCityList then NS.ToggleCityList() end end)
+local cityIconEv = CreateFrame("Frame")
+cityIconEv:RegisterEvent("PLAYER_ENTERING_WORLD")
+cityIconEv:SetScript("OnEvent", function()
+    local f = UnitFactionGroup and UnitFactionGroup("player")
+    cityBtn.tex:SetTexture(CITY_ICON[f] or CITY_ICON.Alliance)
+end)
+panel.dungeonBtn, panel.optBtn, panel.farmBtn, panel.cityBtn = dungeonBtn, optBtn, farmBtn, cityBtn
+-- sorrend balrol: [farm] [city] [dungeon] [options] [X]
 -- az X gomb kepe kitolt a keretebol: tobb hely kell, kulonben osszeernek
 optBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
 dungeonBtn:SetPoint("RIGHT", optBtn, "LEFT", -7, 0)
-farmBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -7, 0)
+cityBtn:SetPoint("RIGHT", dungeonBtn, "LEFT", -7, 0)
+farmBtn:SetPoint("RIGHT", cityBtn, "LEFT", -7, 0)
 
 local function Divider(y)
     local t = panel:CreateTexture(nil, "ARTWORK")

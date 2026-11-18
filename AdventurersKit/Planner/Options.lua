@@ -81,89 +81,43 @@ pk:Number(L["Highest quest level: your level plus"],
 pagePick:HookScript("OnShow", function() pk:Refresh() end)
 
 ---------------------------------------------------------------------------
--- 45 City list: a varosi / fogadoi lista, kihagyott helyek, teendok
+-- 45 City list: a varosi / fogadoi lista (be / ki, magatol nyiljon-e) es a teendok kuszobei
 ---------------------------------------------------------------------------
 local pageCity = NS.AddOptionsTab(L["City list"], 45)
 local cl = NS.OptFlow(pageCity)
-cl:Text(L["In a city, or in a village with an inn (innkeeper within ~250 yd), a list opens with every quest you can pick up nearby (XP, chain position, "]
-    .. L["dungeon tag), plus a to-do section on top (repair, sell, ammo, XP food) and Bank / AH / Trainer buttons."], 0)
+cl:Text(L["In a city, or in a village with an inn (innkeeper within ~250 yd): a list of every quest you can pick up nearby (XP, chain position, "]
+    .. L["dungeon tag), with errands on top (repair, sell, ammo, XP food) and a Directions menu (bank, AH, trainers...). "]
+    .. L["The town icon on the quest panel (or /qf city) opens and closes it anywhere."], 0)
 cl:Header(L["On / off"])
+local autoCb
 cl:Check(L["City list"],
-    L["Off: the list never opens by itself, in any city or inn (same as 'Disable city list everywhere' on the list). "]
-    .. L["With it off, the nearby quest popups (Quest pickup tab) show in cities too."],
+    L["Off: the list never opens by itself, and the nearby quest popups (Quest pickup tab) show in towns too. "]
+    .. L["The panel icon and /qf city still open it."],
     function() return not QuestFocusDB.noCityMode end,
     function(v)
-        QuestFocusDB.noCityMode = not v
-        if v then NS.ShowCityList() end
+        QuestFocusDB.noCityMode = not v or nil
+        NS.RefreshCityList()
         NS.Panel_Update()
+        cl:Refresh()
     end)
-cl:Button(L["Open the list now"], 160, L["Same as /qf city: opens the list here, even outside a city or in a skipped place."],
+autoCb = cl:Check(L["Open automatically in towns"],
+    L["On: the list pops up when you arrive in a city or a village with an inn (closing it keeps it closed until you leave). "]
+    .. L["Off: only the panel icon or /qf city opens it."],
+    function() return not QuestFocusDB.cityNoAuto end,
+    function(v)
+        QuestFocusDB.cityNoAuto = not v or nil
+        if v and not NS.CityListShown() then NS.RefreshCityList() end
+    end, 24)
+cl:OnRefresh(function()
+    -- a lista kikapcsolva: a magatol nyilas sem szamit (szurke)
+    if autoCb.SetEnabled then autoCb:SetEnabled(not QuestFocusDB.noCityMode) end
+    autoCb.label:SetFontObject(QuestFocusDB.noCityMode and "GameFontDisable" or "GameFontHighlight")
+end)
+cl:Button(L["Open the list now"], 160, L["Same as the town icon on the panel and /qf city: opens the list here, also outside towns."],
     function() if NS.ShowCityList then NS.ShowCityList() end end, 28)
 
-cl:Header(L["Ignore list: places where it doesn't open by itself"])
-local ignInfo = cl:Text(L["Added with 'Don't open here again' on the list (it covers ~500 yards around that spot). "]
-    .. L["Remove a place to get the list back there."], 2)
--- Helyek listaja: soronkent nev + Remove gomb (frissiteskor ujraepitve)
-local ignBox = CreateFrame("Frame", nil, pageCity)
-ignBox:SetSize(420, 20)
-cl:Place(ignBox, 28, 8)
-local ignRows = {}
-local ignAll
-local function RebuildIgnore()
-    local list = NS.CharDB().cityIgnore or {}
-    for _, r in ipairs(ignRows) do r:Hide() end
-    for i, e in ipairs(list) do
-        local r = ignRows[i]
-        if not r then
-            r = CreateFrame("Frame", nil, ignBox)
-            r:SetSize(420, 22)
-            r.btn = CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
-            r.btn:SetSize(70, 20)
-            r.btn:SetPoint("LEFT", 0, 0)
-            r.btn:SetText(L["Remove"])
-            if r.btn:GetFontString() then r.btn:GetFontString():SetFontObject("GameFontNormalSmall") end
-            r.text = r:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-            r.text:SetPoint("LEFT", r.btn, "RIGHT", 8, 0)
-            r.text:SetPoint("RIGHT", 0, 0)
-            r.text:SetJustifyH("LEFT")
-            ignRows[i] = r
-        end
-        r:SetPoint("TOPLEFT", ignBox, "TOPLEFT", 0, -(i - 1) * 24)
-        r.text:SetText("|cffffff00" .. (e.name or "?") .. "|r")
-        r.btn:SetScript("OnClick", function()
-            local cur = NS.CharDB().cityIgnore or {}
-            for j, x in ipairs(cur) do
-                if x == e then
-                    table.remove(cur, j)
-                    NS.Loud(NS.Print, L["City list: |cffffff00%s|r removed, the list opens there again."], e.name or "?")
-                    break
-                end
-            end
-            cl:Refresh()
-        end)
-        r:Show()
-    end
-    local n = #list
-    if n == 0 then
-        ignBox.empty = ignBox.empty or ignBox:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        ignBox.empty:SetPoint("TOPLEFT", 0, -3)
-        ignBox.empty:SetText(L["None - the list opens in every city and inn."])
-        ignBox.empty:Show()
-    elseif ignBox.empty then
-        ignBox.empty:Hide()
-    end
-    ignBox:SetHeight(math.max(1, n) * 24)
-    if ignAll then ignAll:SetShown(n > 1) end
-    if pageCity.Remeasure then pageCity.Remeasure() end
-end
-ignAll = cl:Button(L["Remove all"], 120, nil, function()
-    if NS.ResetCityIgnore then NS.ResetCityIgnore() end
-    cl:Refresh()
-end, 28)
-cl:OnRefresh(RebuildIgnore)
-
-cl:Header(L["City to-do (above the quests)"])
-cl:Text(L["Shown at the top of the city list with the nearest NPC for it (click: marker). Bags and repair also warn out in the world, in the buff reminder (Buffs tab). 0 turns a line off."], 2)
+cl:Header(L["Errands: when to warn"])
+cl:Text(L["Errands show at the top of the city list with the nearest NPC for them (click: marker). Bags and repair also warn out in the world, in the buff reminder (Buffs tab). 0 turns a line off."], 2)
 cl:Number(L["Bags full: warn at"],
     L["Percent of your bag slots in use, in cities only. Default 70. The nearest vendor to sell to is shown (or Directions > Bank)."],
     function() return NS.CityLimit("bagPct") end,

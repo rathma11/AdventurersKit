@@ -166,30 +166,6 @@ city.sep = city:CreateTexture(nil, "ARTWORK")
 city.sep:SetHeight(1)
 city.sep:SetColorTexture(1, 0.82, 0, 0.3)
 
----------------------------------------------------------------------------
--- Ignoralt helyek: NS.CharDB().cityIgnore = { {c, x, y, name} }. Vilag koordinatan
--- (yard) tarolva, CITY_IGNORE_R sugaron belul ignoralt (varos es fogados falu is).
----------------------------------------------------------------------------
-local CITY_IGNORE_R = 500
-local function PlaceName()
-    local z, s = GetZoneText and GetZoneText() or "", GetMinimapZoneText and GetMinimapZoneText() or ""
-    if s ~= "" and s ~= z then return s .. " (" .. z .. ")" end
-    return z ~= "" and z or "?"
-end
-local function IgnoredHere()
-    local list = NS.CharDB().cityIgnore
-    if not list or #list == 0 then return end
-    local pc, px, py = NS.PlayerWorldPos()
-    if not pc then return end
-    for i, e in ipairs(list) do
-        if e.c == pc then
-            local dx, dy = e.x - px, e.y - py
-            if dx * dx + dy * dy <= CITY_IGNORE_R * CITY_IGNORE_R then return i, e end
-        end
-    end
-end
-NS.CityIgnoredHere = IgnoredHere
-
 -- Lapos gomb a lista stilusahoz (a piros UIPanelButton helyett): sotet hatter, vekony arany
 -- keret, hoverre vilagosabb; opcionalis kis ikon a szoveg elott. Szelesseg a szoveghez igazodik.
 local function FlatBtn(text, icon, coords)
@@ -230,50 +206,6 @@ local function FlatBtn(text, icon, coords)
     b:SetText(text)
     return b
 end
-local function MakeBtn(text) return FlatBtn(text) end
-city.ignoreBtn = MakeBtn(L["Don't open here again"])
-city.disableBtn = MakeBtn(L["Disable city list everywhere"])
-city.ignoreBtn:SetScript("OnClick", function() NS.Loud(function()
-    local i, e = IgnoredHere()
-    if i then
-        table.remove(NS.CharDB().cityIgnore, i)
-        NS.Print(L["City list: |cffffff00%s|r is no longer ignored."], e.name or "?")
-        city.ignoreBtn:SetText(L["Don't open here again"])
-        return
-    end
-    local pc, px, py = NS.PlayerWorldPos()
-    if not pc then return end
-    NS.CharDB().cityIgnore = NS.CharDB().cityIgnore or {}
-    local name = PlaceName()
-    table.insert(NS.CharDB().cityIgnore, { c = pc, x = px, y = py, name = name })
-    NS.Print(L["City list: |cffffff00%s|r ignored (also next time). |cffffff00/qf city|r opens it anyway, |cffffff00/qf cityreset|r clears the ignore list."], name)
-    city:Hide()
-end) end)
-city.ignoreBtn:SetScript("OnEnter", function(self)
-    local ignored = IgnoredHere()
-    local tt = NS.TT.Begin(self, "ANCHOR_TOP", ignored and L["Remove from ignore list"] or L["Don't open here again"])
-    if ignored then
-        NS.TT.Note(tt, (L["The list opens by itself in %s again."]):format(PlaceName()))
-    else
-        NS.TT.Note(tt, (L["This list won't pop up by itself in %s (within ~500 yd) any more, not even next time. "
-            .. "Other cities and inns are not affected. /qf city opens it anyway; Options > City list lists and clears these places."])
-            :format("|cffffff00" .. PlaceName() .. "|r"))
-    end
-    NS.TT.Finish(tt)
-end)
-city.ignoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-city.disableBtn:SetScript("OnClick", function()
-    QuestFocusDB.noCityMode = true
-    city:Hide()
-    NS.PrintAlways(L["City list disabled everywhere (all cities and inns). Turn it back on: Options > City list."])
-    NS.Panel_Update()
-end)
-city.disableBtn:SetScript("OnEnter", function(self)
-    local tt = NS.TT.Begin(self, "ANCHOR_TOP", L["Disable city list everywhere"])
-    NS.TT.Note(tt, L["Turns off the city list in every city and inn, not just here. Turn it back on: Options > City list."])
-    NS.TT.Finish(tt)
-end)
-city.disableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 city.dungeonBtn = FlatBtn(L["Dungeon quests"], NS.DUNGEON_ICON)
 city.dungeonBtn:SetPoint("BOTTOMRIGHT", city, "BOTTOMRIGHT", -22, 12)
 city.dungeonBtn:SetScript("OnClick", function() if NS.ToggleDungeonList then NS.ToggleDungeonList() end end)
@@ -631,6 +563,8 @@ end
 
 -- Csak ami itt, a telepulesen elerheto (GUIDE_R yardon belul): kis faluban nincs AH, bank...
 local GUIDE_R = 700
+-- telepulesen kivul (ikonnal / /qf city nyitva): a legkozelebbi, barmilyen messze
+local function GuideR() return (NS.InTown and NS.InTown()) and GUIDE_R or math.huge end
 local function ProfList()
     local mine = {}
     local QP = NS.Module("QuestieProfessions")
@@ -641,7 +575,7 @@ local function ProfList()
     local list = {}
     for _, pr in ipairs(PROFS) do
         local p, d = Nearest("Prof:" .. pr[1])
-        if p and d and d <= GUIDE_R then
+        if p and d and d <= GuideR() then
             list[#list + 1] = { label = pr[2], icon = pr[3], crop = true, point = p, dist = d, mine = mine[pr[1]] ~= nil }
         end
     end
@@ -672,7 +606,7 @@ local function ShowGuideMenu(anchor)
                 if #ProfList() > 0 then list[#list + 1] = e end
             else
                 e.point, e.dist = Nearest(g.kind)
-                if e.point and e.dist and e.dist <= GUIDE_R then list[#list + 1] = e end
+                if e.point and e.dist and e.dist <= GuideR() then list[#list + 1] = e end
             end
         end
     end
@@ -755,7 +689,7 @@ grip:SetScript("OnMouseUp", function()
     if not city.sizing then return end
     city:StopMovingOrSizing()
     city.sizing = nil
-    local fixed = -(city.lastTop or -38) + 59
+    local fixed = -(city.lastTop or -38) + (city.lastBottom or 59)
     local rows = math.floor((city:GetHeight() - fixed) / CITY_ROW_H + 0.5)
     QuestFocusDB.citySize = {
         w = math.floor(math.max(CITY_MIN_W, math.min(CITY_MAX_W, city:GetWidth())) + 0.5),
@@ -832,11 +766,23 @@ end
 NS.InCity = function() return InCity() and not QuestFocusDB.noCityMode end
 NS.InTown = InCity -- telepulesen vagy-e (a city list kapcsolotol fuggetlenul)
 
+-- Magatol nyilik-e (Options > City list): a lista be van kapcsolva es "Open automatically in
+-- towns" is. Kulonben csak a panel ikonja / a /qf city nyitja (city.forced).
+local function AutoOpen()
+    return not QuestFocusDB.noCityMode and not QuestFocusDB.cityNoAuto
+end
+NS.CityAutoOpen = AutoOpen
+
+-- ures lista (kezzel nyitva, nincs quest es teendo): egy sor szoveg a questek helyen
+city.empty = city:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+city.empty:SetJustifyH("LEFT")
+city.empty:SetWordWrap(false)
+city.empty:Hide()
+
 local function RefreshCityList()
-    if QuestFocusDB.noCityMode or not NS.QuestieAvailable() then city:Hide() return end
-    local ignored = IgnoredHere()
-    if ignored and not city.forced then city:Hide() return end
-    city.ignoreBtn:SetText(ignored and L["Remove from ignore list"] or L["Don't open here again"])
+    if not NS.QuestieAvailable() then city:Hide() return end
+    -- kikapcsolt city list: csak a kezzel nyitott (ikon, /qf city) marad kint
+    if QuestFocusDB.noCityMode and not city.forced then city:Hide() return end
     local pc, px, py = NS.PlayerWorldPos()
     if not pc then return end
     local ok, list = pcall(BuildPickups, pc, px, py, CITY_MAX)
@@ -909,12 +855,24 @@ local function RefreshCityList()
         r:SetPoint("TOPLEFT", city, "TOPLEFT", 14, -38 - (i - 1) * NEED_ROW_H)
         r:Show()
     end
-    if n == 0 and #needs == 0 then city:Hide() return end
+    local empty = n == 0 and #needs == 0
+    if empty and not city.forced then city:Hide() return end
+    local town = InCity()
     local top = -38 - (#needs > 0 and (#needs * NEED_ROW_H + 6) or 0)
-    city.title:SetText(n > 0 and (L["Quests to pick up here (%d)"]):format(n) or L["In town"])
+    if n > 0 then
+        city.title:SetText((town and L["Quests to pick up here (%d)"] or L["Quests to pick up nearby (%d)"]):format(n))
+    else
+        city.title:SetText(town and L["In town"] or L["Not in town"])
+    end
+    city.empty:ClearAllPoints()
+    city.empty:SetPoint("TOPLEFT", city, "TOPLEFT", 14, top - 3)
+    city.empty:SetPoint("RIGHT", city, "RIGHT", -14, 0)
+    city.empty:SetText(town and L["Nothing to do here: no quests to pick up nearby, no errands."]
+        or L["No quests to pick up nearby, no errands. Directions: the nearest bank, trainers..."])
+    city.empty:SetShown(empty)
     cContent:SetHeight(math.max(-y, 1))
     local rowsMax = CityRows()
-    local visH = math.min(n, rowsMax) * CITY_ROW_H
+    local visH = empty and CITY_ROW_H or math.min(n, rowsMax) * CITY_ROW_H
     -- csuszka csak ha tobb sor van, mint ami kifer
     local needBar = n > rowsMax
     city.lastTop, city.lastN, city.lastVisH, city.lastBar = top, n, visH, needBar
@@ -927,17 +885,16 @@ local function RefreshCityList()
     if not needBar then cScroll:SetVerticalScroll(0) end
     city.foot:ClearAllPoints()
     city.foot:SetPoint("TOPLEFT", city, "TOPLEFT", 14, top - visH - 4)
+    city.foot:SetShown(n > 0)
+    -- also sor (vonal + Dungeon quests gomb) csak ha van dungeon quest a listaban
     city.sep:ClearAllPoints()
     city.sep:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 20)
     city.sep:SetPoint("TOPRIGHT", city, "TOPRIGHT", -12, top - visH - 20)
-    city.ignoreBtn:ClearAllPoints()
-    city.ignoreBtn:SetPoint("TOPLEFT", city, "TOPLEFT", 12, top - visH - 27)
-    city.disableBtn:ClearAllPoints()
-    city.disableBtn:SetPoint("LEFT", city.ignoreBtn, "RIGHT", 6, 0)
-    -- van dungeon quest a listaban: Start dungeon gomb is
+    city.sep:SetShown(anyDungeon)
     city.dungeonBtn:SetShown(anyDungeon)
-    city:SetHeight(-top + visH + 59)
-    if not city:IsShown() and not city.closedHere then city:Show() end
+    city.lastBottom = anyDungeon and 59 or 30
+    city:SetHeight(-top + visH + city.lastBottom)
+    if not city:IsShown() and (city.forced or (town and AutoOpen() and not city.closedHere)) then city:Show() end
 end
 
 NS.RefreshCityList = RefreshCityList
@@ -948,10 +905,10 @@ cityEv:RegisterEvent("PLAYER_ENTERING_WORLD")
 cityEv:SetScript("OnEvent", function()
     C_Timer.After(2, function()
         if InCity() then
-            RefreshCityList()
+            if city:IsShown() or AutoOpen() then RefreshCityList() end
         else
             city.closedHere = nil -- kovetkezo varosban ujra feljon
-            city:Hide()
+            if not city.forced then city:Hide() end
         end
         NS.Panel_Update() -- varos mod ki/be: statisztika dobozok
     end)
@@ -971,21 +928,42 @@ city:SetScript("OnUpdate", function(_, dt)
     if not city:IsMouseOver() then RefreshCityList() end
 end)
 city:HookScript("OnHide", function() city.forced = nil end)
--- /qf city: kezzel is megnyithato (varoson kivul es ignoralt helyen is)
+-- Panel ikon / /qf city: kezzel nyitva (telepulesen kivul is, es akkor is, ha magatol nem
+-- nyilik). Kezzel nyitva kint marad, amig be nem zarod (a telepulest elhagyva is).
 NS.ShowCityList = function()
+    if not NS.QuestieAvailable() then
+        NS.Loud(NS.Print, L["The city list needs Questie."])
+        return
+    end
     city.closedHere = nil
-    city.forced = (not InCity() or IgnoredHere()) and true or nil
+    city.forced = true
     RefreshCityList()
 end
-NS.ResetCityIgnore = function()
-    local n = NS.CharDB().cityIgnore and #NS.CharDB().cityIgnore or 0
-    NS.CharDB().cityIgnore = {}
-    NS.Print(L["City list: ignore list cleared (%d places)."], n)
+NS.CityListShown = function() return city:IsShown() end
+NS.ToggleCityList = function()
+    if city:IsShown() then
+        city.closedHere = true
+        city:Hide()
+    else
+        NS.ShowCityList()
+    end
 end
+
+-- 0.7.9: a "Don't open here again" helyek megszuntek; a regi mentett listakat egyszer toroljuk
+local cleanEv = CreateFrame("Frame")
+cleanEv:RegisterEvent("PLAYER_LOGIN")
+cleanEv:SetScript("OnEvent", function()
+    local db = QuestFocusDB
+    if type(db) ~= "table" then return end
+    db.cityIgnore = nil
+    for _, c in pairs(type(db.chars) == "table" and db.chars or {}) do
+        if type(c) == "table" then rawset(c, "cityIgnore", nil) end
+    end
+end)
 
 -- Ujraprobalkozas: belepeskor / relog utan a Questie meg toltodhet (vagy a hely meg nem
 -- ismert), ilyenkor az elso frissites semmit nem ad. Amig varosban vagyunk es a lista nincs
--- kint (es nem zartuk be / ignoraltuk), 4 mp-enkent ujraprobalja.
+-- kint (es nem zartuk be), 4 mp-enkent ujraprobalja.
 local cityRetry, cityRetryElapsed = CreateFrame("Frame"), 0
 cityRetry:SetScript("OnUpdate", function(_, dt)
     cityRetryElapsed = cityRetryElapsed + dt
@@ -1001,8 +979,8 @@ cityRetry:SetScript("OnUpdate", function(_, dt)
         end
         NS.Panel_Update()
     end
-    if city:IsShown() or city.closedHere or QuestFocusDB.noCityMode or not inNow then return end
-    if InCombatLockdown() or IgnoredHere() then return end
+    if city:IsShown() or city.closedHere or not AutoOpen() or not inNow then return end
+    if InCombatLockdown() then return end
     RefreshCityList()
 end)
 

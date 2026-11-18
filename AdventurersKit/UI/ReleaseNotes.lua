@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.9", date = "2026-11-18", items = {
+        "City list: a town icon on the quest panel (between the farm clock and the dungeon icon) opens and closes "
+            .. "it, also outside towns: then it shows nearby quests, errands and Directions to the nearest bank, "
+            .. "trainers... Same as /qf city (it now toggles).",
+        "City list: new option 'Open automatically in towns' (Options > City list, on by default). Off: the list "
+            .. "only opens from the icon or /qf city.",
+        "City list: 'Don't open here again' and 'Disable city list everywhere' are gone, with the per-place ignore "
+            .. "list and /qf cityreset. Saved ignored places are cleared. The City list tab is tidier.",
+    } },
     { version = "0.7.8", date = "2026-11-18", items = {
         "Farm session on the quest panel: it shows like a quest, titled \"Farm session\" with a clock. The boxes show "
             .. "time, XP per hour and gold per hour; the rows show XP gained, XP to level with an ETA, mobs killed, "

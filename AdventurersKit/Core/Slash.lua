@@ -35,7 +35,7 @@ local function SlashHandler(msg)
     elseif msg == "bags" then
         if NS.ToggleBagList then NS.ToggleBagList() end
     elseif msg == "city" then
-        if NS.ShowCityList then NS.ShowCityList() end
+        if NS.ToggleCityList then NS.ToggleCityList() end
     elseif msg == "dungeon" or msg == "dungeons" then
         if NS.ToggleDungeonList then NS.ToggleDungeonList() end
     elseif msg:match("^dungeons?%s") then
@@ -48,8 +48,6 @@ local function SlashHandler(msg)
         if NS.OpenShareSettings then NS.OpenShareSettings("export") end
     elseif msg == "import" then
         if NS.OpenShareSettings then NS.OpenShareSettings("import") end
-    elseif msg == "cityreset" then
-        if NS.ResetCityIgnore then NS.ResetCityIgnore() end
     elseif msg == "chat" then
         QuestFocusDB.quietChat = not QuestFocusDB.quietChat
         Print(L["Chat messages: %s"], QuestFocusDB.quietChat and L["off (only the login line and command replies)"] or L["on"])
@@ -145,7 +143,7 @@ local function SlashHandler(msg)
         Print(L["  /qf icon <iconname> - custom icon; /qf icon - automatic"])
         Print(L["  /qf unmark - remove marker"])
         Print(L["  /qf clear - clear selection + marker"])
-        Print(L["  /qf city - city list here; /qf cityreset - clear ignored places"])
+        Print(L["  /qf city - open / close the city list (also outside towns)"])
         Print(L["  /qf dungeon - dungeon list; /qf dungeon <name> - dungeon prep (quests, then the entrance); /qf dungeon off - end it"])
         Print(L["  /qf farm - start / stop a farm session; /qf farm pause | resume | reset | show"])
         Print(L["  /qf chat - toggle chat messages; /qf notes - release notes"])

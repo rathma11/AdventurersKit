@@ -67,7 +67,7 @@ When a quest you can pick up is within ~300 yards, a popup appears at the top ce
 Only quests between your level minus 2 and plus 10 are shown; this range also applies to the "Pick up nearby" list. Change the range or turn the popup off on the Panel tab. The length is a rough estimate, because Questie's data has no counts: about 8 kills per mob objective, 6 items per loot objective (with the drop rate), about 1 min for talk or delivery quests, all scaled by your kill pace.
 
 ### City mode
-In a city or an inn (where you get rested XP), quests don't pop up one by one. When you arrive, a single list shows every quest you can pick up within ~600 yards, up to 12. Each row has the level, the name, the estimated length and the distance, and a click puts a TomTom marker on the quest giver. The list refreshes while you walk around, and quests you have picked up drop off it. It closes when you leave; X hides it until the next city. `/qf city` opens it anywhere. In city mode the panel hides the Progress / Time left / Pace boxes. Toggle it on the Panel tab.
+In a city or an inn (where you get rested XP), quests don't pop up one by one. When you arrive, a single list shows every quest you can pick up within ~600 yards, up to 12. Each row has the level, the name, the estimated length and the distance, and a click puts a TomTom marker on the quest giver. The list refreshes while you walk around, and quests you have picked up drop off it. It closes when you leave; X hides it until the next city. The town icon on the quest panel (or `/qf city`) opens and closes it anywhere. In city mode the panel hides the Progress / Time left / Pace boxes. Options > City list turns it off, or stops it opening by itself in towns ("Open automatically in towns").
 
 ### Travel: Hearthstone and flight
 When a marker is placed, the addon compares walking with your Hearthstone and with flying. If one of them is clearly faster, it says so once in chat, e.g. "Faster: Hearthstone to Booty Bay (~2m instead of ~9m on foot)". The Hearthstone estimate includes the 10 s cast and any cooldown.
@@ -109,8 +109,7 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/qf zone` | toggle zone focus: only quests of the current zone stay in the Questie tracker |
 | `/qf minimap` | toggle the minimap button |
 | `/qf bags` | toggle the quest item list next to the bags |
-| `/qf city` | list of quests to pick up nearby (city mode list; opens even in an ignored place) |
-| `/qf cityreset` | clear the list of places where the city list is ignored |
+| `/qf city` | open / close the city list (quests to pick up nearby, errands, Directions), also outside towns |
 | `/qf chat` | turn chat messages on/off (off: only the login line and command replies) |
 | `/qf notes` | release notes |
 | `/qf junk` | destroy unsellable leftover quest items (asks for each one) |

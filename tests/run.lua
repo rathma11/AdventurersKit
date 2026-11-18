@@ -334,6 +334,55 @@ test("in town: inn, resting, sleeping bag, taxi", function()
     at(0.50, 0.55, false)
 end)
 
+-- 0.7.9: no per-place ignore list; "Open automatically in towns" option + the panel's town icon
+test("city list: auto-open option, town icon toggle", function()
+    local city = _G.QuestFocusCityList
+    local saveBags = W.bags
+    W.bags = { [0] = { 16, 0 }, { 10, 0 }, { 10, 0 }, { 10, 0 }, { 10, 0 } } -- full bags: a Sell errand always shows
+    local function arrive(resting)
+        W.MovePlayer(1429, 0.30, 0.80) -- no innkeeper nearby: only resting makes it a town
+        W.player.resting, W.player.auras, W.player.onTaxi = resting, {}, false
+        W.Fire("PLAYER_UPDATE_RESTING")
+        W.Advance(9)
+    end
+    check(NS.panel.cityBtn ~= nil, "panel has the town icon")
+    arrive(false)
+    eq(city:IsShown(), false, "out of town: closed")
+    eq(NS.CityAutoOpen(), true, "auto-open is on by default")
+    QuestFocusDB.cityNoAuto = true
+    arrive(true)
+    eq(city:IsShown(), false, "auto-open off: stays closed in town")
+    NS.ToggleCityList()
+    eq(city:IsShown(), true, "town icon opens it")
+    NS.ToggleCityList()
+    eq(city:IsShown(), false, "...and closes it")
+    arrive(false)
+    QuestFocusDB.cityNoAuto = nil
+    arrive(true)
+    eq(city:IsShown(), true, "auto-open on: opens in town")
+    NS.ToggleCityList()
+    W.Advance(9)
+    eq(city:IsShown(), false, "closed by hand: stays closed in this town")
+    arrive(false)
+    NS.ToggleCityList()
+    eq(city:IsShown(), true, "town icon opens it outside towns too")
+    check(contains(city.title:GetText(), "nearby") or contains(city.title:GetText(), "Not in town"), "...with a not-in-town title")
+    W.Advance(10)
+    eq(city:IsShown(), true, "opened by hand: stays open outside towns")
+    NS.ToggleCityList()
+    QuestFocusDB.noCityMode = true
+    arrive(true)
+    eq(city:IsShown(), false, "city list off: no auto-open")
+    NS.ToggleCityList()
+    eq(city:IsShown(), true, "city list off: the icon still opens it")
+    NS.ToggleCityList()
+    QuestFocusDB.noCityMode = nil
+    check(NS.ResetCityIgnore == nil and NS.CityIgnoredHere == nil, "ignore list functions are gone")
+    W.bags = saveBags
+    arrive(false)
+    W.MovePlayer(1429, 0.50, 0.55)
+end)
+
 test("ping modes", function()
     W.Advance(1)
     NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
