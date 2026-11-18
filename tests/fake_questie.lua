@@ -15,6 +15,8 @@ local QuestieDB = {
     GetObject = function(a, b) return Q.objects[id2(a, b)] end,
     GetItem = function(a, b) return Q.items[id2(a, b)] end,
     GetItemDroprate = function() return 25 end,
+    -- one field of a quest (QuestPointers, the list of every quest ID, is set by a test)
+    QueryQuestSingle = function(qid, key) local q = Q.quests[qid]; return q and q[key] end,
 }
 local QuestiePlayer = { currentQuestlog = {} }
 local ZoneDB = {

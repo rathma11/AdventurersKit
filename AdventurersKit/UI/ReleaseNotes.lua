@@ -5,6 +5,17 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.3", date = "2026-11-18", items = {
+        "Dungeon prep: quest chains show up. If a dungeon quest needs earlier quests first (e.g. The Defias "
+            .. "Brotherhood), the list shows the chain's next step with its quest giver, marked as chain step N/M.",
+        "Dungeon prep: quests you can't pick up yet are listed greyed at the end (e.g. \"from level 17\").",
+        "Dungeon prep: a quest that starts from a looted item (The Unsent Letter from VanCleef) is no longer a "
+            .. "pickup row; it is in the \"starts inside the dungeon\" note, and the \"No known location\" chat spam is gone.",
+        "Dungeon prep: the Entrance row is replaced by two buttons next to the title: the entrance on the world map, "
+            .. "and the game's group finder.",
+        "Dungeon data comes only from Questie now; the Dungeon Journal addon is only opened (Shift+click), not read.",
+        "Panel: while you drag the resize grip, the rows follow right away (they used to stay put until you let go).",
+    } },
     { version = "0.7.2", date = "2026-11-18", items = {
         "Fix: during dungeon prep the \"What next?\" suggestions (next zone, route, pick up nearby) were sometimes "
             .. "drawn over the prep list. Now only the prep list shows until prep ends.",

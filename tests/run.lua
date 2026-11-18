@@ -447,6 +447,81 @@ test("dungeon prep: suggestion view stays hidden while prepping", function()
     eq(panel.title:GetText(), "What next?", "...with their title")
 end)
 
+-- 0.7.3: the prep list comes from Questie only (every quest of the dungeon), quest chains show
+-- their next step, quests you can't pick up yet show greyed, a quest that starts from a looted
+-- item goes into the "starts inside" note, and the entrance is a title button, not a row.
+test("dungeon prep: chains, later quests, item-started quests, title buttons", function()
+    local DB = Q.modules.QuestieDB
+    local AQ = Q.modules.AvailableQuests
+    Q.NPC(960, "Gryan Test", 12, { { 45, 45 } })
+    Q.Quest({ id = 2001, name = "Brotherhood 1", starter = 960, finisher = 960 })
+    Q.Quest({ id = 2002, name = "Brotherhood 2", starter = 960, finisher = 960 }).preQuestSingle = { 2001 }
+    Q.Quest({ id = 2003, name = "Red Silk", zone = 1581, starter = 960, finisher = 960 }).preQuestSingle = { 2002 }
+    Q.Quest({ id = 2004, name = "VanCleef", zone = 1581, starter = 960, finisher = 960 }).preQuestGroup = { 2001, 2002 }
+    local letter = Q.Quest({ id = 2005, name = "Unsent", zone = 1581, finisher = 960 })
+    letter.Starts.Item = { 7001 }
+    Q.Quest({ id = 2006, name = "Too High", zone = 1581, starter = 960, finisher = 960, requiredLevel = 30 })
+    DB.QuestPointers = { [2001] = true, [2002] = true, [2003] = true, [2004] = true, [2005] = true, [2006] = true }
+    local oldAvail = AQ.__availableQuests
+    AQ.__availableQuests = { [2001] = true, [2005] = true }
+    if NS.state.questId then NS.C.ClearQuest() end
+    W.chat = {}
+    NS.StartPrep("The Deadmines")
+    W.Advance(2)
+    local rows, entrance = NS.PrepRows()
+    local byQid, note = {}, nil
+    for _, r in ipairs(rows) do
+        check(r.kind ~= "entrance", "the entrance is not a row any more")
+        if r.qid then byQid[r.qid] = r end
+        if r.kind == "note" then note = r end
+    end
+    local step = byQid[2001]
+    check(step and step.kind == "pickup", "chain: its first step (Brotherhood 1) is a pickup row")
+    eq(step and #step.chainFor, 2, "...shared by both dungeon quests of the chain")
+    check(not byQid[2003] and not byQid[2004], "...the chained dungeon quests are not rows of their own")
+    eq(byQid[2006] and byQid[2006].kind, "later", "a quest above your level: greyed 'later' row")
+    check(not byQid[2005], "item-started quest: no pickup row")
+    local inNote = false
+    for _, x in ipairs(note and note.list or {}) do if x.qid == 2005 then inNote = true end end
+    check(inNote, "...it is in the 'starts inside' note")
+    check(entrance and entrance.kind == "entrance", "entrance kept as the marker target")
+    eq(NS.state.waypoint and NS.state.waypoint.title, "Gryan Test", "marker on the chain step's quest giver")
+    for _, l in ipairs(W.chat) do
+        check(not contains(l, "No known location"), "no 'No known location' spam: " .. l)
+    end
+    local panel = NS.panel
+    check(panel.prepEntranceBtn:IsShown() and panel.prepLfgBtn:IsShown(), "entrance + group finder buttons shown")
+    panel.prepEntranceBtn:GetScript("OnClick")(panel.prepEntranceBtn)
+    check(contains(NS.state.waypoint and NS.state.waypoint.title, "entrance"), "entrance button: marker on the entrance")
+    panel.prepLfgBtn:GetScript("OnEnter")(panel.prepLfgBtn)
+    panel.prepEntranceBtn:GetScript("OnEnter")(panel.prepEntranceBtn)
+    NS.StopPrep(true)
+    check(not panel.prepEntranceBtn:IsShown() and not panel.prepLfgBtn:IsShown(), "buttons hidden after prep")
+    AQ.__availableQuests = oldAvail
+end)
+
+-- 0.7.3: dragging the resize grip lays the rows out again right away; the panel does not go
+-- below its content (rows used to stay where they were while only the frame shrank)
+test("panel resize: rows follow while dragging", function()
+    local panel = NS.panel
+    if NS.state.questId then NS.C.ClearQuest() end
+    QuestFocusDB.panelH = 500
+    NS.Panel_Update()
+    W.Advance(1)
+    local grip = panel.grip
+    check(grip:IsShown(), "grip shown in the suggestion view")
+    W.cursorX, W.cursorY = 0, 0
+    grip:GetScript("OnMouseDown")(grip, "LeftButton")
+    W.cursorY = 480                                -- drag far up: smaller than the content
+    W.Advance(0.5, 0.25)
+    check(panel:GetHeight() > 120, ("mid-drag the panel keeps its content height (got %s)"):format(tostring(panel:GetHeight())))
+    grip:GetScript("OnMouseUp")(grip)
+    check(QuestFocusDB.panelH >= panel:GetHeight() - 1, "saved height is not below the real one")
+    W.cursorX, W.cursorY = nil, nil
+    QuestFocusDB.panelH = nil
+    NS.Panel_Update()
+end)
+
 test("travel route (Dijkstra) sanity", function()
     local TR = NS.TransportRoute
     local t, steps = TR({ wc = 0, wx = 0, wy = 0 }, { wc = 0, wx = 300, wy = 400 }, 7, false)

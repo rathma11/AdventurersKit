@@ -271,10 +271,6 @@ local RAIDS = {
 }
 local function QuestDungeon(q, qid)
     if type(q) ~= "table" then return end
-    -- Dungeon Journal (ha fent van): a Forever sajat dungeonjai is
-    qid = tonumber(qid or q.Id or q.id)
-    local jn = qid and NS.JournalDungeonOfQuest and NS.JournalDungeonOfQuest(qid)
-    if jn then return jn, false end
     local zs = tonumber(q.zoneOrSort)
     if not zs then return end
     if DUNGEONS[zs] then return DUNGEONS[zs], false end

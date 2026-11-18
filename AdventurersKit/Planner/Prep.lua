@@ -16,7 +16,6 @@ local ICON_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t "
 local ICON_TODO = "|TInterface\\GossipFrame\\AvailableQuestIcon:12:12|t "
 local ICON_FAR = "|TInterface\\COMMON\\Indicator-Gray:12:12|t "
 local ICON_SEL = "|TInterface\\COMMON\\Indicator-Green:12:12|t "
-local ICON_DOOR = "|T" .. SKULL .. ":12:12|t "
 
 local prep = { dungeon = nil, rows = {}, sel = nil, dirty = true }
 local acceptedAt = 0
@@ -28,6 +27,8 @@ local function Saved()
 end
 
 NS.PrepActive = function() return prep.dungeon end
+-- a lista sorai es a bejarat (tesztekhez / hibakereseshez)
+NS.PrepRows = function() return prep.rows, prep.entrance end
 
 ---------------------------------------------------------------------------
 -- Adatok
@@ -62,40 +63,88 @@ local function Available(qid, q, requires)
     return (tonumber(requires) or 0) <= (UnitLevel("player") or 1)
 end
 
+local function InLog(qid)
+    local QP = NS.Module("QuestiePlayer")
+    if QP and type(QP.currentQuestlog) == "table" and QP.currentQuestlog[qid] then return true end
+    return C_QuestLog and C_QuestLog.GetLogIndexForQuestID and (C_QuestLog.GetLogIndexForQuestID(qid) or 0) > 0 or false
+end
+
+-- Felveheto sor: quest ado(k), a legkozelebbi pont es tavolsag
+local function PickupRow(qid, q, name, level, requires, note, pc, px, py)
+    local r = { kind = "pickup", qid = qid, name = name, level = level, requires = requires, note = note }
+    if q and type(q.Starts) == "table" then
+        local sources = P.QuestStarters(qid, q)
+        r.sources = sources
+        r.giver = sources[1] and sources[1].name
+        local p, dist
+        if pc then p, dist = P.Nearest(sources, pc, px, py) end
+        if not p then
+            -- masik kontinensen: az elso ismert pont (a zona neve miatt)
+            for _, s in ipairs(sources) do
+                local pts = P.SourcePoints(s)
+                if pts[1] then p = pts[1] break end
+            end
+        end
+        r.point, r.dist = p, dist
+    end
+    r.giver = r.giver or note
+    return r
+end
+
 local function Build()
     prep.dirty = false
     local rows = {}
     local name = prep.dungeon
-    if not name then prep.rows = rows return end
+    if not name then prep.rows, prep.entrance = rows, nil return end
     local e = NS.CollectDungeon and NS.CollectDungeon(name)
     prep.info = e
     local pc, px, py = NS.PlayerWorldPos()
-    local pickups, have, insideList = {}, {}, {}
+    local pickups, have, later, insideList = {}, {}, {}, {}
+    local byQid = {} -- egy lanc lepese csak egyszer (pl. ket dungeon quest ugyanazzal a lanccal)
+    local function QName(qid, q) return (q and q.name) or ("Quest " .. tostring(qid)) end
+    -- Lancban levo quest: a lanc kovetkezo (meg nem kesz) lepese kerul a listara
+    local function AddChain(d, q)
+        local steps = NS.QuestChainSteps and NS.QuestChainSteps(d.qid) or {}
+        local idx, step
+        for i, s in ipairs(steps) do
+            if not NS.QuestIsDone(s) then idx, step = i, s break end
+        end
+        if not step then return false end
+        local target = d.name or QName(d.qid, q)
+        local r = byQid[step]
+        if r then
+            r.chainFor[#r.chainFor + 1] = target
+            return true
+        end
+        local sq = NS.GetQuestieQuest(step)
+        local sname, slevel, sreq = QName(step, sq), sq and sq.level, sq and sq.requiredLevel
+        if InLog(step) then
+            r = { kind = "have", qid = step, name = sname, level = slevel }
+            have[#have + 1] = r
+        elseif Available(step, sq, sreq) then
+            r = PickupRow(step, sq, sname, slevel, sreq, nil, pc, px, py)
+            pickups[#pickups + 1] = r
+        else
+            r = { kind = "later", qid = step, name = sname, level = slevel, requires = sreq }
+            later[#later + 1] = r
+        end
+        r.chainIdx, r.chainN, r.chainFor = idx, #steps + 1, { target }
+        byQid[step] = r
+        return true
+    end
     for _, d in ipairs(e and e.quests or {}) do
-        local q = NS.GetQuestieQuest(d.qid)
-        if d.inLog then
-            have[#have + 1] = { kind = "have", qid = d.qid, name = d.name or (q and q.name), level = d.level }
+        local q = d.quest or NS.GetQuestieQuest(d.qid)
+        if byQid[d.qid] then
+            -- mar szerepel (egy masik quest lancanak lepesekent)
+        elseif d.inLog then
+            local r = { kind = "have", qid = d.qid, name = d.name or (q and q.name), level = d.level }
+            have[#have + 1] = r
+            byQid[d.qid] = r
         elseif Available(d.qid, q, d.requires) then
-            local r = { kind = "pickup", qid = d.qid, name = d.name or (q and q.name), level = d.level,
-                requires = d.requires, note = d.note }
-            if q and type(q.Starts) == "table" then
-                local sources = P.QuestStarters(d.qid, q)
-                r.sources = sources
-                r.giver = sources[1] and sources[1].name
-                local p, dist
-                if pc then p, dist = P.Nearest(sources, pc, px, py) end
-                if not p then
-                    -- masik kontinensen: az elso ismert pont (a zona neve miatt)
-                    for _, s in ipairs(sources) do
-                        local pts = P.SourcePoints(s)
-                        if pts[1] then p = pts[1] break end
-                    end
-                end
-                r.point, r.dist = p, dist
-            end
-            r.giver = r.giver or d.note
-            -- bent indulo quest (a quest ado csak az instance-ban van, vagy a Journal szerint
-            -- "inside"): nem kulon sor, hanem egy "+N bent indul" megjegyzes
+            local r = PickupRow(d.qid, q, d.name or (q and q.name), d.level, d.requires, d.note, pc, px, py)
+            -- bent indulo quest (a quest ado csak az instance-ban van, csak targyrol indul, pl. egy
+            -- bosstol lootolt level, vagy "inside" a megjegyzesben): nem kulon sor, hanem egy
+            -- "+N bent indul" megjegyzes
             local inside = false
             if not r.point then
                 if r.sources and #r.sources > 0 and NS.PrepSpawnsInside then
@@ -104,33 +153,54 @@ local function Build()
                         if not NS.PrepSpawnsInside(s.spawns) then inside = false break end
                     end
                 end
+                if d.startItem and not (r.sources and #r.sources > 0) then inside = true end
                 if not inside and type(d.note) == "string" and d.note:lower():find("inside", 1, true) then inside = true end
             end
             if inside then insideList[#insideList + 1] = r else pickups[#pickups + 1] = r end
-        elseif d.qid and not NS.QuestIsDone(d.qid) and q and type(q.Starts) == "table" and type(q.Starts.Item) == "table"
-            and type(d.note) == "string" and d.note:lower():find("inside", 1, true) then
-            -- itemrol indul a dungeonban (nem "felveheto" a Questie szerint)
-            insideList[#insideList + 1] = { kind = "pickup", qid = d.qid, name = d.name or q.name, level = d.level, giver = d.note }
+            byQid[d.qid] = r
+        elseif not AddChain(d, q) then
+            if d.startItem then
+                -- targyrol indul (a dungeonban lootolod): a "bent indul" megjegyzesbe
+                insideList[#insideList + 1] = { kind = "pickup", qid = d.qid, name = d.name or (q and q.name),
+                    level = d.level, giver = d.note }
+            else
+                -- meg nem veheto fel (szint, vagy mas feltetel): halvanyan, a lista vegen
+                local r = { kind = "later", qid = d.qid, name = d.name or (q and q.name), level = d.level,
+                    requires = d.requires, giver = d.note }
+                later[#later + 1] = r
+                byQid[d.qid] = r
+            end
         end
     end
-    -- legkozelebbi elol; hely nelkuliek (pl. a dungeonban indulo quest) a vegen
+    -- legkozelebbi elol; hely nelkuliek a vegen
     table.sort(pickups, function(a, b)
         local da = a.dist or (a.point and 1e8) or 2e8
         local db = b.dist or (b.point and 1e8) or 2e8
         if da ~= db then return da < db end
         return (a.name or "") < (b.name or "")
     end)
-    table.sort(have, function(a, b) return (a.level or 0) < (b.level or 0) end)
+    local function byLevel(a, b)
+        if (a.level or 0) ~= (b.level or 0) then return (a.level or 0) < (b.level or 0) end
+        return (a.name or "") < (b.name or "")
+    end
+    table.sort(have, byLevel)
+    table.sort(later, function(a, b)
+        if (a.requires or 0) ~= (b.requires or 0) then return (a.requires or 0) < (b.requires or 0) end
+        return byLevel(a, b)
+    end)
     for _, r in ipairs(pickups) do rows[#rows + 1] = r end
     for _, r in ipairs(have) do rows[#rows + 1] = r end
+    for _, r in ipairs(later) do rows[#rows + 1] = r end
     if #insideList > 0 then rows[#rows + 1] = { kind = "note", list = insideList } end
+    -- a bejarat nem sor: a cim melletti terkep gomb mutatja; a marker ide all, ha mindent felvettel
     local ep, ed, detail = EntrancePoint(name)
-    rows[#rows + 1] = { kind = "entrance", name = name, point = ep, dist = ed, detail = detail }
+    prep.entrance = { kind = "entrance", name = name, point = ep, dist = ed, detail = detail }
     prep.rows = rows
 end
 
 local function RowKey(r) return r and (r.kind == "entrance" and "entrance" or r.qid) end
 local function FindRow(key)
+    if key == "entrance" then return prep.entrance end
     for i, r in ipairs(prep.rows) do if RowKey(r) == key then return r, i end end
 end
 
@@ -139,7 +209,7 @@ local function AutoTarget()
     for _, r in ipairs(prep.rows) do
         if r.kind == "pickup" and r.point then return r end
     end
-    return prep.rows[#prep.rows]
+    return prep.entrance
 end
 
 -- Kijelolt sor, kulonben a mar markerezett (ha meg ugyanolyan: quest ado / bejarat, hogy a
@@ -256,7 +326,7 @@ local function Line(i)
             -- vissza az automatikus celra (legkozelebbi quest ado, aztan a bejarat)
             prep.sel, prep.markedKey = nil, nil
             MarkRow(AutoTarget())
-        elseif d.kind == "have" or d.kind == "note" then
+        elseif d.kind == "have" or d.kind == "note" or d.kind == "later" then
             -- (a quest logban kijelolni nem lehet: az fokuszt valtana es kilepne a prep modbol)
             return
         else
@@ -279,21 +349,20 @@ local function Line(i)
             GameTooltip:AddLine(L["Inside, the panel lists them where they come in the run."], 0.5, 0.5, 0.5, true)
             GameTooltip:Show()
             return
-        elseif d.kind == "entrance" then
-            GameTooltip:SetText((L["%s entrance"]):format(d.name or "?"), 1, 0.6, 0.45)
-            if d.point then
-                GameTooltip:AddLine(("%s %.1f, %.1f"):format(NS.ZoneName(d.point.map), d.point.x, d.point.y), 1, 1, 1)
-            else
-                GameTooltip:AddLine(L["No known entrance location."], 1, 0.4, 0.4)
-            end
-            if d.detail then GameTooltip:AddLine(d.detail, 0.8, 0.8, 0.8, true) end
-            local tl = TravelLine(d.point)
-            if tl then GameTooltip:AddLine(tl, 0.4, 0.8, 1, true) end
-            GameTooltip:AddLine(L["Click: marker on the entrance"], 0.5, 0.5, 0.5)
         else
             GameTooltip:SetText(("[%s] %s"):format(tostring(d.level or "?"), d.name or "?"), 1, 1, 1)
+            if d.chainFor then
+                GameTooltip:AddLine((L["Quest chain step %d/%d for: %s"]):format(d.chainIdx or 1, d.chainN or 1,
+                    table.concat(d.chainFor, ", ")), 0.71, 0.55, 1, true)
+            end
             if d.kind == "have" then
                 GameTooltip:AddLine(L["Already in your quest log"], 0.4, 1, 0.4)
+            elseif d.kind == "later" then
+                GameTooltip:AddLine(L["You can't pick this up yet."], 1, 0.5, 0.3)
+                if d.requires and d.requires > (UnitLevel("player") or 1) then
+                    GameTooltip:AddLine((L["Requires level %d"]):format(d.requires), 0.8, 0.8, 0.8)
+                end
+                if d.giver then GameTooltip:AddLine(d.giver, 0.6, 0.6, 0.6, true) end
             else
                 if d.requires then GameTooltip:AddLine((L["Requires level %d"]):format(d.requires), 0.8, 0.8, 0.8) end
                 if d.giver then GameTooltip:AddLine((L["Quest giver: %s"]):format(d.giver), 0.8, 0.8, 0.8, true) end
@@ -316,17 +385,134 @@ local function Line(i)
     return r
 end
 
+---------------------------------------------------------------------------
+-- Cim melletti gombok (a prep vege kor elott): a bejarat a terkepen, csapatkereso
+---------------------------------------------------------------------------
+local function YdText(d) return d and ("|cff99ccff%d yd|r"):format(d) or nil end
+
+local function TitleButton()
+    local b = CreateFrame("Button", nil, panel)
+    b:SetSize(16, 16)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetAllPoints()
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:Hide()
+    return b
+end
+
+local function EntranceTooltip(owner)
+    local d = prep.entrance
+    GameTooltip:SetOwner(owner, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetText((L["%s entrance"]):format(prep.dungeon or "?"), 1, 0.6, 0.45)
+    if d and d.point then
+        GameTooltip:AddLine(("%s %.1f, %.1f"):format(NS.ZoneName(d.point.map), d.point.x, d.point.y), 1, 1, 1)
+        if d.dist then GameTooltip:AddLine(YdText(math.floor(d.dist + 0.5)), 1, 1, 1) end
+        if d.detail then GameTooltip:AddLine(d.detail, 0.8, 0.8, 0.8, true) end
+        local tl = TravelLine(d.point)
+        if tl then GameTooltip:AddLine(tl, 0.4, 0.8, 1, true) end
+        GameTooltip:AddLine(L["Click: the entrance on the world map (and the marker on it)"], 0.5, 0.5, 0.5, true)
+    else
+        GameTooltip:AddLine(L["No known entrance location."], 1, 0.4, 0.4)
+    end
+    GameTooltip:Show()
+end
+
+local entranceBtn = TitleButton()
+if not (entranceBtn.tex.SetAtlas and pcall(entranceBtn.tex.SetAtlas, entranceBtn.tex, "Dungeon", false)) then
+    entranceBtn.tex:SetTexture("Interface\\Icons\\INV_Misc_Map_01")
+    entranceBtn.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+end
+entranceBtn:SetScript("OnEnter", EntranceTooltip)
+entranceBtn:SetScript("OnClick", function()
+    local en = prep.entrance
+    if not (en and en.point) then
+        NS.Loud(NS.Print, L["No known entrance location for %s."], prep.dungeon or "?")
+        return
+    end
+    prep.sel = "entrance"
+    MarkRow(en)
+    PrepMacro()
+    local wm = WorldMapFrame
+    if wm then
+        if not wm:IsShown() then pcall(ToggleWorldMap or function() ShowUIPanel(wm) end) end
+        if wm.SetMapID then pcall(wm.SetMapID, wm, en.point.map) end
+    end
+    if NS.Panel_Update then NS.Panel_Update() end
+end)
+panel.prepEntranceBtn = entranceBtn
+
+-- Csapatkereso: a jatek sajat Group Finder menugombjat nyomja meg egy lathatatlan secure gomb
+-- a mienk felett. (Ha addon kod nyitja meg az ablakot, a jatek utana nem keres csoportot
+-- /reload-ig.) A secure gomb a UIParent-en van, igy a panel harc kozben is mozoghat; harcban
+-- rejtve, akkor a gomb csak egy hibauzenetet ad.
+local lfgBtn = TitleButton()
+local EYE = "Interface\\LFGFrame\\LFG-Eye"
+local hasEye = true
+if GetFileIDFromPath then
+    local ok, id = pcall(GetFileIDFromPath, EYE)
+    hasEye = ok and id ~= nil
+end
+if hasEye then
+    lfgBtn.tex:SetTexture(EYE)
+    lfgBtn.tex:SetTexCoord(0, 0.125, 0, 0.25)
+else
+    lfgBtn.tex:SetTexture("Interface\\Icons\\INV_Misc_Eye_01")
+    lfgBtn.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+end
+lfgBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetText(L["Looking For Group"], 1, 0.82, 0)
+    GameTooltip:AddLine((L["Opens the game's group finder, to find a group for %s."]):format(prep.dungeon or "?"), 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+local micro = _G.LFDMicroButton or _G.LFGMicroButton
+local microName = micro and micro.GetName and micro:GetName()
+lfgBtn:SetScript("OnClick", function()
+    -- (a secure gomb kapja a kattintast; ide csak harcban, vagy menugomb nelkul jut)
+    if InCombatLockdown() then
+        if UIErrorsFrame then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "Can't do that while in combat", 1, 0.1, 0.1) end
+    else
+        NS.Loud(NS.Print, L["The game's group finder button was not found."])
+    end
+end)
+if microName then
+    local o = CreateFrame("Button", "QuestFocusPrepLFGButton", UIParent, "SecureActionButtonTemplate")
+    o:SetFrameStrata("DIALOG")
+    o:RegisterForClicks("AnyUp", "AnyDown")
+    o:SetAttribute("type", "macro")
+    o:SetAttribute("macrotext", "/click " .. microName)
+    o:Hide()
+    o:SetScript("OnEnter", function() lfgBtn:GetScript("OnEnter")(lfgBtn); lfgBtn:LockHighlight() end)
+    o:SetScript("OnLeave", function() GameTooltip:Hide(); lfgBtn:UnlockHighlight() end)
+    lfgBtn:HookScript("OnUpdate", function(self)
+        if InCombatLockdown() then return end
+        local l, b, w, h = self:GetLeft(), self:GetBottom(), self:GetWidth(), self:GetHeight()
+        if not l then return end
+        local s = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
+        o:ClearAllPoints()
+        o:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l * s, b * s)
+        o:SetSize(w * s, h * s)
+        if not o:IsShown() then o:Show() end
+    end)
+    lfgBtn:HookScript("OnHide", function() if not InCombatLockdown() then o:Hide() end end)
+    local ev = CreateFrame("Frame")
+    ev:RegisterEvent("PLAYER_REGEN_DISABLED")
+    ev:SetScript("OnEvent", function() o:Hide() end) -- kozvetlenul a harci zar elott
+end
+panel.prepLfgBtn = lfgBtn
+
 local function HideOutside()
     scroll:Hide()
     for _, r in ipairs(lines) do r:Hide() end
+    entranceBtn:Hide()
+    lfgBtn:Hide()
 end
 NS.HidePrep = function()
     HideOutside()
     if NS.HidePrepInside then NS.HidePrepInside() end
 end
 local function Inside() return NS.PrepIsInside and NS.PrepIsInside() end
-
-local function YdText(d) return d and ("|cff99ccff%d yd|r"):format(d) or nil end
 
 local function FooterText()
     local w = NS.state.waypoint
@@ -351,15 +537,25 @@ NS.ShowPrep = function()
     if prep.dirty then Build() end
     local name = prep.dungeon or "?"
     panel.title:SetText((L["Prep: %s"]):format(name))
-    panel.title:SetWidth(NS.PW() - 100)
-    panel.title:SetWidth(math.min(math.ceil(panel.title:GetStringWidth()) + 2, NS.PW() - 100))
+    -- cim, utana a bejarat es a csapatkereso gomb, aztan a prep vege kor (UI\Panel.lua clearBtn)
+    panel.title:SetWidth(NS.PW() - 140)
+    panel.title:SetWidth(math.min(math.ceil(panel.title:GetStringWidth()) + 2, NS.PW() - 140))
+    entranceBtn:ClearAllPoints()
+    entranceBtn:SetPoint("LEFT", panel.title, "RIGHT", 4, 0)
+    entranceBtn:Show()
+    lfgBtn:ClearAllPoints()
+    lfgBtn:SetPoint("LEFT", entranceBtn, "RIGHT", 3, 0)
+    lfgBtn:Show()
+    if panel.clearBtn then
+        panel.clearBtn:ClearAllPoints()
+        panel.clearBtn:SetPoint("LEFT", lfgBtn, "RIGHT", 4, 0)
+    end
     panel.icon:SetTexture(SKULL)
     local nPick, nHave = 0, 0
-    local entrance
     for _, r in ipairs(prep.rows) do
-        if r.kind == "pickup" then nPick = nPick + 1 elseif r.kind == "have" then nHave = nHave + 1
-        elseif r.kind == "entrance" then entrance = r end
+        if r.kind == "pickup" then nPick = nPick + 1 elseif r.kind == "have" then nHave = nHave + 1 end
     end
+    local entrance = prep.entrance
     local ez = entrance and entrance.point and NS.ZoneName(entrance.point.map)
     panel.sub:SetText((L["%d to pick up, %d in log"]):format(nPick, nHave) .. (ez and ("  |cffff9070" .. ez .. "|r") or ""))
     local info = prep.info
@@ -375,13 +571,17 @@ NS.ShowPrep = function()
         r:SetSize(w, rh)
         local sel = RowKey(d) == tKey
         local txt
-        if d.kind == "entrance" then
-            local open = nPick > 0
-            txt = (sel and ICON_SEL or ICON_DOOR) .. (open and "|cffd0a080" or "|cffff9070")
-                .. (L["Entrance: %s"]):format(ez or L["unknown"]) .. "|r"
-                .. (d.dist and ("  " .. YdText(math.floor(d.dist + 0.5))) or "")
-        elseif d.kind == "have" then
+        -- lanc lepes: "lanc 2/7: Red Silk Bandanas" a sor vegen
+        local chain = d.chainFor and ("  " .. NS.ChainMarkup() .. ("|cffb48cff%d/%d: %s|r"):format(d.chainIdx or 1,
+            d.chainN or 1, table.concat(d.chainFor, ", "))) or ""
+        if d.kind == "have" then
             txt = ICON_DONE .. ("|cff808080[%s] %s|r  |cff60a060(%s)|r"):format(tostring(d.level or "?"), d.name or "?", L["in log"])
+                .. chain
+        elseif d.kind == "later" then
+            local lvl = d.requires and d.requires > (UnitLevel("player") or 1)
+                and (L["from level %d"]):format(d.requires) or L["not available yet"]
+            txt = ICON_FAR .. ("|cff707070[%s] %s|r  |cff996060(%s)|r"):format(tostring(d.level or "?"), d.name or "?", lvl)
+                .. chain
         elseif d.kind == "note" then
             txt = "|TInterface\\GossipFrame\\AvailableQuestIcon:12:12|t |cffffff00"
                 .. (L["+%d quests start inside the dungeon"]):format(#d.list) .. "|r"
@@ -394,6 +594,7 @@ NS.ShowPrep = function()
                 .. ("  |cffd8c8a0%s|r"):format(d.giver or "?")
                 .. (where and (" |cff999999- " .. where .. "|r") or "")
                 .. (dist and ("  " .. dist) or "")
+                .. chain
         end
         r.text:SetText(txt)
         r:ClearAllPoints()
@@ -501,7 +702,7 @@ NS.StopPrep = function(quiet, restore)
     local c1 = CharDB()
     local prev = c1 and rawget(c1, "prepPrev")
     if c1 and QuestFocusDB then c1.prepPrev = nil end
-    prep.dungeon, prep.rows, prep.sel, prep.markedKey, prep.info = nil, {}, nil, nil, nil
+    prep.dungeon, prep.rows, prep.sel, prep.markedKey, prep.info, prep.entrance = nil, {}, nil, nil, nil, nil
     if NS.PrepInsideReset then NS.PrepInsideReset() end
     local c = CharDB()
     if c and QuestFocusDB then c.prepDungeon = nil end

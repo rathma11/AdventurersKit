@@ -350,6 +350,7 @@ grip:SetPoint("BOTTOMRIGHT", -4, 4)
 grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
 grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+panel.grip = grip
 -- Atmeretezes (csak javaslat modban): a panel magassagat allitja (QuestFocusDB.panelH), a
 -- szelesseg fix (betumeretbol). Quest modban a panel merete fix, ott a fogantyu nem latszik.
 -- Jobb klikk: alapmeret.
@@ -363,19 +364,30 @@ grip:SetScript("OnMouseDown", function(self, button)
     if button ~= "LeftButton" then return end
     AnchorTopLeft()
     local _, y = GetCursorPosition()
-    self.drag = { y = y, h = panel:GetHeight() }
+    self.drag = { y = y, h = panel:GetHeight(), at = 0 }
     self:SetScript("OnUpdate", function()
         local _, cy = GetCursorPosition()
         local h = self.drag.h + (self.drag.y - cy) / panel:GetEffectiveScale()
         h = math.floor(math.max(120, math.min(900, h)))
+        if h == QuestFocusDB.panelH then return end
         QuestFocusDB.panelH = h
         panel:SetHeight(h)
+        -- huzas kozben is ujrarendezzuk a sorokat (tobb / kevesebb fer ki); a tartalom
+        -- legkisebb magassaga alatt a panel nem megy lejjebb (PanelFinish)
+        local now = GetTime()
+        if now - self.drag.at >= 0.1 and NS.Panel_Update then
+            self.drag.at = now
+            NS.Panel_Update()
+        end
     end)
 end)
 grip:SetScript("OnMouseUp", function(self)
     self:SetScript("OnUpdate", nil)
     self.drag = nil
     if NS.Panel_Update then NS.Panel_Update() end -- tartalom ujrarendezese (tobb/kevesebb sor)
+    -- a mentett magassag ne legyen kisebb, mint amekkora a panel lett (a tartalom minimuma)
+    local h = panel:GetHeight()
+    if h and tonumber(QuestFocusDB.panelH) and h > QuestFocusDB.panelH then QuestFocusDB.panelH = math.floor(h + 0.5) end
 end)
 grip:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")

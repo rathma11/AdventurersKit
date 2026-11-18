@@ -1,41 +1,97 @@
 -- Dungeonok a szintedhez: a panel fejleceben a koponya gomb (es /qf dungeon).
---  - Ha fent van a ForeverDungeonJournal: az o adatai (Forever sajat dungeonjai is), es
---    kattintasra az o ablaka nyilik az adott dungeon / quest quest oldalan.
---  - Ha nincs: hasonlo lista a Questie adataibol (classic dungeonok), kattintasra marker a
---    quest adora.
+-- Az adatok csak a Questie-bol jonnek (classic dungeonok). A ForeverDungeonJournal addont nem
+-- olvassuk, csak megnyitjuk, ha fent van (Shift+klikk, "Start dungeon" gomb).
 local ADDON_NAME, NS = ...
 local L = NS.L
 
 local DJ_W, DJ_ROW_H, DJ_VISIBLE = 460, 18, 18
 
--- Journal (opcionalis): a namespace-e globalis
+-- Journal (opcionalis): csak a megnyitasahoz
 local function FDJ()
     local f = _G.ForeverDungeonJournal_NS
-    return type(f) == "table" and type(f.DB) == "table" and f or nil
+    return type(f) == "table" and f or nil
 end
 NS.HasDungeonJournal = function() return FDJ() ~= nil end
 
--- Lanc ikon: a Journal sajatja, ha fent van (kulonben csak a lila 2/5 szoveg)
+-- Lanc ikon: a Journal ikonja, ha fent van (kulonben csak a lila 2/5 szoveg)
 NS.ChainMarkup = function()
     -- utana egy szokoz: ne erjen ossze a 2/5 szoveggel
     if FDJ() then return "|TInterface\\AddOns\\ForeverDungeonJournal\\Media\\QuestChain:12:12|t " end
     return ""
 end
 
--- quest ID -> dungeon nev a Journal adataibol (egyszer epitjuk); NS.QuestDungeon hasznalja
-local djQuestMap
-NS.JournalDungeonOfQuest = function(qid)
-    local f = FDJ()
-    if not f or not qid then return end
-    if not djQuestMap then
-        djQuestMap = {}
-        for name, d in pairs(f.DB) do
-            for _, q in ipairs(type(d.quests) == "table" and d.quests or {}) do
-                if q.id then djQuestMap[q.id] = name end
+-- Egy quest elofeltetel lanca a Questie preQuestSingle / preQuestGroup mezoibol, a lanc
+-- elejetol a quest elotti lepesig: { qid, ... } (ures, ha nincs elofeltetele). Elagazasnal
+-- (preQuestGroup) a meg nem kesz agat kovetjuk, preQuestSingle-nel a mar kesz vagy az elso.
+local function PreOf(q)
+    local single = type(q.preQuestSingle) == "table" and q.preQuestSingle or nil
+    local group = type(q.preQuestGroup) == "table" and q.preQuestGroup or nil
+    if group and #group > 0 then
+        for _, p in ipairs(group) do
+            p = math.abs(tonumber(p) or 0)
+            if p > 0 and not NS.QuestIsDone(p) then return p end
+        end
+        return math.abs(tonumber(group[1]) or 0)
+    end
+    if single and #single > 0 then
+        for _, p in ipairs(single) do
+            if NS.QuestIsDone(p) then return p end
+        end
+        return tonumber(single[1])
+    end
+end
+NS.QuestChainSteps = function(qid)
+    local steps, seen = {}, { [qid] = true }
+    local q = NS.GetQuestieQuest(qid)
+    while q and #steps < 25 do
+        local p = PreOf(q)
+        if not p or p <= 0 or seen[p] then break end
+        seen[p] = true
+        table.insert(steps, 1, p)
+        q = NS.GetQuestieQuest(p)
+    end
+    return steps
+end
+
+-- dungeon nev -> { qid = true } a teljes Questie adatbazisbol (egyszer epitjuk, a te fajod /
+-- kasztod questjei, ahogy a Questie zona listaja is szur)
+local dungeonQuestIds
+local function DungeonQuestIds(name)
+    if not dungeonQuestIds then
+        local DB = NS.Module("QuestieDB")
+        local QP = NS.Module("QuestiePlayer")
+        local ptrs = DB and type(DB.QuestPointers) == "table" and DB.QuestPointers
+        local get = DB and type(DB.QueryQuestSingle) == "function" and DB.QueryQuestSingle
+        if not (ptrs and get) then return {} end -- a Questie meg nem allt be: kesobb ujra
+        local map = {}
+        local function ok(fn, v)
+            if type(fn) ~= "function" then return true end
+            local good, r = pcall(fn, v)
+            return not good or r and true or false
+        end
+        for qid in pairs(ptrs) do
+            local good, zs = pcall(get, qid, "zoneOrSort")
+            local dname = good and zs and NS.QuestDungeon({ zoneOrSort = zs })
+            if dname then
+                local _, races = pcall(get, qid, "requiredRaces")
+                local _, classes = pcall(get, qid, "requiredClasses")
+                if ok(QP and QP.HasRequiredRace, races) and ok(QP and QP.HasRequiredClass, classes) then
+                    map[dname] = map[dname] or {}
+                    map[dname][qid] = true
+                end
             end
         end
+        dungeonQuestIds = map
     end
-    return djQuestMap[qid]
+    return dungeonQuestIds[name] or {}
+end
+
+-- Csak targyrol indul (nincs NPC / targy quest adoja), pl. a VanCleef-tol lootolt level
+local function StartsFromItemOnly(q)
+    local s = type(q) == "table" and type(q.Starts) == "table" and q.Starts
+    if not s then return false end
+    local function n(t) return type(t) == "table" and #t or 0 end
+    return n(s.Item) > 0 and n(s.NPC) == 0 and n(s.GameObject) == 0
 end
 
 -- Questie nelkuli (Journal nelkuli) lista: classic dungeonok szintsavval
@@ -59,34 +115,8 @@ local function InRange(lo, hi, level)
     return hi >= level - 1 and lo <= level + 5
 end
 
--- { name, lo, hi, quests = { {qid, name, level, requires, note, inLog} } }
+-- { name, lo, hi, quests = { {qid, name, level, requires, note, inLog, quest, startItem} } }
 -- only: csak ez a dungeon, szintsavtol fuggetlenul (dungeon prep, Planner\Prep.lua)
-local function CollectJournal(f, level, only)
-    local fac = UnitFactionGroup and UnitFactionGroup("player")
-    local out = {}
-    for name, d in pairs(only and { [only] = f.DB[only] } or f.DB) do
-        local lo, hi = tostring(d.level or ""):match("(%d+)%D+(%d+)")
-        lo, hi = tonumber(lo), tonumber(hi)
-        local hidden = false
-        if f.FactionHiddenFor then
-            local ok, h = pcall(f.FactionHiddenFor, name, fac)
-            hidden = ok and h and true or false
-        end
-        if lo and hi and not hidden and (only or InRange(lo, hi, level)) then
-            local e = { name = name, lo = lo, hi = hi, quests = {} }
-            for _, q in ipairs(type(d.quests) == "table" and d.quests or {}) do
-                local qf = q.faction
-                if q.id and (not qf or qf == "Both" or qf == fac) and not NS.QuestIsDone(q.id) then
-                    e.quests[#e.quests + 1] = { qid = q.id, name = q.name, level = q.level, requires = q.requires,
-                        note = q.pickup, inLog = InLog(q.id) }
-                end
-            end
-            out[#out + 1] = e
-        end
-    end
-    return out
-end
-
 local function CollectQuestie(level, only)
     local byName = {}
     local out = {}
@@ -97,24 +127,29 @@ local function CollectQuestie(level, only)
             out[#out + 1] = e
         end
     end
-    -- felveheto questek (Questie AvailableQuests) + ami mar a logodban van
+    -- a dungeon minden questje (a meg nem felveheto, lancban levo is), a felveheto questek
+    -- (Questie AvailableQuests) es ami mar a logodban van
     local AQ = NS.Module("AvailableQuests")
     local QP = NS.Module("QuestiePlayer")
     local ids = {}
+    for _, e in ipairs(out) do
+        for qid in pairs(DungeonQuestIds(e.name)) do ids[qid] = false end
+    end
     for qid in pairs(AQ and type(AQ.__availableQuests) == "table" and AQ.__availableQuests or {}) do ids[qid] = false end
     for qid in pairs(QP and type(QP.currentQuestlog) == "table" and QP.currentQuestlog or {}) do ids[qid] = true end
     for qid, inLog in pairs(ids) do
+        inLog = inLog or InLog(qid)
         local q = NS.GetQuestieQuest(qid)
         local dname = q and NS.QuestDungeon(q, qid)
         local e = dname and byName[dname]
-        if e and (inLog or not NS.QuestIsDone(qid)) then
+        if e and not q.isHidden and (inLog or not NS.QuestIsDone(qid)) then
             local giver
             if type(q.Starts) == "table" and type(q.Starts.NPC) == "table" and q.Starts.NPC[1] then
                 local npc = NS.GetNPC(q.Starts.NPC[1])
                 giver = npc and npc.name
             end
             e.quests[#e.quests + 1] = { qid = qid, name = q.name, level = q.level, requires = q.requiredLevel,
-                note = giver, inLog = inLog, quest = q }
+                note = giver, inLog = inLog, quest = q, startItem = StartsFromItemOnly(q) or nil }
         end
     end
     return out
@@ -307,7 +342,7 @@ end
 local function Refresh()
     local level = UnitLevel("player") or 1
     local f = FDJ()
-    local list = f and CollectJournal(f, level) or CollectQuestie(level)
+    local list = CollectQuestie(level)
     table.sort(list, function(a, b) if a.lo ~= b.lo then return a.lo < b.lo end return a.name < b.name end)
     for _, r in ipairs(rows) do r:Hide(); r.data = nil end
     local n, y, nq = 0, 0, 0
@@ -380,34 +415,15 @@ end
 
 -- Egy dungeon questjei (szintsavtol fuggetlenul): { name, lo, hi, quests } vagy nil
 NS.CollectDungeon = function(name)
-    local f = FDJ()
     local level = UnitLevel("player") or 1
-    local list = (f and f.DB[name]) and CollectJournal(f, level, name) or CollectQuestie(level, name)
-    return list[1]
+    return CollectQuestie(level, name)[1]
 end
--- Ismert dungeon nevek (a Journal-bol, kulonben a classic listabol), plusz a bejarat tablabol
+-- Ismert dungeon nevek: a classic lista, plusz a bejarat tabla
 NS.DungeonNames = function()
     local seen, out = {}, {}
     local function add(n) if n and not seen[n] then seen[n] = true; out[#out + 1] = n end end
-    local f = FDJ()
-    if f then
-        local fac = UnitFactionGroup and UnitFactionGroup("player")
-        for name, d in pairs(f.DB) do
-            local hidden = false
-            if f.FactionHiddenFor then
-                local ok, h = pcall(f.FactionHiddenFor, name, fac)
-                hidden = ok and h and true or false
-            end
-            -- a Journal DB-ben NPC-k is lehetnek: csak a szintsavos (dungeon) bejegyzesek
-            if not hidden and tostring(d.level or ""):match("%d+%D+%d+") then add(name) end
-        end
-    else
-        for _, c in ipairs(CLASSIC) do add(c[1]) end
-    end
-    for name in pairs(NS.DungeonEntrances or {}) do
-        -- Journal mellett az alias nevek (pl. "Dire Maul") nem kellenek
-        if not f or f.DB[name] then add(name) end
-    end
+    for _, c in ipairs(CLASSIC) do add(c[1]) end
+    for name in pairs(NS.DungeonEntrances or {}) do add(name) end
     table.sort(out)
     return out
 end
@@ -420,8 +436,8 @@ end
 
 -- Egy dungeon quest "Start dungeon" gombja: Journalban az o quest oldala, kulonben a lista
 NS.OpenDungeonFor = function(qid, dungeon)
-    dungeon = dungeon or (qid and NS.JournalDungeonOfQuest(qid))
-    if dungeon and FDJ() and FDJ().DB[dungeon] and OpenInJournal(dungeon, qid) then return end
+    dungeon = dungeon or (qid and NS.QuestDungeon(NS.GetQuestieQuest(qid), qid))
+    if dungeon and FDJ() and OpenInJournal(dungeon, qid) then return end
     Refresh()
     dj:Show()
 end

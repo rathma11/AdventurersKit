@@ -376,7 +376,7 @@ def("CreateFont", function(name) local f = NewObj("Font", name); if name then ra
 def("IsShiftKeyDown", function() return false end)
 def("IsControlKeyDown", function() return false end)
 def("IsAltKeyDown", function() return false end)
-def("GetCursorPosition", function() return 0, 0 end)
+def("GetCursorPosition", function() return W.cursorX or 0, W.cursorY or 0 end)
 def("GetBindingKey", function() return nil end)
 def("GetBindingText", function(k) return k end)
 def("GetFileIDFromPath", function() return nil end)
