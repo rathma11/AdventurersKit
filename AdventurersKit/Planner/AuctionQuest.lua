@@ -1157,7 +1157,7 @@ function A.Toggle(show)
         frame:Hide()
         StopBuy()
     end
-    if QuestFocusDB then QuestFocusDB.ahqOpen = show and true or nil end
+    if QuestFocusDB then QuestFocusDB.ahqOpen = nil end -- regi beallitas: mar nem nyitjuk magatol
 end
 
 local function BuildTab()
@@ -1301,7 +1301,7 @@ local function OnShowAH()
     BuildTab()
     PlaceTab()
     tab:Show()
-    if QuestFocusDB and QuestFocusDB.ahqOpen then A.Toggle(true) end
+    -- a lista AH-nyitaskor mindig zarva: csak a ful nyitja meg
     -- egyes AH ablakok (Auctionator, sajat UI) kesobb jelennek meg: meg egyszer igazitunk
     if C_Timer and C_Timer.After then
         C_Timer.After(0.2, function()
@@ -1320,9 +1320,7 @@ local function OnCloseAH()
     active = nil
     for _, p in pairs(prices) do if p.scanning then p.scanning = nil end end
     StopBuy()
-    local keep = QuestFocusDB and QuestFocusDB.ahqOpen
     if frame then frame:Hide() end
-    if QuestFocusDB then QuestFocusDB.ahqOpen = keep end -- nyitva marad a kovetkezo latogatasra
     if tab then tab:Hide() end
 end
 

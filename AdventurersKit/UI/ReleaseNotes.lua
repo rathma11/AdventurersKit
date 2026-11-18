@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.7.17", date = "2026-11-18", items = {
+        "Auction house quest items: the list is always closed when you open the auction house; the tab on the "
+            .. "right edge opens it.",
+    } },
     { version = "0.7.16", date = "2026-11-18", items = {
         "Fix: quest items you bought at the auction house stayed on the list, because they go to the mailbox "
             .. "first. Items on their way now count as yours: the row shows \"in mail: N\" (or disappears), also after "

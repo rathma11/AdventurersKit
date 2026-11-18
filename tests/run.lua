@@ -1433,6 +1433,19 @@ test("AH quest items: items in the mail count, list closes after buying", functi
     W.items, W.itemInfo, W.ahAll = {}, nil, {}
 end)
 
+-- 0.7.17: the list is always closed when the AH opens; only the tab opens it
+test("AH quest items: list closed when the AH opens", function()
+    local A = NS.AHQ
+    W.Fire("AUCTION_HOUSE_SHOW")
+    A.tab:Click()
+    check(A.frame:IsShown(), "the tab opens the list")
+    W.Fire("AUCTION_HOUSE_CLOSED")
+    W.Fire("AUCTION_HOUSE_SHOW")
+    check(A.tab:IsShown(), "tab shown")
+    check(not A.frame:IsShown(), "list closed on the next AH visit")
+    W.Fire("AUCTION_HOUSE_CLOSED")
+end)
+
 test("no errors logged by the addon", function()
     for _, e in ipairs(NS.errors or {}) do check(false, "NS.errors: " .. tostring(e.msg)) end
 end)
