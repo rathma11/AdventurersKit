@@ -146,22 +146,13 @@ local function BuildMacroBody(objectives, onlyIndex)
         len = len + #DEADCLR + 1
     end
     for _, t in ipairs(tail) do len = len + #t + 1 end
-    local n = 0
     wipe(targetNames)
+    local names = {}
     local function addName(name)
         if not name or seen[name] then return end
         seen[name] = true
         targetNames[name] = true
-        n = n + 1
-        if pick ~= "busy" then -- nev szerint (nameplate pick mellett tartaleknak)
-            local line = "/targetexact [noexists] " .. name
-            local cost = #line + 1 + #DEADCLR + 1
-            if len + cost <= MACRO_MAX then
-                lines[#lines + 1] = line
-                lines[#lines + 1] = DEADCLR
-                len = len + cost
-            end
-        end
+        names[#names + 1] = name
     end
     for i, obj in ipairs(objectives or {}) do
         if (onlyIndex == nil and not obj.completed) or onlyIndex == i then
@@ -176,8 +167,30 @@ local function BuildMacroBody(objectives, onlyIndex)
             for _, name in ipairs(e.names) do addName(name) end
         end
     end
+    local n = #names
     if n == 0 then
         return '/run print("AKit: no targetable mob")', 0
+    end
+    -- A kivalasztott nameplate mob neve megy elore: ha a /target nameplateN nem talal
+    -- (a token elavult, vagy a kliens nem fogadja el), a [noexists] sor eloszor ot keresi.
+    -- A tobbi a quest sorrendjeben; ami nem fer a 255 karakterbe, az marad ki (a vegerol).
+    local pickName = pick and pick ~= "busy" and UnitExists(pick) and UnitName(pick)
+    if pickName and targetNames[pickName] then
+        for i, name in ipairs(names) do
+            if name == pickName then table.remove(names, i) break end
+        end
+        table.insert(names, 1, pickName)
+    end
+    if pick ~= "busy" then -- nev szerint (nameplate pick mellett tartaleknak)
+        for _, name in ipairs(names) do
+            local line = "/targetexact [noexists] " .. name
+            local cost = #line + 1 + #DEADCLR + 1
+            if len + cost <= MACRO_MAX then
+                lines[#lines + 1] = line
+                lines[#lines + 1] = DEADCLR
+                len = len + cost
+            end
+        end
     end
     for _, t in ipairs(tail) do lines[#lines + 1] = t end
     return table.concat(lines, "\n"), n

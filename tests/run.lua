@@ -751,6 +751,36 @@ test("macro ping: never a tapped or unpicked mob (nameplate mode)", function()
     check(contains(build(), "/ping"), "nameplates off: ping stays")
 end)
 
+test("macro: picked nameplate mob's name comes first in the fallback (Goretusk Liver Pie)", function()
+    -- /ak debug from the user: Picked: Goretusk (nameplate1); the fallback had only Great Goretusk + Bellygrub
+    local src = function(id, name) return { id = id, name = name, isNpc = true } end
+    local objs = { { desc = "Goretusk Liver", completed = false, sources = {
+        src(157, "Great Goretusk"), src(345, "Bellygrub"), src(454, "Young Goretusk"), src(547, "Goretusk"),
+    } } }
+    local saveExtra = NS.state.extra
+    NS.state.extra = nil
+    W.cvars.nameplateShowEnemies = "1"
+    W.units.target = nil
+    NS.state.pick = "nameplate1"
+    W.units.nameplate1 = { name = "Goretusk", hostile = true }
+    local body, n = NS.C.BuildMacroBody(objs, nil)
+    eq(n, 4, "all four wanted mobs count")
+    check(#body <= 255, ("fits: %d chars"):format(#body))
+    eq(firstLine(body), "/target [noharm][dead] nameplate1", "nameplate line first")
+    local lines = {}
+    for l in (body .. "\n"):gmatch("([^\n]*)\n") do lines[#lines + 1] = l end
+    eq(lines[2], "/cleartarget [dead]", "corpse from the token line cleared")
+    eq(lines[3], "/targetexact [noexists] Goretusk", "picked mob's name is the first fallback: " .. body)
+    check(contains(body, "/ping"), "ping kept")
+    -- without a pick the quest order stays
+    NS.state.pick = nil
+    W.units.nameplate1 = nil
+    W.cvars.nameplateShowEnemies = "0"
+    body = NS.C.BuildMacroBody(objs, nil)
+    check(contains(body, "/targetexact [noexists] Great Goretusk\n"), "no pick: quest order: " .. body)
+    NS.state.extra = saveExtra
+end)
+
 test("macro: nameplate pick (mob within ~20 yd) keeps a by-name fallback", function()
     W.Advance(1)
     NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)

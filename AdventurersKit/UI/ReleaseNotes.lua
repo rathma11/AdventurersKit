@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.2", date = "2026-11-18", items = {
+        "AKit macro: when it picks a quest mob by its nameplate, that mob's name is now the first by-name fallback. "
+            .. "Before, a long name list could push it out of the 255-character macro, so if the nameplate line "
+            .. "missed, the mob right in front of you was not targeted (e.g. Goretusk on Goretusk Liver Pie).",
+    } },
     { version = "0.8.1", date = "2026-11-18", items = {
         "AKit macro, quest mob close by (its nameplate shows, about 20 yd): the macro no longer relies only on the "
             .. "nameplate. If that nameplate is gone or renumbered by the time you press it, it falls back to targeting "
