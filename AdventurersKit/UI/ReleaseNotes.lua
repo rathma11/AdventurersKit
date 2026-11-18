@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.8", date = "2026-11-18", items = {
+        "Farm session tooltips are easier to read: the gold one in sections (Coins, Items, Totals) and the XP one "
+            .. "(XP gained, Pace, Level), with space between them. Per hour values are grey so the totals stand out, "
+            .. "the AH total is green, the price source muted, rested XP blue and the time to level highlighted; the "
+            .. "explanations are small grey notes at the bottom.",
+        "Farm session summary: the item lines are real item rows. Hover shows the item's tooltip, shift-click puts "
+            .. "the link in chat, ctrl-click opens the dressing room.",
+    } },
     { version = "0.8.7", date = "2026-11-18", items = {
         "Farm session: XP tooltip. Hover the XP box or the XP / level / kill rows on the panel, or the Time and XP "
             .. "rows in the summary: XP gained split into kill XP (base and rested bonus) and quests / other, XP per "

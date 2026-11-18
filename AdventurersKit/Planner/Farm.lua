@@ -493,73 +493,95 @@ function F.GoldPerHour(t)
     return t.goldH, "vendor"
 end
 
--- Arany bontas a tooltipbe: nyers arany, itemek vendor / AH aron, ossz vendorolva / AH-zva;
--- osszeg es ora rata (az elso perc utan)
-function F.GoldBreakdown(tt, t)
+-- Tooltip tagolas (DESIGN.md / NS.Style): szekcio fejlec (TT.Sub, arany), uresen elvalasztva; cimke
+-- feher (fo sor) vagy szurke (al sor), ertek jobbra; az ora rata halvanyabb, igy az osszeg kiemelkedik;
+-- a magyarazat kis szurke betuvel a vegen.
+local C_RATE = "888888"      -- per ora: halvany
+local C_SRC = "c8a86a"       -- ar forrasa (Auctionator): tompa arany
+local C_RESTED = "6fa8ff"    -- rested XP: a jatek kek rested szine, olvashatobban
+local C_HL = HEX.GOLD or "ffd100" -- kiemelt ertek (ETA)
+local function Section(tt, text, first)
+    if not first then tt:AddLine(" ") end
+    if NS.TT then NS.TT.Sub(tt, text) else tt:AddLine(text, 1, 0.82, 0) end
+end
+local function Row(tt, label, value, sub)
+    local c = sub and 0.72 or 1
+    tt:AddDoubleLine((sub and "  " or "") .. label, value, c, c, c, 1, 1, 1)
+end
+local function Note(tt, text) tt:AddLine(text, 0.55, 0.55, 0.55, true) end
+local function Col(hex, s) return "|cff" .. hex .. s .. "|r" end
+
+-- Arany bontas a tooltipbe: Coins / Items / Totals / hogyan szamolja; osszeg es ora rata (1 perc utan)
+-- extra(tt): tovabbi szekciok a megjegyzesek ele (elo nezet: top itemek, legtobbet olt mobok);
+-- visszaadhat egy tovabbi megjegyzest
+function F.GoldBreakdown(tt, t, extra)
     local src = F.AHSource()
     local h = t.elapsed >= 60 and (t.elapsed / 3600) or nil
-    local function line(label, v, r, g, b)
-        tt:AddDoubleLine(label, F.FormatMoney(v) .. (h and ("  |cff999999" .. F.FormatMoney(v / h) .. L["/h"] .. "|r") or ""),
-            r or 1, g or 1, b or 1, 1, 1, 1)
+    local function money(v, hex)
+        local m = F.FormatMoney(v)
+        if hex then m = Col(hex, m) end
+        return m .. (h and ("  " .. Col(C_RATE, F.FormatMoney(v / h) .. L["/h"])) or "")
     end
-    if NS.TT then NS.TT.Sub(tt, L["Gold breakdown"]) else tt:AddLine(L["Gold breakdown"], 1, 0.82, 0) end
-    line(L["Raw gold looted (coins)"], t.money)
-    line(L["Items: if you vendor them"], t.vendor)
+    Section(tt, L["Coins"], true)
+    Row(tt, L["Raw gold looted"], money(t.money))
+    Section(tt, L["Items"])
+    Row(tt, L["If you vendor them"], money(t.vendor))
     if src then
-        line((L["Items: if you sell them on the AH (%s)"]):format(src), t.best)
-        if t.fallback > 0 then
-            tt:AddLine((L["  %d of them at vendor price (no AH price, soulbound, or the AH pays less)"]):format(t.fallback),
-                0.6, 0.6, 0.6, true)
-        end
+        Row(tt, L["If you sell them on the AH"] .. " " .. Col(C_SRC, "(" .. src .. ")"), money(t.best))
     else
-        tt:AddLine(L["  AH value: needs Auctionator, TSM or Auctioneer"], 0.6, 0.6, 0.6, true)
+        Row(tt, L["On the AH"], Col(C_RATE, L["needs Auctionator, TSM or Auctioneer"]))
     end
-    line(L["Total if vendored"], t.money + t.vendor, 1, 0.86, 0.5)
-    if src then line(L["Total if sold on the AH"], t.money + t.best, 1, 0.86, 0.5) end
-    tt:AddLine(src and L["Gold per hour = (raw gold + items at AH price) / time; an item without an AH price counts at vendor price."]
-        or L["Gold per hour = (raw gold + items at vendor price) / time."], 0.6, 0.6, 0.6, true)
-    if not h then tt:AddLine(L["Per hour values come after the first minute."], 0.6, 0.6, 0.6, true) end
+    Section(tt, L["Totals"])
+    Row(tt, L["If vendored"], money(t.money + t.vendor))
+    if src then Row(tt, L["If sold on the AH"], money(t.money + t.best, HEX.GOOD)) end
+    local extraNote = extra and extra(tt)
+    tt:AddLine(" ")
+    if extraNote then Note(tt, extraNote) end
+    if src and t.fallback > 0 then
+        Note(tt, (L["%d items count at vendor price (no AH price, soulbound, or the AH pays less)."]):format(t.fallback))
+    end
+    Note(tt, src and L["Gold per hour = (raw gold + items at AH price) / time."]
+        or L["Gold per hour = (raw gold + items at vendor price) / time."])
+    if not h then Note(tt, L["Per hour values come after the first minute."]) end
 end
 
 -- XP bontas a tooltipbe (elo nezet: XP doboz, XP / szint / kill sorok; osszegzo: TIME AND XP sorok)
 function F.XPBreakdown(tt, t, fd)
     local s = F.XPStats(t, fd)
     local h = t.elapsed >= 60 and (t.elapsed / 3600) or nil
-    local function line(label, value, r, g, b) tt:AddDoubleLine(label, value, r or 1, g or 1, b or 1, 1, 1, 1) end
-    local function dim(x) return "  |cff999999" .. x .. "|r" end
-    local function rate(v) return h and dim(Num(v / h) .. L["/h"]) or "" end
-    if NS.TT then NS.TT.Sub(tt, L["XP breakdown"]) else tt:AddLine(L["XP breakdown"], 1, 0.82, 0) end
-    line(L["XP gained"], Num(t.xp) .. rate(t.xp), 1, 0.86, 0.5)
-    line(L["  from kills"], Num(s.killXP) .. rate(s.killXP))
-    line(L["    base"], Num(s.baseKill))
-    if s.rested > 0 then line(L["    rested bonus"], Num(s.rested), 0.6, 0.75, 1) end
-    line(L["  quests and other"], Num(s.other) .. rate(s.other))
+    local function rate(v) return h and ("  " .. Col(C_RATE, Num(v / h) .. L["/h"])) or "" end
+    Section(tt, L["XP gained"], true)
+    Row(tt, L["Total"], Num(t.xp) .. rate(t.xp))
+    Row(tt, L["from kills"], Num(s.killXP) .. rate(s.killXP), true)
+    Row(tt, L["base"], Num(s.baseKill), true)
+    if s.rested > 0 then Row(tt, Col(C_RESTED, L["rested bonus"]), Col(C_RESTED, Num(s.rested)), true) end
+    Row(tt, L["quests and other"], Num(s.other) .. rate(s.other), true)
 
-    if NS.TT then NS.TT.Sub(tt, L["Pace"]) else tt:AddLine(L["Pace"], 1, 0.82, 0) end
-    line(L["XP per hour"], t.xpH and Num(t.xpH) or L["after the first minute"])
-    line(L["XP per hour, last 5 min"], s.recentH and Num(s.recentH) or L["after 2 minutes"])
-    line(L["Kills"], Num(s.kills) .. (h and dim(Num(s.kills / h) .. L["/h"]) or ""))
+    Section(tt, L["Pace"])
+    Row(tt, L["XP per hour"], t.xpH and Num(t.xpH) or Col(C_RATE, L["after the first minute"]))
+    Row(tt, L["last 5 minutes"], s.recentH and Num(s.recentH) or Col(C_RATE, L["after 2 minutes"]), true)
+    Row(tt, L["Kills"], Num(s.kills) .. (h and ("  " .. Col(C_RATE, Num(s.kills / h) .. L["/h"])) or ""))
     if s.perKill then
-        line(L["XP per kill"], Num(s.perKill) .. (s.rested > 0 and dim((L["base %s"]):format(Num(s.basePerKill))) or ""))
+        Row(tt, L["XP per kill"], Num(s.perKill)
+            .. (s.rested > 0 and ("  " .. Col(C_RATE, (L["base %s"]):format(Num(s.basePerKill)))) or ""), true)
     end
 
-    if NS.TT then NS.TT.Sub(tt, L["Level"]) else tt:AddLine(L["Level"], 1, 0.82, 0) end
-    line((L["Level %d"]):format(UnitLevel("player") or 0),
-        ("%s / %s"):format(Num(s.cur), Num(s.max)) .. (s.pct and dim(("%.1f%%"):format(s.pct)) or ""))
-    if s.sessionPct then line(L["This session"], ("%.1f%%"):format(s.sessionPct) .. dim(L["of a level"])) end
+    Section(tt, (L["Level %d"]):format(UnitLevel("player") or 0))
+    Row(tt, L["Progress"], ("%s / %s"):format(Num(s.cur), Num(s.max)) .. (s.pct and ("  " .. Col(C_RATE, ("%.1f%%"):format(s.pct))) or ""))
+    if s.sessionPct then Row(tt, L["this session"], ("%.1f%%"):format(s.sessionPct) .. "  " .. Col(C_RATE, L["of a level"]), true) end
     if t.need then
-        line(L["XP to level"], Num(t.need))
-        line(L["Kills to level"], s.killsToLevel and Num(s.killsToLevel) or "?")
-        line(L["Time to level"], s.etaRested and FormatETA(s.etaRested) or "?")
-        if s.pool > 0 and s.etaNoRested then line(L["  without the rested XP"], FormatETA(s.etaNoRested), 0.75, 0.75, 0.75) end
+        Row(tt, L["XP to level"], Num(t.need))
+        Row(tt, L["Kills to level"], s.killsToLevel and Num(s.killsToLevel) or "?")
+        Row(tt, L["Time to level"], s.etaRested and Col(C_HL, FormatETA(s.etaRested)) or "?")
+        if s.pool > 0 and s.etaNoRested then Row(tt, L["without the rested XP"], FormatETA(s.etaNoRested), true) end
     else
-        line(L["XP to level"], L["max level"])
+        Row(tt, L["XP to level"], L["max level"])
     end
-    line(L["Rested XP left"], Num(s.pool) .. (s.poolKills and dim((L["~%d kills"]):format(s.poolKills)) or ""),
-        0.6, 0.75, 1)
-    tt:AddLine(L["Kill XP comes from the kill lines in chat; quests and other = the rest. The time to level uses your "]
-        .. L["pace without rested XP, plus the rested XP you have left (it doubles kill XP until it runs out)."],
-        0.6, 0.6, 0.6, true)
+    Row(tt, Col(C_RESTED, L["Rested XP left"]), Col(C_RESTED, Num(s.pool))
+        .. (s.poolKills and ("  " .. Col(C_RATE, (L["~%d kills"]):format(s.poolKills))) or ""))
+    tt:AddLine(" ")
+    Note(tt, L["Kill XP comes from the kill lines in chat; quests and other = the rest. The time to level uses your "]
+        .. L["pace without rested XP, plus the rested XP you have left (it doubles kill XP until it runs out)."])
 end
 local function XPTooltip(owner, t, anchor)
     t = t or F.Totals()
@@ -579,21 +601,22 @@ local function TopItemsTooltip(owner)
     local fd = DB()
     local tt = NS.TT and NS.TT.Begin(owner, "ANCHOR_LEFT", L["Farm session"], F.FormatTime(t.elapsed))
     if not tt then GameTooltip:SetOwner(owner, "ANCHOR_LEFT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
-    F.GoldBreakdown(tt, t)
-    if NS.TT then NS.TT.Sub(tt, L["Top looted items"]) else tt:AddLine(L["Top looted items"], 1, 0.82, 0) end
-    if #t.items == 0 then tt:AddLine(L["Nothing looted yet."], 0.8, 0.8, 0.8) end
-    local src = F.AHSource()
-    for i = 1, math.min(5, #t.items) do
-        local it = t.items[i]
-        tt:AddDoubleLine(("%s x%d"):format(it.link, it.n or 1), F.FormatMoney(src and it.best or it.vendor)
-            .. ((src and it.best > 0) and (" |cff888888" .. NS.PriceSourceText(it.src, it.age) .. "|r") or ""), 1, 1, 1, 1, 1, 1)
-    end
-    local top = F.TopKills(fd, 3)
-    if top[1] then
-        if NS.TT then NS.TT.Sub(tt, L["Most killed"]) else tt:AddLine(L["Most killed"], 1, 0.82, 0) end
-        for _, k in ipairs(top) do tt:AddDoubleLine(k.name, "x" .. k.n, 1, 1, 1, 0.8, 0.8, 0.8) end
-    end
-    if t.net then tt:AddLine((L["Net gold change (vendor, quests, repairs too): %s"]):format(F.FormatMoney(t.net)), 0.6, 0.6, 0.6, true) end
+    F.GoldBreakdown(tt, t, function()
+        Section(tt, L["Top looted items"])
+        if #t.items == 0 then tt:AddLine(L["Nothing looted yet."], 0.72, 0.72, 0.72) end
+        local src = F.AHSource()
+        for i = 1, math.min(5, #t.items) do
+            local it = t.items[i]
+            tt:AddDoubleLine(("%s x%d"):format(it.link, it.n or 1), F.FormatMoney(src and it.best or it.vendor)
+                .. ((src and it.best > 0) and ("  " .. Col(C_SRC, NS.PriceSourceText(it.src, it.age))) or ""), 1, 1, 1, 1, 1, 1)
+        end
+        local top = F.TopKills(fd, 3)
+        if top[1] then
+            Section(tt, L["Most killed"])
+            for _, k in ipairs(top) do Row(tt, k.name, "x" .. k.n) end
+        end
+        return t.net and (L["Net gold change (vendor, quests, repairs too): %s"]):format(F.FormatMoney(t.net)) or nil
+    end)
     if NS.TT then
         NS.TT.Finish(tt, L["Looted gold is only money you loot, not vendor sales or quest rewards."])
     else
@@ -746,6 +769,8 @@ function F.SummaryData(fd)
         local it = t.items[i]
         trow(it.link .. " x" .. (it.n or 1), F.FormatMoney(src and it.best or it.vendor)
             .. (src and it.src == "vendor" and it.vendor > 0 and ("  " .. dim(L["vendor"])) or ""), true)
+        -- item sor: hoverre az item tooltipje, shift-klikk: link a chatbe, ctrl-klikk: probababu
+        out[#out].tip, out[#out].link = "item", it.link
     end
     local gH, kind = F.GoldPerHour(t)
     trow(kind == "AH" and L["Gold per hour (AH)"] or L["Gold per hour (vendor)"],
@@ -812,6 +837,24 @@ local function SummaryFrame()
 end
 
 -- az i. elem (szekcio fejlec / sor / elvalaszto) a keszletbol
+-- Item sor kattintasa (osszegzo LOOT sorai): a jatek sajat modositos klikkje. HandleModifiedItemClick
+-- kezeli a shift (link a chatbe) es a ctrl (probababu) klikket; ha nincs, kezzel ugyanez.
+function F.ItemRowClick(link)
+    if not link then return end
+    local H = rawget(_G, "HandleModifiedItemClick")
+    if type(H) == "function" then
+        local ok, handled = pcall(H, link)
+        if ok and handled then return "handled" end
+    end
+    if IsShiftKeyDown and IsShiftKeyDown() then
+        local ins = rawget(_G, "ChatEdit_InsertLink")
+        if type(ins) == "function" then pcall(ins, link) return "chat" end
+    elseif IsControlKeyDown and IsControlKeyDown() then
+        local d = rawget(_G, "DressUpItemLink")
+        if type(d) == "function" then pcall(d, link) return "dressup" end
+    end
+end
+
 local function SumItem(i, kind)
     local it = sum.items[i]
     if it and it.kind ~= kind then
@@ -840,12 +883,21 @@ local function SumItem(i, kind)
                 local t = sum.totals
                 if not t then return end
                 if self.tipKind == "xp" then XPTooltip(self, t, "ANCHOR_RIGHT") return end
+                if self.tipKind == "item" and self.link then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    local ok = pcall(GameTooltip.SetHyperlink, GameTooltip, self.link)
+                    if not ok then GameTooltip:SetText(self.link) end
+                    GameTooltip:Show()
+                    return
+                end
                 local tt = NS.TT and NS.TT.Begin(self, "ANCHOR_RIGHT", L["Farm session"], F.FormatTime(t.elapsed))
                 if not tt then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetText(L["Farm session"], 1, 1, 1); tt = GameTooltip end
                 F.GoldBreakdown(tt, t)
                 if NS.TT then NS.TT.Finish(tt) else GameTooltip:Show() end
             end)
             it.hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            -- item sor kattintasa: a jatek szokasos modositos klikkje (shift: link a chatbe, ctrl: probababu)
+            it.hit:SetScript("OnClick", function(self) F.ItemRowClick(self.link) end)
         end
         sum.items[i] = it
     end
@@ -884,7 +936,7 @@ function F.ShowSummary(fd)
             it.hit:ClearAllPoints()
             it.hit:SetPoint("TOPLEFT", f, "TOPLEFT", 10, y + 1)
             it.hit:SetSize(SUM_W - 20, ROW_H)
-            it.hit.tipKind = e.tip
+            it.hit.tipKind, it.hit.link = e.tip, e.link
             it.hit:SetShown(e.tip and true or false)
             y = y - ROW_H
         end

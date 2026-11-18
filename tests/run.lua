@@ -1014,14 +1014,27 @@ test("farm session: totals, pause, summary", function()
     F.RouteTooltip(NS.panel)
     local tip = table.concat(GameTooltip.__lines or {}, "\n")
     check(contains(tip, "[BoP Ring]") and contains(tip, "[Linen Cloth]"), "tooltip lists the top items")
-    for _, want in ipairs({ "Raw gold looted (coins)", "Items: if you vendor them", "Items: if you sell them on the AH (Auctionator)",
-        "2 of them at vendor price", "Total if vendored", "Total if sold on the AH", "Gold per hour = (raw gold + items at AH price)" }) do
+    for _, want in ipairs({ "Raw gold looted", "If you vendor them", "If you sell them on the AH", "Auctionator",
+        "2 items count at vendor price", "If vendored", "If sold on the AH", "Gold per hour = (raw gold + items at AH price)" }) do
         check(contains(tip, want), "gold breakdown: " .. want)
     end
-    check(contains(tip, "/h"), "breakdown has per hour values")
+    -- 0.8.8: sections in order (Coins, Items, Totals, then the top items), blank lines between them,
+    -- notes at the bottom; per hour values grey, the AH total green, the price source muted
+    local lines = GameTooltip.__lines or {}
+    local function at(text)
+        for i, l in ipairs(lines) do if contains(l, text) then return i end end
+    end
+    local iC, iI, iT, iTop, iNote = at("Coins"), at("Items"), at("Totals"), at("Top looted items"), at("Gold per hour =")
+    check(iC and iI and iT and iTop and iNote and iC < iI and iI < iT and iT < iTop and iTop < iNote,
+        "gold tooltip sections in order, notes last")
+    check(iI and lines[iI - 1] == " ", "blank line before a section")
+    check(contains(tip, "|cff888888") and contains(tip, "/h|r"), "per hour values in grey")
+    local ahTotal = lines[at("If sold on the AH") or 0] or ""
+    check(contains(ahTotal, "|cff33ff99"), "AH total in green")
+    check(contains(tip, "|cffc8a86a(Auctionator)|r"), "price source in a muted accent")
     GameTooltip:Hide()
     W.FireScript(NS.panel.statBoxes[3], "OnEnter")
-    check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "Total if sold on the AH"), "stat box 3 hover: breakdown")
+    check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "If sold on the AH"), "stat box 3 hover: breakdown")
     GameTooltip:Hide()
 
     -- stop: summary window + one line in chat, panel back to quests
@@ -1051,8 +1064,39 @@ test("farm session: totals, pause, summary", function()
     check(hit ~= nil, "summary LOOT rows are hoverable")
     if hit then
         W.FireScript(hit, "OnEnter")
-        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "Total if vendored"), "summary hover: gold breakdown")
+        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "If vendored"), "summary hover: gold breakdown")
         GameTooltip:Hide()
+    end
+    -- 0.8.8: the item lines are item rows: item tooltip on hover, shift-click: link in chat, ctrl-click: dressing room
+    local ihit
+    for _, it in ipairs(sf.items) do if it.hit and it.hit:IsShown() and it.hit.tipKind == "item" then ihit = it.hit break end end
+    if check(ihit and ihit.link and contains(ihit.link, "|Hitem:"), "summary item lines are item rows") then
+        local shown
+        local orig = GameTooltip.SetHyperlink
+        GameTooltip.SetHyperlink = function(_, l) shown = l end
+        W.FireScript(ihit, "OnEnter")
+        GameTooltip.SetHyperlink = orig
+        eq(shown, ihit.link, "hover: the item's own tooltip")
+        GameTooltip:Hide()
+        local got
+        rawset(_G, "HandleModifiedItemClick", function(l) got = l return true end)
+        ihit:Click()
+        eq(got, ihit.link, "click: the game's modified click (shift: chat link, ctrl: dressing room)")
+        rawset(_G, "HandleModifiedItemClick", nil)
+        local inserted
+        rawset(_G, "IsShiftKeyDown", function() return true end)
+        rawset(_G, "ChatEdit_InsertLink", function(l) inserted = l end)
+        eq(F.ItemRowClick(ihit.link), "chat", "fallback: shift-click inserts the link")
+        eq(inserted, ihit.link, "the link went to chat")
+        rawset(_G, "IsShiftKeyDown", function() return false end)
+        rawset(_G, "IsControlKeyDown", function() return true end)
+        local dressed
+        rawset(_G, "DressUpItemLink", function(l) dressed = l end)
+        eq(F.ItemRowClick(ihit.link), "dressup", "fallback: ctrl-click opens the dressing room")
+        eq(dressed, ihit.link, "dressing room item")
+        rawset(_G, "IsControlKeyDown", function() return false end)
+        rawset(_G, "ChatEdit_InsertLink", nil)
+        rawset(_G, "DressUpItemLink", nil)
     end
     sf.newBtn:Click()
     check(F.IsRunning() and not sf:IsShown(), "Start new: a new session, window closed")
@@ -1150,10 +1194,13 @@ test("farm session: live counters, rested XP, summary groups", function()
     check(s.recentH ~= nil, "last 5 min pace after 2+ minutes")
     W.FireScript(b[2], "OnEnter")
     local xtip = table.concat(GameTooltip.__lines or {}, "\n")
-    for _, want in ipairs({ "XP breakdown", "from kills", "rested bonus", "quests and other", "XP per hour, last 5 min",
-        "XP per kill", "Kills to level", "Time to level", "without the rested XP", "Rested XP left", "This session" }) do
+    for _, want in ipairs({ "XP gained", "from kills", "rested bonus", "quests and other", "last 5 minutes",
+        "XP per kill", "Kills to level", "Time to level", "without the rested XP", "Rested XP left", "this session", "Pace" }) do
         check(contains(xtip, want), "XP tooltip: " .. want)
     end
+    -- 0.8.8: rested in the rested-XP blue, the time to level highlighted
+    check(contains(xtip, "|cff6fa8ffrested bonus|r"), "rested in blue")
+    check(contains(xtip, "Time to level | |cffffd100"), "time to level highlighted")
     GameTooltip:Hide()
     local row1
     for _, f in ipairs(W.frames) do
@@ -1172,7 +1219,7 @@ test("farm session: live counters, rested XP, summary groups", function()
     end
     if check(xhit, "summary XP rows are hoverable") then
         W.FireScript(xhit, "OnEnter")
-        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "XP breakdown"), "summary hover: XP breakdown")
+        check(contains(table.concat(GameTooltip.__lines or {}, "\n"), "Kills to level"), "summary hover: XP breakdown")
         GameTooltip:Hide()
     end
     local data = F.SummaryData(fd)
