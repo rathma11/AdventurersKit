@@ -173,6 +173,25 @@ local function ItemValue(rec, id)
     return n * sell, n * best, src, age
 end
 
+-- ETA a szintig az alap (rested nelkuli) tempobol: amig van rested pool, a kill dupla XP-t ad
+-- (a bonus a poolbol fogy), utana sima. need XP-hez: rested resz = min(pool, need / 2),
+-- a tobbit alap tempoval kell osszeszedni: ido = (need - min(pool, need / 2)) / alap ora.
+function F.EtaSeconds(need, baseH, pool)
+    if not (need and baseH and baseH > 0) then return nil end
+    local fromRested = math.min(math.max(0, pool or 0), need / 2)
+    return (need - fromRested) / baseH * 3600
+end
+
+-- "Mangy Wolf dies, you gain 250 experience. (+125 exp Rested bonus)" -> 125. A csapat bonus
+-- ("+20 exp group bonus") nem rested. Csak az angol kliens szovege (a felhasznalo enUS).
+function F.ParseRested(msg)
+    if type(msg) ~= "string" then return 0 end
+    for n, what in msg:gmatch("%(%s*%+?(%d+)%s+exp%s+([^%)]-)%s+bonus%)") do
+        if what:lower() == "rested" then return tonumber(n) or 0 end
+    end
+    return 0
+end
+
 -- Osszesites: idot, XP-t, penzt, erteket es oras rataikat egy tablaba
 function F.Totals(fd, now)
     fd = fd or DB()
@@ -193,8 +212,12 @@ function F.Totals(fd, now)
         return a.id < b.id
     end)
     local h = t.elapsed / 3600
+    -- rested: a kill XP-bol ennyi volt a rested bonus; a "sajat" (alap) XP ennyivel kevesebb
+    t.rested = math.min(fd.rested or 0, t.xp)
+    t.restedLeft = math.max(0, tonumber(GetXPExhaustion and GetXPExhaustion()) or 0)
     if t.elapsed >= 60 then
         t.xpH = t.xp / h
+        t.baseH = (t.xp - t.rested) / h
         t.goldH = (t.money + t.vendor) / h
         t.bestH = (t.money + t.best) / h
     end
@@ -202,7 +225,7 @@ function F.Totals(fd, now)
     local maxLvl = (GetMaxPlayerLevel and GetMaxPlayerLevel()) or 60
     if lvl < maxLvl then
         t.need = math.max(0, (UnitXPMax("player") or 0) - (UnitXP("player") or 0))
-        if t.xpH and t.xpH > 0 then t.eta = t.need / t.xpH * 3600 end
+        t.eta = F.EtaSeconds(t.need, t.baseH, t.restedLeft)
     end
     if fd.moneyStart then t.net = (GetMoney() or 0) - fd.moneyStart end
     return t
@@ -285,6 +308,7 @@ function F.OnKillMsg(msg)
     fd.kills = fd.kills or {}
     fd.kills[name] = (fd.kills[name] or 0) + 1
     fd.killCount = (fd.killCount or 0) + 1
+    fd.rested = (fd.rested or 0) + F.ParseRested(msg)
 end
 
 -- legtobbet olt mobok: { { name, n }, ... } csokkeno sorrendben
@@ -345,10 +369,12 @@ function F.PanelLines(t, fd)
     local ico = function(path) return "|T" .. path .. ":12:12|t " end
     local out = {}
     out[#out + 1] = ico("Interface\\COMMON\\Indicator-Yellow") .. lab(L["XP gained"]) .. Num(t.xp)
+        .. ((t.rested or 0) > 0 and dim((L["rested %s"]):format(Num(t.rested))) or "")
         .. (t.xpH and dim(Num(t.xpH) .. L["/h"]) or "")
     if t.need then
         out[#out + 1] = ico("Interface\\COMMON\\Indicator-Yellow") .. lab(L["To level"]) .. Num(t.need)
             .. (t.eta and dim("ETA " .. FormatETA(t.eta)) or "")
+            .. ((t.restedLeft or 0) > 0 and dim((L["rested left %s"]):format(Num(t.restedLeft))) or "")
     else
         out[#out + 1] = ico("Interface\\COMMON\\Indicator-Gray") .. lab(L["To level"]) .. L["max level"]
     end
@@ -373,13 +399,18 @@ function F.UpdatePanelStats(panel)
     local b = panel.statBoxes
     b[1].label:SetText(L["TIME"]); b[2].label:SetText(L["XP / HOUR"]); b[3].label:SetText(L["GOLD / HOUR"])
     b[1].value:SetText(fd.paused and ("|cff" .. HEX.WARN .. F.FormatTime(t.elapsed) .. "|r") or F.FormatTime(t.elapsed))
-    b[2].value:SetText(t.xpH and Num(t.xpH) or "-")
-    b[3].value:SetText(t.goldH and Short(t.goldH) or "-")
+    -- az elso percben meg nincs megbizhato ora rata: addig a szerzett osszeg latszik ("+250"),
+    -- igy az elso killtol latod, hogy szamol (0.7.8-ban ilyenkor "-" volt: mintha nem szamolna)
+    b[2].label:SetText(t.xpH and L["XP / HOUR"] or L["XP GAINED"])
+    b[3].label:SetText(t.goldH and L["GOLD / HOUR"] or L["GOLD GAINED"])
+    b[2].value:SetText(t.xpH and Num(t.xpH) or ((t.xp > 0) and ("+" .. Num(t.xp)) or "-"))
+    b[3].value:SetText(t.goldH and Short(t.goldH) or ((t.money + t.vendor > 0) and ("+" .. Short(t.money + t.vendor)) or "-"))
     local max = UnitXPMax("player") or 0
     panel.bar:SetValue(max > 0 and (UnitXP("player") or 0) / max or 0)
     panel.bar:SetStatusBarColor(0.58, 0.35, 0.85) -- XP lila (mint a jatek XP csikja)
-    panel.sub:SetText(fd.paused and ("|cff" .. HEX.WARN .. L["Paused"] .. "|r")
+    panel.sub:SetText((fd.paused and ("|cff" .. HEX.WARN .. L["Paused"] .. "|r")
         or (fd.started and date and (L["Running since %s"]):format(date("%H:%M", fd.started)) or L["Running"]))
+        .. "  |cff" .. HEX.DIM .. (L["%d kills"]):format(fd.killCount or 0) .. "|r")
     return t
 end
 
@@ -508,65 +539,61 @@ end
 F.UpdateButton = UpdateButton
 
 ---------------------------------------------------------------------------
--- Osszegzo ablak leallitaskor (DESIGN.md: kis "box" dialog)
+-- Osszegzo ablak leallitaskor (DESIGN.md: kis "box" dialog, mint a panel: szekcio fejlecek,
+-- elvalasztok a csoportok kozott, cimke balra / ertek jobbra, lapos NS.Style gombok kozepen)
 ---------------------------------------------------------------------------
-local sum
-local function SummaryFrame()
-    if sum then return sum end
-    sum = S.Box("AdventurersKitFarmSummary", 320, 200, L["FARM SESSION SUMMARY"], "DIALOG")
-    sum:SetPoint("TOP", UIParent, "TOP", 0, -160)
-    S.Draggable(sum, "farmSumPos")
-    sum.body = sum:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sum.body:SetPoint("TOPLEFT", 12, -26)
-    sum.body:SetWidth(296)
-    sum.body:SetJustifyH("LEFT")
-    sum.body:SetJustifyV("TOP")
-    if sum.body.SetSpacing then sum.body:SetSpacing(3) end
-    sum.closeBtn = S.FlatButton(sum, L["Close"], 90, 22)
-    sum.closeBtn:SetPoint("BOTTOMRIGHT", -12, 10)
-    sum.closeBtn:SetScript("OnClick", function() sum:Hide() end)
-    sum.newBtn = S.FlatButton(sum, L["Start new"], 110, 22)
-    sum.newBtn:SetPoint("RIGHT", sum.closeBtn, "LEFT", -6, 0)
-    sum.newBtn:SetScript("OnClick", function() sum:Hide(); NS.Loud(F.Start) end)
-    sum.newBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(L["Start new"], 1, 1, 1)
-        GameTooltip:AddLine(L["Starts a new farm session from zero. Same as /ak farm start."], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    sum.newBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    if UISpecialFrames then table.insert(UISpecialFrames, "AdventurersKitFarmSummary") end
-    return sum
-end
-
--- Az osszegzes sorai (az ablak es a teszt is ezt hasznalja)
-function F.SummaryLines(fd)
+-- Az osszegzes adatai csoportokban: { sec = "FEJLEC" } / { label, value, sub = true } / { div = true }
+function F.SummaryData(fd)
     fd = fd or DB()
     local t = fd and F.Totals(fd)
     if not t then return {} end
     local out = {}
-    local function row(label, value) out[#out + 1] = "|cff" .. HEX.LABEL .. label .. ":|r " .. value end
-    local function dim(s) return "  |cff" .. HEX.DIM .. s .. "|r" end
+    local function sec(s) out[#out + 1] = { sec = s } end
+    local function row(label, value, sub) out[#out + 1] = { label = label, value = value, sub = sub } end
+    local function div() out[#out + 1] = { div = true } end
+    local function dim(s) return "|cff" .. HEX.DIM .. s .. "|r" end
+    local short = t.elapsed < 60 -- egy perc alatt nincs ora rata
+
+    sec(L["TIME AND XP"])
     row(L["Duration"], F.FormatTime(t.elapsed))
-    local top = F.TopKills(fd, 3)
-    local tk = {}
-    for i, k in ipairs(top) do tk[i] = k.name .. " x" .. k.n end
-    row(L["Mobs killed"], Num(fd.killCount or 0) .. (tk[1] and dim(table.concat(tk, ", ")) or ""))
-    row(L["XP gained"], Num(t.xp) .. (t.xpH and dim(Num(t.xpH) .. L["/h"]) or ""))
+    row(L["XP gained"], Num(t.xp))
+    if (t.rested or 0) > 0 then row(L["of it rested bonus"], Num(t.rested), true) end
+    row(L["XP per hour"], t.xpH and Num(t.xpH) or dim(short and L["- (under 1 min)"] or "-"))
     local lv = (UnitLevel("player") or 0) - (fd.startLevel or UnitLevel("player") or 0)
     if lv > 0 then row(L["Levels gained"], ("|cff%s+%d|r  (%d)"):format(HEX.GOOD, lv, UnitLevel("player") or 0)) end
+    if t.need then row(L["To level"], Num(t.need) .. (t.eta and ("  " .. dim("ETA " .. FormatETA(t.eta))) or "")) end
+    if (t.restedLeft or 0) > 0 then row(L["Rested XP left"], Num(t.restedLeft)) end
+    div()
+
+    sec(L["KILLS"])
+    row(L["Mobs killed"], Num(fd.killCount or 0))
+    for _, k in ipairs(F.TopKills(fd, 3)) do row(k.name, "x" .. k.n, true) end
+    div()
+
+    sec(L["LOOT"])
     row(L["Looted gold"], F.FormatMoney(t.money))
     local nItems = 0
     for _, it in pairs(fd.items or {}) do nItems = nItems + (it.n or 0) end
-    row(L["Items looted"], Num(nItems) .. dim((L["vendor %s"]):format(F.FormatMoney(t.vendor, true))))
+    row(L["Items looted"], Num(nItems))
+    row(L["Vendor value"], F.FormatMoney(t.vendor))
     local src = F.AHSource()
-    if src then row(L["Best sale"], F.FormatMoney(t.money + t.best) .. dim(src)) end
+    if src then row(L["Best sale"], F.FormatMoney(t.money + t.best) .. "  " .. dim(src)) end
     for i = 1, math.min(3, #t.items) do
         local it = t.items[i]
-        out[#out + 1] = "   " .. it.link .. " x" .. (it.n or 1) .. dim(F.FormatMoney(src and it.best or it.vendor, true))
+        row(it.link .. " x" .. (it.n or 1), F.FormatMoney(src and it.best or it.vendor), true)
     end
-    row(L["Gold per hour"], t.goldH and (F.FormatMoney(t.goldH) .. (src and t.bestH and dim(L["best"] .. " " .. F.FormatMoney(t.bestH, true)) or ""))
-        or "-")
+    row(L["Gold per hour"], t.goldH and F.FormatMoney(t.goldH) or dim(short and L["- (under 1 min)"] or "-"))
+    if src and t.bestH then row(L["best sale per hour"], F.FormatMoney(t.bestH), true) end
+    return out
+end
+
+-- Sima szoveg sorok (teszt, regi hivok): "FEJLEC" / "cimke: ertek"
+function F.SummaryLines(fd)
+    local out = {}
+    for _, e in ipairs(F.SummaryData(fd)) do
+        if e.sec then out[#out + 1] = e.sec
+        elseif e.label then out[#out + 1] = e.label .. ": " .. e.value end
+    end
     return out
 end
 
@@ -580,14 +607,104 @@ function F.ChatLine(fd)
         F.FormatMoney(t.vendor), t.goldH and F.FormatMoney(t.goldH) or "-")
 end
 
+local SUM_W, ROW_H = 300, 15
+local sum
+local function SummaryFrame()
+    if sum then return sum end
+    sum = S.Box("AdventurersKitFarmSummary", SUM_W, 200, L["FARM SESSION SUMMARY"], "DIALOG")
+    sum:SetPoint("TOP", UIParent, "TOP", 0, -160)
+    S.Draggable(sum, "farmSumPos")
+    sum.items = {} -- ujrahasznalt elemek: { kind, a, b }
+    sum.footLine = S.Divider(sum)
+    sum.footLine:SetPoint("BOTTOMLEFT", 12, 44)
+    sum.footLine:SetPoint("BOTTOMRIGHT", -12, 44)
+    local function Btn(text, tip, onClick)
+        local b = S.FlatButton(sum, text, 120, 24)
+        b.text:SetFontObject("GameFontNormal")
+        b:SetScript("OnClick", onClick)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(text, 1, 1, 1)
+            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        return b
+    end
+    sum.newBtn = Btn(L["Start new"], L["Starts a new farm session from zero. Same as /ak farm start."],
+        function() sum:Hide(); NS.Loud(F.Start) end)
+    sum.closeBtn = Btn(L["Close"], L["Closes this window (Esc works too)."], function() sum:Hide() end)
+    sum.newBtn:SetPoint("BOTTOMRIGHT", sum, "BOTTOM", -4, 12)
+    sum.closeBtn:SetPoint("BOTTOMLEFT", sum, "BOTTOM", 4, 12)
+    if UISpecialFrames then table.insert(UISpecialFrames, "AdventurersKitFarmSummary") end
+    return sum
+end
+
+-- az i. elem (szekcio fejlec / sor / elvalaszto) a keszletbol
+local function SumItem(i, kind)
+    local it = sum.items[i]
+    if it and it.kind ~= kind then
+        if it.a then it.a:Hide() end
+        if it.b then it.b:Hide() end
+        it = nil
+    end
+    if not it then
+        it = { kind = kind }
+        if kind == "sec" then
+            it.a = S.Section(sum)
+        elseif kind == "div" then
+            it.a = S.Divider(sum)
+        else
+            it.a = sum:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            it.a:SetJustifyH("LEFT")
+            it.a:SetWordWrap(false)
+            it.b = sum:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            it.b:SetJustifyH("RIGHT")
+            it.b:SetWordWrap(false)
+        end
+        sum.items[i] = it
+    end
+    return it
+end
+
 function F.ShowSummary(fd)
     local f = SummaryFrame()
     S.RestorePos(f, "farmSumPos")
-    f.body:SetText(table.concat(F.SummaryLines(fd), "\n"))
-    local h = tonumber(f.body:GetStringHeight()) or 0
-    local n = #F.SummaryLines(fd)
-    if h < n * 10 then h = n * 15 end
-    f:SetHeight(26 + h + 12 + 22 + 10)
+    local y = -26
+    local data = F.SummaryData(fd)
+    for i, e in ipairs(data) do
+        local kind = e.sec and "sec" or (e.div and "div" or "row")
+        local it = SumItem(i, kind)
+        it.a:ClearAllPoints()
+        if kind == "sec" then
+            it.a:SetText(e.sec)
+            it.a:SetPoint("TOPLEFT", f, "TOPLEFT", 14, y)
+            y = y - 15
+        elseif kind == "div" then
+            y = y - 4
+            it.a:SetPoint("TOPLEFT", f, "TOPLEFT", 12, y)
+            it.a:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, y)
+            y = y - 7
+        else
+            it.a:SetText(e.label)
+            it.a:SetTextColor(e.sub and 0.75 or 1, e.sub and 0.75 or 1, e.sub and 0.75 or 1)
+            it.a:SetPoint("TOPLEFT", f, "TOPLEFT", e.sub and 24 or 14, y)
+            it.a:SetWidth(SUM_W * 0.55 - (e.sub and 10 or 0))
+            it.b:ClearAllPoints()
+            it.b:SetText(e.value)
+            it.b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, y)
+            it.b:SetWidth(SUM_W * 0.42)
+            it.b:Show()
+            y = y - ROW_H
+        end
+        it.a:Show()
+    end
+    for i = #data + 1, #f.items do
+        local it = f.items[i]
+        if it.a then it.a:Hide() end
+        if it.b then it.b:Hide() end
+    end
+    f:SetHeight(-y + 8 + 44)
     f:Show()
 end
 F.SummaryFrame = function() return sum end
@@ -701,12 +818,20 @@ ev:SetScript("OnEvent", function(_, event, a1)
         UpdateButton()
     elseif event == "PLAYER_XP_UPDATE" then
         F.OnXP()
+        RefreshPanel()
     elseif event == "CHAT_MSG_MONEY" then
         F.OnMoneyMsg(a1)
+        RefreshPanel()
     elseif event == "CHAT_MSG_LOOT" then
         F.OnLootMsg(a1)
+        RefreshPanel()
     elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
         F.OnKillMsg(a1)
+        -- az XP a UnitXP kulonbsegbol jon; ha a PLAYER_XP_UPDATE a chat uzenet elott jott (vagy
+        -- elmaradt), kicsit kesobb meg egyszer megnezzuk (kulonbseg alapu: dupla szamolas nincs)
+        F.OnXP()
+        RefreshPanel()
+        C_Timer.After(0.3, function() F.OnXP() RefreshPanel() end)
     elseif event == "GET_ITEM_INFO_RECEIVED" then
         F.OnItemInfo(a1)
     elseif event == "PLAYER_LOGOUT" then

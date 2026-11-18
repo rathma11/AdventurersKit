@@ -903,7 +903,7 @@ test("farm session: totals, pause, summary", function()
     check(NS.panel:IsShown(), "panel shown")
     eq(NS.panel.title:GetText(), "Farm session", "panel title")
     eq(NS.panel.statBoxes[1].label:GetText(), "TIME", "stat box 1")
-    eq(NS.panel.statBoxes[3].label:GetText(), "GOLD / HOUR", "stat box 3")
+    eq(NS.panel.statBoxes[3].label:GetText(), "GOLD GAINED", "stat box 3 (first minute: the gain)")
     W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 45 experience.")
     W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 45 experience.")
     W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Kobold Vermin dies, you gain 40 experience.")
@@ -1008,8 +1008,8 @@ test("farm session: totals, pause, summary", function()
     local sf = F.SummaryFrame()
     check(sf and sf:IsShown(), "summary window shown")
     local sum = table.concat(F.SummaryLines(fd), "\n")
-    for _, want in ipairs({ "Duration", "Mobs killed", "Mangy Wolf x2", "XP gained", "Levels gained", "Looted gold",
-        "Items looted", "Best sale", "Gold per hour" }) do
+    for _, want in ipairs({ "TIME AND XP", "KILLS", "LOOT", "Duration", "Mobs killed", "Mangy Wolf: x2", "XP gained",
+        "Levels gained", "Looted gold", "Items looted", "Vendor value", "Best sale", "Gold per hour" }) do
         check(contains(sum, want), "summary: " .. want)
     end
     sf.newBtn:Click()
@@ -1032,8 +1032,80 @@ test("farm session: totals, pause, summary", function()
     W.player.level, W.player.xp, W.money = level, 0, 0
 end)
 
+-- 0.8.4: live counters right after the first kill (the boxes showed "-" for the first minute, as if
+-- nothing counted), XP even when PLAYER_XP_UPDATE came before / without the chat line, rested XP
+-- (part of the gain, ETA from the base pace, pool left), and the summary window's groups.
+test("farm session: live counters, rested XP, summary groups", function()
+    local F = NS.Farm
+    local function rowsText()
+        local t = {}
+        for _, f in ipairs(W.frames) do
+            if f.__parent == NS.panel and f.__kind == "Button" and f:IsShown() and f.text and f.text:GetText() then
+                t[#t + 1] = f.text:GetText()
+            end
+        end
+        return table.concat(t, "\n")
+    end
+    eq(F.ParseRested("Mangy Wolf dies, you gain 250 experience. (+125 exp Rested bonus)"), 125, "rested bonus")
+    eq(F.ParseRested("Mangy Wolf dies, you gain 150 experience. (+20 exp group bonus)"), 0, "group bonus is not rested")
+    eq(F.ParseRested("Mangy Wolf dies, you gain 125 experience."), 0, "no bonus")
+    eq(F.EtaSeconds(1000, 1000, 0), 3600, "ETA without rested")
+    eq(F.EtaSeconds(1000, 1000, 300), 2520, "ETA: rested pool covers part")
+    eq(F.EtaSeconds(1000, 1000, 5000), 1800, "ETA: rested doubles everything")
+    eq(F.EtaSeconds(1000, nil, 0), nil, "no ETA without a pace")
+
+    W.player.xp, W.player.xpMax, W.player.rested = 100, 10000, 3000
+    SlashCmdList.QUESTFOCUS("farm start")
+    local b = NS.panel.statBoxes
+    -- the game sends PLAYER_XP_UPDATE, then the chat line; no clock tick in between
+    W.player.xp, W.player.rested = 350, 2875
+    W.Fire("PLAYER_XP_UPDATE", "player")
+    W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Mangy Wolf dies, you gain 250 experience. (+125 exp Rested bonus)")
+    local txt = rowsText()
+    check(contains(txt, "XP gained:|r 250"), "XP row right after the kill")
+    check(contains(txt, "Mobs killed:|r 1"), "kill row right after the kill")
+    check(contains(txt, "rested 125"), "rested part on the XP row")
+    check(contains(txt, "rested left 2,875"), "rested pool left on the To level row")
+    eq(b[2].label:GetText(), "XP GAINED", "first minute: the box shows the gain")
+    eq(b[2].value:GetText(), "+250", "XP box right after the kill")
+    check(contains(NS.panel.sub:GetText(), "1 kills"), "kill count in the sub line")
+    -- only the chat line (PLAYER_XP_UPDATE missed / late): XP still counts, once
+    W.player.xp = 600
+    W.Fire("CHAT_MSG_COMBAT_XP_GAIN", "Kobold Vermin dies, you gain 250 experience. (+125 exp Rested bonus)")
+    W.Advance(1, 0.5)
+    W.Fire("PLAYER_XP_UPDATE", "player")
+    local fd = rawget(NS.CharDB(), "farm")
+    eq(fd.xp, 500, "XP from the kill without its own XP event, not counted twice")
+    eq(fd.killCount, 2, "two kills")
+    -- after a minute: rates; ETA from the base pace with the rested pool
+    W.Advance(60, 1)
+    local t = F.Totals()
+    eq(b[2].label:GetText(), "XP / HOUR", "after a minute: rate")
+    eq(t.rested, 250, "rested part")
+    check(t.baseH and math.abs(t.baseH - 250 / (t.elapsed / 3600)) < 1, "base pace without rested")
+    check(t.eta and math.abs(t.eta - F.EtaSeconds(t.need, t.baseH, 2875)) < 1, "ETA uses the base pace and the pool")
+
+    SlashCmdList.QUESTFOCUS("farm stop")
+    local data = F.SummaryData(fd)
+    local secs, divs = {}, 0
+    for _, e in ipairs(data) do
+        if e.sec then secs[#secs + 1] = e.sec end
+        if e.div then divs = divs + 1 end
+    end
+    eq(table.concat(secs, ","), "TIME AND XP,KILLS,LOOT", "summary groups")
+    eq(divs, 2, "dividers between the groups")
+    local sum = table.concat(F.SummaryLines(fd), "\n")
+    check(contains(sum, "of it rested bonus: 250"), "summary: rested part")
+    check(contains(sum, "Rested XP left: 2,875"), "summary: rested pool left")
+    local sf = F.SummaryFrame()
+    check(sf and sf:IsShown() and sf.newBtn and sf.closeBtn and sf.footLine, "summary window with styled buttons")
+    sf.closeBtn:Click()
+    W.player.rested, W.player.xp, W.player.xpMax = nil, 0, 1000
+end)
+
 -- 0.7.8: the farm session is a pseudo-quest on the panel: the first stop of the route while it runs,
 -- next arrow to the quests, back arrow to the farm session, a quest click leaves the farm view.
+
 test("farm session: pseudo-quest on the route and the arrows", function()
     local F = NS.Farm
     W.Advance(1)

@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.8.4", date = "2026-11-18", items = {
+        "Farm session: the counters move from the first kill. In the first minute the boxes show the XP and gold "
+            .. "gained (\"+250\") instead of \"-\" (the per hour rate comes after a minute), the panel updates right "
+            .. "on each kill / XP / loot, and the kill count is next to the start time.",
+        "Farm session: rested XP. The XP row shows how much was rested bonus; the ETA to level uses your pace "
+            .. "without rested plus the rested XP you have left, which is shown too.",
+        "Farm session summary: grouped like the panel (Time and XP, Kills, Loot) with dividers, values on the right "
+            .. "and the usual flat gold-edged Start new / Close buttons.",
+    } },
     { version = "0.8.3", date = "2026-11-18", items = {
         "City list: 'Hide for 20 min' button at the bottom. The list closes and won't open by itself for 20 minutes, "
             .. "not even in the next town or after /reload. The town icon on the panel or /ak city still opens it.",
