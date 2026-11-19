@@ -104,6 +104,11 @@ function A.ScanMail()
         end
     end
     m.snap, m.snapT, m.buys = snap, Time(), {}
+    if NS.DebugOn("ah") then
+        local k = 0
+        for _ in pairs(snap) do k = k + 1 end
+        NS.Debug("ah", "mailbox read: %d different item(s) in the mail, pending purchases cleared", k)
+    end
 end
 
 A.loading = 0           -- hany item info nincs meg betoltve (GET_ITEM_INFO_RECEIVED-re ujra)
@@ -369,6 +374,14 @@ local function FinishScan(id)
         for _, l in ipairs(p.pages and p.pages[pg] or {}) do all[#all + 1] = l end
     end
     p.listings, p.time, p.scanning = all, Now(), nil
+    if NS.DebugOn("ah") then
+        local best
+        for _, l in ipairs(all) do
+            local u = (l.buyout or 0) / math.max(1, l.count or 1)
+            if u > 0 and (not best or u < best) then best = u end
+        end
+        NS.Debug("ah", "scan done: item %s, %d listing(s), cheapest unit %s", tostring(id), #all, best and A.FormatCoins(math.floor(best)) or "-")
+    end
 end
 
 -- AUCTION_ITEM_LIST_UPDATE a sajat lekerdezesunkre
@@ -512,7 +525,8 @@ local function StartBuy(list)
             b.capAll = b.capAll + plan.cost
         end
     end
-    if #b.items == 0 then return end
+    if #b.items == 0 then NS.Debug("ah", "buy: nothing affordable to buy") return end
+    NS.Debug("ah", "buy started: %d item(s), confirmed cap %s", #b.items, A.FormatCoins(b.capAll))
     buy = b
     A.buy = b
     return b
@@ -521,6 +535,8 @@ end
 local function BuyNextItem(reason)
     local st = buy.items[buy.cur]
     if reason and st then buy.note = reason end
+    NS.Debug("ah", "buy: done with %s (%d/%d, spent %s)%s", tostring(st and st.name), st and st.got or 0, st and st.need or 0,
+        A.FormatCoins(st and st.spent or 0), reason and (": " .. reason) or "")
     buy.cur = buy.cur + 1
     buy.ready, buy.waitPrice, buy.needStart = nil, nil, nil
     local nxt = buy.items[buy.cur]
@@ -601,12 +617,15 @@ function A.BuyClick()
         -- klasszikus: az index meg ugyanazt az aukciot mutatja? (kozben frissulhetett a lista)
         local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemId = GetAuctionItemInfo("list", l.idx)
         if (tonumber(itemId) and tonumber(itemId) ~= st.id) or tonumber(count) ~= l.count or tonumber(buyout) ~= l.buyout then
+            NS.Debug("ah", "buy click: the list changed under the auction, searching again")
             buy.ready, buy.wantQuery = nil, 1
             if UpdatePopup then UpdatePopup() end
             return "stale"
         end
     end
     if st.spent + l.buyout > st.cap then -- soha nem a megerositett ar folott
+        NS.Debug("ah", "buy click: %s would go over the confirmed cap (%s + %s > %s)", tostring(st.name), A.FormatCoins(st.spent),
+            A.FormatCoins(l.buyout), A.FormatCoins(st.cap))
         BuyNextItem()
         if UpdatePopup then UpdatePopup() end
         return "cap"
@@ -629,6 +648,7 @@ function A.BuyClick()
         ok = type(PlaceAuctionBid) == "function" and pcall(PlaceAuctionBid, "list", l.idx, l.buyout)
     end
     if not ok then
+        NS.Debug("ah", "buy click: the game refused %s x%d for %s", tostring(st.name), l.count or 0, A.FormatCoins(l.buyout))
         buy.note = L["The game refused the purchase."]
         buy.ready = nil
         if l.commodity then BuyNextItem() else buy.wantQuery = 1 end
@@ -637,6 +657,8 @@ function A.BuyClick()
     end
     st.spent, st.got = st.spent + l.buyout, st.got + l.count
     buy.spentAll, buy.bought = buy.spentAll + l.buyout, buy.bought + 1
+    NS.Debug("ah", "bought %s x%d for %s (%s, %d/%d)", tostring(st.name), l.count or 0, A.FormatCoins(l.buyout),
+        l.commodity and "commodity" or l.auctionID and "item auction" or "classic AH", st.got, st.need)
     -- postan jon: karakterenkent mentve, /reload utan is (A.InMail)
     buy.last = { st = st, l = l, t = Now(), mail = A.AddPending(st.id, l.count) }
     buy.ready = nil
@@ -651,6 +673,7 @@ local function OnBuyError()
     local last = buy and buy.last
     if not (last and Now() - last.t < 5) then return end
     local st, l = last.st, last.l
+    NS.Debug("ah", "purchase failed after the click (sold / no money): %s x%d not counted", tostring(st.name), l.count or 0)
     st.spent, st.got = st.spent - l.buyout, st.got - l.count
     buy.spentAll, buy.bought = buy.spentAll - l.buyout, buy.bought - 1
     A.RemovePending(last.mail)
@@ -1443,7 +1466,10 @@ local function OnPurchaseDone(event, auctionID)
     else -- COMMODITY_PURCHASE_FAILED
         extCommodity = nil
     end
-    if x then A.AddPending(x.id, x.n) end
+    if x then
+        NS.Debug("ah", "purchase from another AH UI (%s): item %s x%d counted as in the mail", event, tostring(x.id), x.n or 0)
+        A.AddPending(x.id, x.n)
+    end
     return x
 end
 
@@ -1565,3 +1591,25 @@ if NS.AddOptionsTab and NS.OptFlow then
         .. L["purchase). It never pays more than the price you confirmed. Bought items arrive in your mailbox."], 2)
     page:HookScript("OnShow", function() o:Refresh() end)
 end
+
+-- Debug: AH quest itemek + arak pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("ah", function(out)
+    out[#out + 1] = ("AH tab: %s | AH open: %s (%s) | price addon: %s | queue %d | query: %s"):format(Enabled() and "on" or "off",
+        tostring(ahOpen), Modern() and "modern" or "classic", tostring(NS.PriceAddon and NS.PriceAddon() or "-"), #queue,
+        active and (("%s p%d %s"):format(tostring(active.name), active.page or 0, tostring(active.purpose))) or "-")
+    if buy then
+        local st = buy.items[buy.cur]
+        out[#out + 1] = ("Buying: item %d/%d %s | bought %d, spent %s of %s%s"):format(buy.cur, #buy.items, tostring(st and st.name),
+            buy.bought, A.FormatCoins(buy.spentAll), A.FormatCoins(buy.capAll), buy.note and (" | " .. buy.note) or "")
+    end
+    local ok, items = pcall(A.NeededItems)
+    if not ok then out[#out + 1] = "Needed items: error " .. tostring(items) return end
+    out[#out + 1] = ("Needed items: %d (item info loading: %d)"):format(#items, A.loading or 0)
+    for _, e in ipairs(items) do
+        local p = prices[e.id]
+        local vendor, ah, _, src, age = NS.ItemPrice(e.id)
+        out[#out + 1] = ("  %s (%d) need %d, in mail %d | scan: %s | price: vendor %s, AH %s (%s)"):format(e.name, e.id, e.need,
+            e.inMail or 0, p and (p.scanning and "scanning" or (p.listings and (#p.listings .. " listing(s)")) or "-") or "-",
+            vendor and A.FormatCoins(vendor) or "?", ah and A.FormatCoins(ah) or "-", NS.DebugPlain(NS.PriceSourceText(src, age)))
+    end
+end)

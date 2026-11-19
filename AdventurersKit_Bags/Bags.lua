@@ -418,6 +418,7 @@ NS.BagFocus = function(itemId)
         local found = ApplyFocusAll()
         focusTicker:Show()
         NS.bagFocusDebug = ("item %d, %d button(s) found"):format(bagFocus, found)
+        NS.Debug("bags", "highlight %s", NS.bagFocusDebug)
     else
         ClearFocusAll()
         focusTicker:Hide()
@@ -591,6 +592,11 @@ RefreshBagList = function()
     if not QuestFocusDB.bagListCollapsed then
         Scan()
         scan.done = true
+        if NS.DebugOn("bags") then
+            local sum = ("%d listed, %d usable on the panel, %d leftover, %d bank only"):format(#scan.items, #scan.usable,
+                #scan.leftovers, #scan.bankOnly)
+            if sum ~= scan.lastSum then scan.lastSum = sum; NS.Debug("bags", "scan: %s", sum) end
+        end
         MaybeRefreshBagnon()
     end
 
@@ -1019,3 +1025,26 @@ fl:Button(L["Destroy leftover quest items"], 200,
     L["Unsellable quest items no active quest needs any more. Asks one by one before destroying. Same as /ak junk."],
     function() if NS.DiscardLeftovers then NS.DiscardLeftovers() end end, 28)
 page:HookScript("OnShow", function() fl:Refresh() end)
+
+-- Debug: taska modul pillanatkep (Core\Debug.lua "bags" szekcio hivja)
+NS.BagDebugLines = function()
+    local out = {}
+    out[#out + 1] = ("Quest item list: %s | collapsed %s | bags open %s | list shown %s | Bagnon %s"):format(
+        QuestFocusDB.noBagList and "off" or "on", tostring(QuestFocusDB.bagListCollapsed == true),
+        tostring(anchorFrame ~= nil and anchorFrame:IsShown()), tostring(list:IsShown()), tostring(Bags() ~= nil))
+    out[#out + 1] = ("Bagnon colors: %s | use buttons on the panel: %s"):format(QuestFocusDB.noBagGlow and "off" or "on",
+        QuestFocusDB.noUseButton and "off" or "on")
+    local ok, s = pcall(Scan)
+    if not ok then out[#out + 1] = "Scan error: " .. tostring(s) return out end
+    local function line(e)
+        local n = e.needs and e.needs[1]
+        return ("  %s %s x%d%s%s"):format(e.kind, (e.link and e.link:match("%[(.-)%]")) or tostring(e.id), e.count or 0,
+            n and (" | " .. tostring(n.title)) or "", e.surplus and (" | surplus " .. e.surplus) or "")
+    end
+    out[#out + 1] = ("Listed: %d"):format(#s.items)
+    for _, e in ipairs(s.items) do out[#out + 1] = line(e) end
+    out[#out + 1] = ("Usable on the panel: %d"):format(#s.usable)
+    for _, e in ipairs(s.usable) do out[#out + 1] = line(e) end
+    for _, e in ipairs(s.bankOnly) do out[#out + 1] = line(e) end
+    return out
+end

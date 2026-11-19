@@ -729,6 +729,7 @@ local function CheckLearning()
     for name, a in pairs(HelpfulAuras()) do
         if not learning.before[name] and not skip[name] and a.mine ~= false and a.duration >= 300 then
             DB().buffLearn[learning.itemId] = name
+            NS.Debug("buffs", "learned: item %s gives the buff %s", tostring(learning.itemId), tostring(name))
             learning = nil
             return
         end
@@ -1155,6 +1156,7 @@ local function NearVendors()
     return out
 end
 
+local lastBagTier -- debug: a taska lepcso valtozasa (Core\DebugLog.lua "bags")
 local function OutsideWarnings()
     local out = {}
     if QuestFocusDB.noOutWarn or not NS.CityLimit or (NS.InTown and NS.InTown()) or (not NS.InTown and IsResting and IsResting()) then
@@ -1175,6 +1177,11 @@ local function OutsideWarnings()
         elseif freeLimit > 0 and free <= freeLimit then tier, reach = 1, 300 end
     end
     local bagWarn = reach and (reach == math.huge or (v.anyD and v.anyD <= reach))
+    if tier ~= lastBagTier then
+        NS.Debug("bags", "bag warning tier %d -> %d: %d free of %d, nearest vendor %s yd, warn %s", lastBagTier or 0, tier, free,
+            total, v.anyD and tostring(math.floor(v.anyD)) or "?", tostring(bagWarn and true or false))
+        lastBagTier = tier
+    end
     -- szin a lepcso szerint: enyhe sarga, kozepes narancs, surgos elenk piros
     local TIER_COL = { "|cffffcc33", "|cffff8833", "|cffff2020" }
     local bagText = (L["%d/%d used, %d free"]):format(total - free, total, free)
@@ -1238,7 +1245,11 @@ NS.BuffsOutsideWarnings = OutsideWarnings -- tests\run.lua (taska lepcsok)
 local function UpdateAlert(auras)
     if InCombatLockdown() then return end
     if QuestFocusDB.noBuffAlert or not On() or hiddenUntilCombat or UnitIsDeadOrGhost("player") then
-        if alert:IsShown() then alert:Hide() end
+        if alert:IsShown() then
+            NS.Debug("buffs", "reminder hidden: %s", QuestFocusDB.noBuffAlert and "reminder off" or not On() and "module off"
+                or hiddenUntilCombat and "closed until the next combat" or "dead")
+            alert:Hide()
+        end
         lastAlertKey = nil
         return
     end
@@ -1285,7 +1296,7 @@ local function UpdateAlert(auras)
         end
     end
     if #need == 0 then
-        if alert:IsShown() then alert:Hide() end
+        if alert:IsShown() then NS.Debug("buffs", "reminder hidden: every buff is fine") alert:Hide() end
         lastAlertKey = nil
         return
     end
@@ -1304,6 +1315,13 @@ local function UpdateAlert(auras)
     end
     -- Szovegek mindig frissulnek, a secure resz csak ha valtozott a lista
     if key ~= lastAlertKey then
+        if NS.DebugOn("buffs") then
+            local t = {}
+            for _, n in ipairs(need) do
+                t[#t + 1] = ("%s%s"):format(n.slot.key, n.info and " (info)" or n.left and (" %ds left"):format(n.left) or " missing")
+            end
+            NS.Debug("buffs", "reminder rows: %s", table.concat(t, ", "))
+        end
         lastAlertKey = key
         for _, b in ipairs(alertRows) do b:Hide(); b.text:Hide(); b.click:Hide(); b.arrow:Hide(); b.off:Hide() end
         if NS.HideBuffFlyout then NS.HideBuffFlyout() end

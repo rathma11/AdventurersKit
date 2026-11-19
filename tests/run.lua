@@ -1444,6 +1444,111 @@ test("slash commands", function()
     W.Advance(5)
 end)
 
+test("debug: ring buffer (last N lines, repeats folded)", function()
+    local R = NS.DebugRing
+    check(R ~= nil, "NS.DebugRing exported")
+    if not R then return end
+    local r = R.new(3)
+    eq(#r:list(), 0, "empty ring")
+    r:push("10:00:00", "a")
+    r:push("10:00:01", "b")
+    eq(#r:list(), 2, "two lines")
+    eq(r:list()[1].msg, "a", "oldest first")
+    r:push("10:00:02", "c")
+    r:push("10:00:03", "d")
+    local l = r:list()
+    eq(#l, 3, "capped at 3")
+    eq(l[1].msg, "b", "the oldest dropped out")
+    eq(l[3].msg, "d", "newest last")
+    r:push("10:00:04", "d")
+    r:push("10:00:05", "d")
+    l = r:list()
+    eq(#l, 3, "repeats do not take new lines")
+    eq(l[3].rep, 3, "repeat count")
+    eq(l[3].time, "10:00:05", "repeat updates the time")
+    for i = 1, 10 do r:push("t", "x" .. i) end
+    l = r:list()
+    eq(l[1].msg, "x8", "wraps around many times") eq(l[3].msg, "x10", "newest after wrapping")
+    r:clear()
+    eq(#r:list(), 0, "cleared")
+end)
+
+test("debug: section registry, keys, snapshots", function()
+    local want = { "general", "target", "marker", "route", "quest", "city", "prep", "escort", "buffs", "bags", "farm", "ah", "zone" }
+    eq(#NS.DEBUG_SECTIONS, #want, "section count")
+    for i, k in ipairs(want) do
+        local s = NS.DEBUG_SECTIONS[i]
+        eq(s and s.key, k, "section " .. i)
+        check(NS.DebugSection(k) == s, "DebugSection(" .. k .. ")")
+        check(s and type(s.title) == "string" and s.title ~= "", k .. ": has a title")
+        check(s and #s.snapshots > 0, k .. ": has a snapshot")
+        local lines = NS.DebugSnapshotLines(k)
+        for _, line in ipairs(lines) do
+            check(not contains(line, "snapshot error"), k .. ": " .. line)
+        end
+        local text = NS.DebugText(k)
+        check(contains(text, "Adventurer's Kit v" .. NS.Version()), k .. ": header has the version")
+        check(contains(text, "== " .. s.title .. " [" .. k .. "] =="), k .. ": header has the section name")
+        check(not contains(text, "|c") and not contains(text, "|r"), k .. ": copy text has no colour codes")
+    end
+    eq(NS.DebugKey("Targeting"), "target", "alias targeting") eq(NS.DebugKey("AH"), "ah", "key is case-insensitive")
+    eq(NS.DebugKey("dungeon"), "prep", "alias dungeon") eq(NS.DebugKey("nope"), nil, "unknown key")
+    check(contains(NS.DebugKeyList(), "general, target, marker"), "key list for the help")
+    check(contains(NS.DebugText("target"), "Wanted mobs:"), "targeting section = the old /ak debug content")
+    local all = NS.DebugTextAll()
+    if verbose then out("\n" .. all .. "\n") end
+    for _, k in ipairs(want) do check(contains(all, "[" .. k .. "] =="), "Copy all has " .. k) end
+end)
+
+test("debug: toggle guard (off = nothing logged), saved account-wide", function()
+    QuestFocusDB.debugLog = nil
+    NS.DebugClear("target")
+    eq(NS.DebugOn("target"), false, "off by default")
+    local formatted = false
+    local probe = setmetatable({}, { __tostring = function() formatted = true return "probe" end })
+    NS.Debug("target", "should not appear %s", probe)
+    eq(NS.DebugCount("target"), 0, "off: nothing in the buffer")
+    check(not formatted, "off: arguments are not even formatted")
+    NS.SetDebugOn("target", true)
+    eq(QuestFocusDB.debugLog.target, true, "switch saved in QuestFocusDB.debugLog")
+    NS.Debug("target", "pick %s -> %s", "nameplate1", nil)
+    NS.Debug("target", "bad format %d", "x") -- a hibas formatum nem dob hibat
+    eq(NS.DebugCount("target"), 2, "on: logged")
+    check(contains(NS.DebugLogLines("target")[1], "pick nameplate1 -> nil"), "formatted line")
+    check(NS.DebugLogLines("target")[1]:match("^%[%d%d:%d%d:%d%d%]") ~= nil, "timestamp")
+    -- egy valodi dontes: a macro ujraepul es a naplo megmondja, miert
+    W.Advance(1)
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    NS.state.lastBody = nil
+    NS.C.UpdateMacro()
+    check(contains(table.concat(NS.DebugLogLines("target"), "\n"), "macro rebuilt"), "macro rebuild logged")
+    check(contains(NS.DebugText("target"), "-- log (on,"), "copy text has the log")
+    for _, k in ipairs({ "marker", "quest", "zone", "city", "farm", "ah", "route" }) do NS.SetDebugOn(k, true) end
+    NS.C.MarkObjective(nil)
+    check(NS.DebugCount("marker") > 0, "marker decision logged")
+    NS.SetDebugOn("target", false)
+    eq(QuestFocusDB.debugLog.target, nil, "switch off removes the key")
+    local n = NS.DebugCount("target")
+    NS.C.UpdateMacro()
+    NS.Debug("target", "x")
+    eq(NS.DebugCount("target"), n, "off again: nothing new")
+    QuestFocusDB.debugLog = nil
+end)
+
+test("debug: slash commands and the copy window", function()
+    for _, cmd in ipairs({ "debug list", "debug target", "debug farm on", "debug farm", "debug farm clear", "debug farm off",
+        "debug nope", "copy", "copy ah", "copy all", "copy nope", "farm", "farm" }) do
+        W.safecall("/ak " .. cmd, SlashCmdList.QUESTFOCUS, cmd)
+    end
+    local f = rawget(_G, "QuestFocusCopyFrame")
+    check(f ~= nil and f:IsShown(), "copy window shown")
+    local sawList = false
+    for _, l in ipairs(W.chat) do if contains(l, "Debug sections: general, target") then sawList = true end end
+    check(sawList, "/ak debug list prints the section keys")
+    if f then f:Hide() end
+    QuestFocusDB.debugLog = nil
+end)
+
 test("in-game self test logic (fake world)", function()
     local pass, total, fails = NS.SelfTest()
     check(total >= 7, "self test has its checks")

@@ -47,6 +47,10 @@ local function SelectQuest(questId, title, isComplete, mark)
     if mark then state.lastMarkQuest, state.lastMarkTime = questId, now end
     local changed = questId ~= state.questId
     local hadQuest = state.questId ~= nil -- belepeskori visszaallitasnal (nem volt elotte) nem jelolunk
+    if changed then
+        NS.Debug("quest", "focus %s -> %s (%s)%s%s", tostring(state.questId), tostring(questId), tostring(title),
+            isComplete and ", turn-in" or "", mark and ", by click" or ", automatic")
+    end
     if changed then state.extra = nil end -- a ticker 3 mp-en belul ujraszamolja
     -- elozmeny a "vissza" nyilnak (Planner\QuestNav.lua): a quest, amirol most ellepsz
     if changed and hadQuest and NS.OnFocusLeave then pcall(NS.OnFocusLeave, state.questId) end

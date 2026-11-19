@@ -88,12 +88,17 @@ QF:RegisterEvent("UNIT_FLAGS")
 -- Kesleltetett macro ujraepites (target valtas / a target meghalt). Kesleltetve! A /target
 -- sor meg a macro futasa KOZBEN valtja ki a PLAYER_TARGET_CHANGED-et; ha azonnal atirnank
 -- a macrot, a hatralevo sorai (a ping) mar nem futnanak le.
-local function ScheduleMacroRebuild()
+local function ScheduleMacroRebuild(why)
     if not state.questId or state.targetRebuildPending then return end
     state.targetRebuildPending = true
+    if NS.DebugOn("target") then
+        NS.Debug("target", "rebuild in 0.5 s: %s (target: %s)", why or "?",
+            UnitExists("target") and tostring(UnitName("target")) or "none")
+    end
     C_Timer.After(0.5, function()
         state.targetRebuildPending = nil
-        if state.questId and not InCombatLockdown() then UpdateMacro() end
+        if state.questId and not InCombatLockdown() then UpdateMacro()
+        elseif state.questId then NS.Debug("target", "rebuild skipped: in combat") end
     end)
 end
 
@@ -101,11 +106,14 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     if event == "UNIT_HEALTH" or event == "UNIT_FLAGS" then
         -- A target meghalt: PLAYER_TARGET_CHANGED ilyenkor nincs, de a macro a "mar a targeted"
         -- allapotra (ping nelkul) epult -> ujra kell, hogy a kovetkezo mobot pingelje
-        if arg1 == "target" and UnitIsDead("target") then ScheduleMacroRebuild() end
+        if arg1 == "target" and UnitIsDead("target") then ScheduleMacroRebuild("target died") end
         return
     elseif event == "CVAR_UPDATE" then
         -- nameplate ki/be: mas macro kell (click vs. targetexact)
-        if state.questId then C_Timer.After(0.1, UpdateMacro) end
+        if state.questId then
+            NS.Debug("target", "CVar changed (%s): macro rebuild", tostring(arg1))
+            C_Timer.After(0.1, UpdateMacro)
+        end
         return
     elseif event == "PLAYER_TARGET_CHANGED" then
         if UnitExists("target") and targetNames[UnitName("target") or ""] and TapDenied("target")
@@ -113,7 +121,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
             UIErrorsFrame:AddMessage(L["AKit: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
         -- Target valtas: a ping sor ki/be (uj celpontra pingel, a mostanira nem)
-        ScheduleMacroRebuild()
+        ScheduleMacroRebuild("target changed")
         return
     end
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
@@ -145,15 +153,17 @@ QF:SetScript("OnEvent", function(self, event, arg1)
         -- Harcban a gombot nem lehet atallitani, a regi nameplate token pedig mar mas mobra
         -- mutathat: inkabb engedjuk el, harc alatt a nev szerinti target dolgozik.
         state.pick = nil
+        NS.Debug("target", "combat start: nameplate pick dropped (by-name targeting in combat)")
         if state.questId and not InCombatLockdown() then UpdateMacro() end
     elseif event == "PLAYER_REGEN_ENABLED" then
+        NS.Debug("target", "combat end: %s", state.pendingBody and "writing the deferred macro, then rebuild" or "rebuild")
         if state.pendingBody then ApplyMacro(state.pendingBody) end
         PickNameplate()
         -- Mindig ujraepitjuk: a harc elott irt macro a regi (mar halott) targetre szolt, pl.
         -- ping nelkul ("mar a targeted"); a pick valtozasa nelkul a fenti nem irja at.
         if state.questId then UpdateMacro() end
         -- a target halala nehol csak a harc vege utan latszik
-        if UnitExists("target") then ScheduleMacroRebuild() end
+        if UnitExists("target") then ScheduleMacroRebuild("combat ended with a target") end
     end
 end)
 

@@ -3,6 +3,12 @@
 All notable changes to Adventurer's Kit (formerly QuestFocus). The same notes are in game:
 Options > Release notes, or `/ak notes`. Generated from `AdventurersKit/UI/ReleaseNotes.lua`.
 
+## 0.11.0 (2026-11-19)
+
+- Debug per feature: Options > Debug lists 13 sections (General, Targeting / AKit macro, Markers / arrow / spawns, Route & travel, Quest panel / stepping / skips, City list & errands, Dungeon prep, Escort, Buffs, Bags, Farm session, AH quest items & prices, Zone focus), each with a snapshot of what it sees now.
+- Every section has a log switch (saved for the account). While it is on, that part writes its decisions with the time into a log of the last 200 lines: why the macro was rebuilt, what got picked, why there was no ping, why the marker moved, why the city list opened or closed, farm events, AH purchases. Off costs nothing.
+- Copy debug on a section (or Copy all) opens the copy window with a header (version, date, section), the snapshot and the log, selected for Ctrl+C. Commands: /ak debug <section> [on | off], /ak copy <section> | all, /ak debug list; plain /ak debug still prints the targeting snapshot.
+
 ## 0.10.1 (2026-11-19)
 
 - AKit macro pings are simpler: pressing the button pings your target. Turn-in NPCs and other neutral or friendly NPCs are pinged too (a neutral goblin like Drizzlik got no ping before), and a quest mob you already target is pinged again (the game limits ping spam itself).

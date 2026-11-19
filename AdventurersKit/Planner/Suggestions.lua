@@ -373,13 +373,47 @@ end
 NS.PrepareTurnInRoute = function()
     if QuestFocusDB.noSuggest or not NS.QuestieAvailable() then tiRoute = {} return 0 end
     tiRoute = TurnInRoute()
-    tiKey = TurnInKey(tiRoute)
+    local newKey = TurnInKey(tiRoute)
+    if newKey ~= tiKey and NS.DebugOn("route") then
+        local t = {}
+        for i, s in ipairs(tiRoute) do
+            if i > TURNIN_ROUTE then break end
+            t[#t + 1] = ("%s%s %dyd%s"):format(s.done and "TI " or "", tostring(s.title or s.qid), math.floor(s.dist or 0),
+                s.deferred and " (skipped)" or "")
+        end
+        NS.Debug("route", "route changed (%d stops): %s", #tiRoute, table.concat(t, " > "))
+    end
+    tiKey = newKey
     -- a futo farm session az utvonal elso allomasa (ha nem az latszik a panelen)
     local farm = NS.Farm and NS.Farm.RouteEntry()
     if farm then table.insert(tiRoute, 1, farm) end
     return #tiRoute
 end
 NS.TurnInRouteList = function() return tiRoute end -- tesztek
+
+-- Debug: utvonal + utazas pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("route", function(out)
+    out[#out + 1] = ("Route: %s | %d stop(s)"):format(QuestFocusDB.noSuggest and "off (suggestions off)" or "on", #tiRoute)
+    for i, s in ipairs(tiRoute) do
+        if i > 15 then out[#out + 1] = "  ..." break end
+        out[#out + 1] = ("  %d. %s%s (%s) %d yd%s%s"):format(i, s.done and "turn in: " or "", tostring(s.title or (s.farm and "farm") or "?"),
+            tostring(s.qid or "-"), math.floor(s.dist or 0), s.deferred and " skipped" or "",
+            (not s.done and s.objs and NS.QuestEta and NS.QuestEta(s.objs)) and (" ETA " .. NS.QuestEta(s.objs)) or "")
+    end
+    local w = state.waypoint
+    local r = w and w.wx and NS.TravelAdvice and NS.TravelAdvice(w)
+    if r then
+        local FT = P.FormatTime
+        out[#out + 1] = ("Travel to the marker (%s): best %s | walk %s | hs %s | fly %s | boat %s"):format(tostring(w.title),
+            tostring(r.best), r.walk and FT(r.walk) or "-", r.hs and FT(r.hs.time) or "-",
+            r.fly and (FT(r.fly.time) .. " " .. tostring(r.fly.from) .. " > " .. tostring(r.fly.to)) or "-",
+            r.boat and FT(r.boat.time) or "-")
+    else
+        out[#out + 1] = "Travel to the marker: -"
+    end
+    local hs = NS.HearthTurnIns and NS.HearthTurnIns()
+    if hs then out[#out + 1] = ("Turn-ins at the hearthstone: %d"):format(#hs) end
+end)
 
 -- prepared: a PrepareTurnInRoute ebben a frissitesben mar lefutott (nem szamoljuk ujra)
 NS.ShowTurnInPickups = function(y, maxRows, prepared)

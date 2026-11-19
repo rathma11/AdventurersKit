@@ -113,8 +113,8 @@ By default it casts the one you last had on (e.g. Blessing of Might). To choose,
 | `/ak chat` | turn chat messages on/off (off: only the login line and command replies) |
 | `/ak notes` | release notes |
 | `/ak junk` | destroy unsellable leftover quest items (asks for each one) |
-| `/ak debug` | diagnostics to chat |
-| `/ak copy` | diagnostics in a selectable text box (Ctrl+C to copy); also the **Copy** button on the Debug tab |
+| `/ak debug` | targeting / AKit macro diagnostics to chat; `/ak debug <section>` another section, `/ak debug <section> on \| off` its decision log, `/ak debug list` the section keys |
+| `/ak copy [section \| all]` | a debug section (or all of them) in a selectable text box (Ctrl+C to copy); also the **Copy debug** / **Copy all** buttons on the Debug tab |
 | `/ak spell <name>` | tag spell in the macro (e.g. `/ak spell Moonfire`); `/ak spell` = clear, `/ak spell off` = disable |
 | `/ak next` | next objective (marker + macro); worth putting in a macro too |
 | `/ak all` | macro for all remaining mobs |
@@ -163,8 +163,8 @@ The settings are grouped into tabs on the left, in this order: General (panel, f
 - **Quest item list**, **Bagnon coloring** and **quest item button** on/off.
 - **Panel tab:** quest suggestions, progress popup, reset kill pace.
 - **Buffs tab:** buff buttons, warning and how many minutes before, item slots. Drag an item from your bags onto a slot. Right click cycles through set, automatic and off.
-- **Lua errors:** Adventurer's Kit's own Lua errors are listed at the bottom of the Debug tab with time, count and stack. By default they don't open the error window (one chat line instead). The **Lua error popup** checkbox turns the window back on, and **Clear errors** empties the list. Other addons are not affected.
-- **Debug tab:** live view of the selected quest, the wanted mobs, the picked nameplate, combat state, the visible quest mob nameplates and the current macro text.
+- **Lua errors:** Adventurer's Kit's own Lua errors are listed in the General debug section with time, count and stack. By default they don't open the error window (one chat line instead). The **Lua error popup** checkbox turns the window back on, and **Clear errors** empties the list. Other addons are not affected.
+- **Debug tab:** one row per feature (General, Targeting / AKit macro, Markers / arrow / spawns, Route & travel, Quest panel / stepping / skips, City list & errands, Dungeon prep, Escort, Buffs, Bags, Farm session, AH quest items & prices, Zone focus). Each has a **log** switch (saved account-wide; while on, the feature writes its decisions with a timestamp into a buffer of the last 200 lines; off costs nothing) and a **Copy debug** button: the copy window shows a header (version, date, section), the current snapshot and the log. **Copy all** puts every section in one text.
 
 The macro icon changes automatically: **crosshair** while you need to kill mobs or collect items, **letter** when the quest is complete and must be turned in, **map** when no quest is selected.
 

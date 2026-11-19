@@ -71,6 +71,7 @@ local function ZoneFocusOff(silent)
         if log[qid] and IsTracked(qid, log[qid].index) then Untrack(qid, log[qid].index) end
     end
     QuestFocusDB.zoneFocus = nil
+    NS.Debug("zone", "focus off (was %s)%s", tostring(zf.zone), silent and ", switching" or "")
     if not silent then Print(L["Zone focus off: previous quests are back in the tracker."]) end
 end
 
@@ -91,6 +92,7 @@ local function ZoneFocusOn()
         end
     end
     QuestFocusDB.zoneFocus = zf
+    NS.Debug("zone", "focus on %s: %d kept, %d hidden", tostring(zone), kept, hidden)
     Print(L["Zone focus: |cffffff00%s|r (%d quests kept, %d hidden). Turn off: same button / /ak zone"],
         zone or "?", kept, hidden)
 end
@@ -151,10 +153,15 @@ local function MaybeAskZone()
         if zf.zone == zone then return end
         local here = QuestsHere(zone)
         -- itt nincs questunk: a fokusz marad (kulonben ures lenne a tracker)
-        if here == 0 then return end
-        if QuestFocusDB.zoneAutoFollow then ZoneFocusOn() return end
-        if askedZone[zone] then return end
-        if InCombatLockdown() then state.askZoneAfterCombat = true return end
+        if here == 0 then NS.Debug("zone", "entered %s: no quests here, focus stays on %s", zone, tostring(zf.zone)) return end
+        if QuestFocusDB.zoneAutoFollow then NS.Debug("zone", "entered %s: auto follow", zone) ZoneFocusOn() return end
+        if askedZone[zone] then NS.Debug("zone", "entered %s: already asked this session", zone) return end
+        if InCombatLockdown() then
+            NS.Debug("zone", "entered %s: in combat, ask after combat", zone)
+            state.askZoneAfterCombat = true
+            return
+        end
+        NS.Debug("zone", "entered %s (%d quests): ask to switch from %s", zone, here, tostring(zf.zone))
         askedZone[zone] = true
         StaticPopup_Hide("QUESTFOCUS_ZONEFOCUS")
         -- 3 parameter kell a szovegbe, a StaticPopup csak 2-t ad at: elore formazzuk
@@ -162,10 +169,18 @@ local function MaybeAskZone()
         StaticPopup_Show("QUESTFOCUS_ZONESWITCH")
         return
     end
-    if QuestFocusDB.noZonePrompt or askedZone[zone] then return end
+    if QuestFocusDB.noZonePrompt or askedZone[zone] then
+        NS.Debug("zone", "entered %s: no question (%s)", zone, QuestFocusDB.noZonePrompt and "question off" or "already asked")
+        return
+    end
     local here, other = QuestsHere(zone)
     -- csak ha van itt quest, es van mas is, amit el lehetne rejteni
-    if here == 0 or other == 0 then return end
+    if here == 0 or other == 0 then
+        NS.Debug("zone", "entered %s: no question (%d quests here, %d elsewhere)", zone, here, other)
+        return
+    end
+    NS.Debug("zone", "entered %s: ask to focus (%d here, %d elsewhere)%s", zone, here, other,
+        InCombatLockdown() and ", after combat" or "")
     if InCombatLockdown() then
         state.askZoneAfterCombat = true
         return

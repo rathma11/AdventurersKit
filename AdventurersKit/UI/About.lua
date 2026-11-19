@@ -66,6 +66,7 @@ local FEATURES = {
         L["Per-character settings: buffs, skipped quests, dungeon prep and the farm session are kept per character."],
         L["Profile export / import: your settings as text to share (/ak export, /ak import)."],
         L["Self test: /ak selftest checks your live data and prints one summary line."],
+        L["Debug sections: every feature has its own snapshot and an optional decision log; Options > Debug copies one section or all of them for a bug report (/ak debug <section>, /ak copy <section>)."],
     } },
 }
 
@@ -81,7 +82,9 @@ local COMMANDS = {
     { "/ak bags | junk", L["quest item list, destroy leftover quest items"] },
     { "/ak export | import", L["share settings"] },
     { "/ak notes", L["release notes"] },
-    { "/ak selftest | debug | copy", L["self test and diagnostics"] },
+    { "/ak selftest", L["self test"] },
+    { "/ak debug [section [on | off]]", L["debug snapshot in chat, a section's log on / off"] },
+    { "/ak copy [section | all]", L["debug text to copy for a bug report"] },
 }
 
 local page = NS.AddOptionsTab(L["About"], 85)

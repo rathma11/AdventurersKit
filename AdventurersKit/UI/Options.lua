@@ -2,7 +2,7 @@ local ADDON_NAME, NS = ...
 local L = NS.L
 NS.C = NS.C or {}
 local C = NS.C
-local arrow, DebugLines, Panel_Update, Print, state, ToggleZoneFocus, UpdateMacro = C.arrow, C.DebugLines, C.Panel_Update, C.Print, C.state, C.ToggleZoneFocus, C.UpdateMacro
+local arrow, Panel_Update, Print, state, ToggleZoneFocus, UpdateMacro = C.arrow, C.Panel_Update, C.Print, C.state, C.ToggleZoneFocus, C.UpdateMacro
 local UseOwnArrow = C.UseOwnArrow
 local ApplyMacro, BuildMacroBody, IconId = C.ApplyMacro, C.BuildMacroBody, C.IconId
 
@@ -11,7 +11,7 @@ local ApplyMacro, BuildMacroBody, IconId = C.ApplyMacro, C.BuildMacroBody, C.Ico
 -- Bal oldalon fuggoleges fulek feature-onkent (sorrend: order), jobb oldalon a
 -- gorgetheto oldal. Minden kapcsolo alatt rovid, szurke leiras.
 -- Oldal sorrend:  10 General · 20 Macro & marker · 30 Route & progress · 40 Quest pickup · 45 City list
---                 50 Zone focus · 60 Bags (modul) · 70 Buffs (modul) · 90 Debug
+--                 50 Zone focus · 60 Bags (modul) · 70 Buffs (modul) · 90 Debug (UIDebugTab.lua)
 ---------------------------------------------------------------------------
 local function RebuildMacro()
     state.lastBody = nil
@@ -795,120 +795,6 @@ zon:Check(L["Switch without asking (focus on)"],
     function(v) QuestFocusDB.zoneAutoFollow = v end)
 pageZone:HookScript("OnShow", function() zon:Refresh() end)
 
----------------------------------------------------------------------------
--- 90 Debug (sajat gorgetes)
----------------------------------------------------------------------------
-local pageDebug = AddOptionsTab("Debug", 90, { noScroll = true })
-local dbgScroll = CreateFrame("ScrollFrame", nil, pageDebug, "UIPanelScrollFrameTemplate")
-dbgScroll:SetPoint("TOPLEFT", 0, -128)
-dbgScroll:SetPoint("BOTTOMRIGHT", -26, 0)
-local dbgChild = CreateFrame("Frame", nil, dbgScroll)
-dbgChild:SetSize(460, 400)
-dbgScroll:SetScrollChild(dbgChild)
-local dbgText = dbgChild:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-dbgText:SetPoint("TOPLEFT")
-dbgText:SetWidth(460)
-dbgText:SetJustifyH("LEFT")
-dbgText:SetJustifyV("TOP")
-local function RefreshDebug()
-    dbgText:SetText(table.concat(DebugLines(), "\n"))
-    dbgChild:SetHeight(math.max(400, dbgText:GetStringHeight() + 10))
-end
-local dbgRefresh = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
-dbgRefresh:SetSize(90, 22)
-dbgRefresh:SetPoint("TOPLEFT")
-dbgRefresh:SetText(L["Refresh"])
-dbgRefresh:SetScript("OnClick", RefreshDebug)
-local dbgChat = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
-dbgChat:SetSize(110, 22)
-dbgChat:SetPoint("LEFT", dbgRefresh, "RIGHT", 6, 0)
-dbgChat:SetText(L["Print to chat"])
-dbgChat:SetScript("OnClick", function() for _, l in ipairs(DebugLines()) do Print(l) end end)
--- Masolas: addon nem irhat a vagolapra, ezert egy kijelolheto szovegmezobe tesszuk
--- (mar kijelolve), amibol Ctrl+C-vel ki lehet masolni
-local copyFrame = CreateFrame("Frame", "QuestFocusCopyFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-copyFrame:SetSize(560, 380)
-copyFrame:SetPoint("CENTER")
-copyFrame:SetFrameStrata("FULLSCREEN_DIALOG")
-copyFrame:EnableMouse(true)
-copyFrame:SetMovable(true)
-copyFrame:RegisterForDrag("LeftButton")
-copyFrame:SetScript("OnDragStart", copyFrame.StartMoving)
-copyFrame:SetScript("OnDragStop", copyFrame.StopMovingOrSizing)
-copyFrame:Hide()
-if copyFrame.SetBackdrop then
-    copyFrame:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 16, edgeSize = 20,
-        insets = { left = 5, right = 5, top = 5, bottom = 5 },
-    })
-    copyFrame:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
-    copyFrame:SetBackdropBorderColor(0.95, 0.78, 0.40, 1)
-end
-local copyTitle = copyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-copyTitle:SetPoint("TOPLEFT", 14, -12)
-copyTitle:SetText(L["Adventurer's Kit debug - press Ctrl+C to copy, then Esc"])
-local copyClose = CreateFrame("Button", nil, copyFrame, "UIPanelCloseButton")
-copyClose:SetPoint("TOPRIGHT", -4, -4)
-local copyScroll = CreateFrame("ScrollFrame", "QuestFocusCopyScroll", copyFrame, "UIPanelScrollFrameTemplate")
-copyScroll:SetPoint("TOPLEFT", 14, -36)
-copyScroll:SetPoint("BOTTOMRIGHT", -32, 14)
-local copyBox = CreateFrame("EditBox", nil, copyScroll)
-copyBox:SetMultiLine(true)
-copyBox:SetFontObject(ChatFontNormal)
-copyBox:SetWidth(500)
-copyBox:SetAutoFocus(false)
-copyBox:SetScript("OnEscapePressed", function() copyFrame:Hide() end)
--- csak olvashato: ha atirnad, visszaallitjuk
-copyBox:SetScript("OnTextChanged", function(self, user)
-    if user and self.text then self:SetText(self.text); self:HighlightText() end
-end)
-copyScroll:SetScrollChild(copyBox)
-
-local function PlainText(s)
-    return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""))
-end
-
-local function ShowCopy()
-    local lines = {}
-    for _, l in ipairs(DebugLines()) do lines[#lines + 1] = PlainText(l) end
-    local text = table.concat(lines, "\n")
-    copyBox.text = text
-    copyBox:SetText(text)
-    copyFrame:Show()
-    copyBox:SetFocus()
-    copyBox:HighlightText()
-    copyScroll:SetVerticalScroll(0)
-end
-NS.ShowCopy = ShowCopy
-
-local dbgCopy = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
-dbgCopy:SetSize(70, 22)
-dbgCopy:SetPoint("LEFT", dbgChat, "RIGHT", 6, 0)
-dbgCopy:SetText(L["Copy"])
-dbgCopy:SetScript("OnClick", ShowCopy)
-local dbgClear = CreateFrame("Button", nil, pageDebug, "UIPanelButtonTemplate")
-dbgClear:SetSize(100, 22)
-dbgClear:SetPoint("LEFT", dbgCopy, "RIGHT", 6, 0)
-dbgClear:SetText(L["Clear errors"])
-dbgClear:SetScript("OnClick", function() wipe(NS.errors); RefreshDebug() end)
-
-local cbErrors = OptCheck(L["Lua error popup for Adventurer's Kit errors"],
-    L["Off: our errors don't open the error window, they are only listed here (and one line in chat). "]
-    .. L["On: the normal Lua error window shows them too. Other addons are not affected."],
-    function() return QuestFocusDB.showErrors end,
-    function(v) QuestFocusDB.showErrors = v end, pageDebug)
-cbErrors:SetPoint("TOPLEFT", dbgRefresh, "BOTTOMLEFT", -2, -6)
-local dbgLive = Desc(pageDebug, L["Live: refreshes every 0.5 s while open. Copy: select all text for Ctrl+C."])
-dbgLive:SetPoint("BOTTOMLEFT", dbgScroll, "TOPLEFT", 0, 8)
-local dbgElapsed = 0
-pageDebug:SetScript("OnShow", function() cbErrors.refresh(); RefreshDebug() end)
-pageDebug:SetScript("OnUpdate", function(_, dt)
-    dbgElapsed = dbgElapsed + dt
-    if dbgElapsed > 0.5 then dbgElapsed = 0; RefreshDebug() end
-end)
-
 opt:SetScript("OnShow", function()
     LayoutTabs()
     SelectTab(selectedKey)
@@ -940,4 +826,4 @@ end
 
 -- belso exportok a tobbi core fajlnak
 NS.opt = opt
-NS.C.OpenOptions, NS.C.OptCheck, NS.C.RebuildMacro, NS.C.SetSpell, NS.C.ShowCopy, NS.C.UpdateMinimapButton, NS.C.opt, NS.C.optNote = OpenOptions, OptCheck, RebuildMacro, SetSpell, ShowCopy, UpdateMinimapButton, opt, nil
+NS.C.OpenOptions, NS.C.OptCheck, NS.C.RebuildMacro, NS.C.SetSpell, NS.C.UpdateMinimapButton, NS.C.opt, NS.C.optNote = OpenOptions, OptCheck, RebuildMacro, SetSpell, UpdateMinimapButton, opt, nil

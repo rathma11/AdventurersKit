@@ -58,6 +58,7 @@ local function Undefer(qid)
     if not qid or not t[qid] then return false end
     t[qid] = nil
     order[qid], armed[qid] = nil, nil
+    NS.Debug("quest", "quest %s no longer skipped", tostring(qid))
     return true
 end
 
@@ -170,6 +171,7 @@ NS.NextQuest = function()
     end
     local s = NextStop(Route())
     if not s then
+        NS.Debug("quest", "next: no other quest on the route")
         NS.Print(L["No other quest on the route."])
         return
     end
@@ -179,6 +181,8 @@ NS.NextQuest = function()
         seq = seq + 1
         order[cur], armed[cur] = seq, nil
     end
+    NS.Debug("quest", "next: %s -> %s (%s)%s%s", tostring(cur), tostring(s.qid), tostring(s.title),
+        (cur and cur ~= s.qid) and (", skipped " .. tostring(cur)) or "", s.deferred and ", oldest skipped stop" or "")
     SetAnchor({ qid = s.qid, done = s.done and true or false })
     Select(s.qid, s.title, s.done) -- az OnFocusEnter feloldja, ha atugrott volt
 end
@@ -186,9 +190,11 @@ end
 NS.PrevQuest = function()
     local qid, title, done = PeekBack()
     if not qid then
+        NS.Debug("quest", "back: no earlier quest")
         NS.Print(L["No earlier quest to go back to."])
         return
     end
+    NS.Debug("quest", "back: %s -> %s (%s)", tostring(state.questId), tostring(qid), tostring(title))
     table.remove(history)
     if qid == "farm" then
         NS.Farm.SetView(true)
@@ -201,6 +207,30 @@ end
 
 -- Key Bindings (Bindings.xml az addon gyokereben). A fejlec (QUESTFOCUS) kozos a Bags modul
 -- "Use item" kotesevel: az a mieink utan toltodik, igy ugyanazon "Adventurer's Kit" alatt latszik.
+-- Debug: panel / lepteto / atugrott questek pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("quest", function(out)
+    out[#out + 1] = ("Focus: %s (%s) | complete: %s | objective: %s"):format(tostring(state.title or "-"), tostring(state.questId or "-"),
+        tostring(state.isComplete), tostring(state.objIndex or "all"))
+    local panel = NS.panel
+    out[#out + 1] = ("Panel: shown %s | hidden by you: %s | farm view: %s | prep: %s"):format(
+        tostring(panel and panel:IsShown()), tostring(QuestFocusDB.hidePanel == true),
+        tostring(NS.FarmViewing and NS.FarmViewing() or false), tostring(NS.PrepActive and NS.PrepActive() or "-"))
+    local skipped = {}
+    for qid in pairs(Deferred(false)) do
+        skipped[#skipped + 1] = ("%s%s"):format(tostring(qid), armed[qid] and "*" or "")
+    end
+    table.sort(skipped)
+    out[#out + 1] = "Skipped (* = armed, clears within " .. NEAR_YD .. " yd): " .. (#skipped > 0 and table.concat(skipped, ", ") or "-")
+    local a = Anchor()
+    out[#out + 1] = "Arrow anchor: " .. (a and (tostring(a.qid) .. (a.done and " (turn-in)" or "")) or "-")
+    local h = {}
+    for i = #history, math.max(1, #history - 9), -1 do h[#h + 1] = tostring(history[i]) end
+    out[#out + 1] = "Back history (newest first): " .. (#h > 0 and table.concat(h, ", ") or "-")
+    local s = NextStop(Route())
+    out[#out + 1] = "Next arrow goes to: " .. (s and (tostring(s.title) .. " (" .. tostring(s.qid) .. ")") or "-")
+    out[#out + 1] = ("Log: %d entries | log generation %s"):format(NS.NumLogEntries(), tostring(NS.questLogGen))
+end)
+
 _G.AdventurersKit_NextQuest = function() NS.NextQuest() end
 _G.AdventurersKit_PrevQuest = function() NS.PrevQuest() end
 _G.BINDING_HEADER_QUESTFOCUS = "Adventurer's Kit"
@@ -273,6 +303,7 @@ ev:RegisterEvent("QUEST_LOG_UPDATE")
 ev:SetScript("OnEvent", function(_, event, qid)
     if not QuestFocusDB then return end
     if event == "QUEST_TURNED_IN" then
+        if next(Deferred(false)) ~= nil then NS.Debug("quest", "quest %s turned in: all skips cleared", tostring(qid)) end
         ClearDeferred()
         return
     end
@@ -288,6 +319,7 @@ ev:SetScript("OnEvent", function(_, event, qid)
     if not title then
         SetAnchor(nil) -- mar nincs a logban (leadtad / eldobtad)
     elseif done and not a.done then
+        NS.Debug("quest", "arrow target %s is complete: all skips cleared", tostring(a.qid))
         ClearDeferred()
     end
 end)
@@ -327,6 +359,7 @@ ev:SetScript("OnUpdate", function(_, dt)
             if d > REARM_YD then
                 armed[qid] = true
             elseif d <= NEAR_YD and armed[qid] then
+                NS.Debug("quest", "skipped quest %s (%s) cleared: you are %d yd from it", tostring(qid), tostring(title), d)
                 t[qid], order[qid], armed[qid] = nil, nil, nil
                 changed = true
             end

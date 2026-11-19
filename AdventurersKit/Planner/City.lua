@@ -786,6 +786,7 @@ city.hideBtn:SetPoint("BOTTOMLEFT", city, "BOTTOMLEFT", 12, 12)
 city.hideBtn:SetScript("OnClick", function()
     NS.CharDB().cityHideUntil = time() + HIDE_SECS
     city.closedHere = true
+    city.hideWhy = "hidden for 20 min"
     city:Hide()
     NS.Loud(NS.Print, L["City list hidden for 20 minutes. The town icon on the panel or /ak city still opens it."])
 end)
@@ -942,14 +943,30 @@ city:SetScript("OnUpdate", function(_, dt)
     cityElapsed = cityElapsed + dt
     if cityElapsed < 5 then return end
     cityElapsed = 0
-    if not InCity() and not city.forced then city:Hide() return end
+    if not InCity() and not city.forced then city.hideWhy = "left town"; city:Hide() return end
     -- optimalizalas: csak ha mozogtal (15 yd) vagy valtozott a quest log
     local moved = NS.Moved and NS.Moved("city", 15)
     if NS.Moved and not moved and cityGen == NS.questLogGen then return end
     cityGen = NS.questLogGen
     if not city:IsMouseOver() then RefreshCityList() end
 end)
-city:HookScript("OnHide", function() city.forced = nil end)
+city:HookScript("OnHide", function()
+    NS.Debug("city", "city list closed: %s", city.hideWhy or "closed (X / Esc / no Questie / no data)")
+    city.hideWhy = nil
+    city.forced = nil
+end)
+city:HookScript("OnShow", function()
+    NS.Debug("city", "city list opened: %s", city.forced and "by you (panel icon / /ak city)" or "automatically in town")
+end)
+-- miert vagy (nem) telepulesen: debug szoveg
+local function InCityWhy()
+    if UnitOnTaxi and UnitOnTaxi("player") then return "no (on a taxi)" end
+    if NearInn() then return ("yes (innkeeper within %d yd)"):format(INN_R) end
+    if IsResting and IsResting() then
+        return SleepingBagRest() and "no (resting from a sleeping bag)" or "yes (resting area)"
+    end
+    return "no (not resting, no innkeeper nearby)"
+end
 -- Panel ikon / /ak city: kezzel nyitva (telepulesen kivul is, es akkor is, ha magatol nem
 -- nyilik). Kezzel nyitva kint marad, amig be nem zarod (a telepulest elhagyva is).
 NS.ShowCityList = function()
@@ -965,6 +982,7 @@ NS.CityListShown = function() return city:IsShown() end
 NS.ToggleCityList = function()
     if city:IsShown() then
         city.closedHere = true
+        city.hideWhy = "toggled off by you"
         city:Hide()
     else
         NS.ShowCityList()
@@ -995,9 +1013,14 @@ cityRetry:SetScript("OnUpdate", function(_, dt)
     local inNow = InCity() and true or false
     if inNow ~= city.wasIn then
         city.wasIn = inNow
+        if NS.DebugOn("city") then
+            NS.Debug("city", "in town: %s%s", InCityWhy(), inNow and (AutoOpen() and ", auto open on"
+                or (", auto open off (%s)"):format(QuestFocusDB.noCityMode and "city list off" or QuestFocusDB.cityNoAuto
+                    and "auto open setting off" or "hidden for 20 min")) or "")
+        end
         if not inNow then
             city.closedHere = nil -- kovetkezo telepulesen ujra feljon
-            if not city.forced then city:Hide() end
+            if not city.forced then city.hideWhy = "left town"; city:Hide() end
         end
         NS.Panel_Update()
     end
@@ -1036,3 +1059,24 @@ qpopTicker:SetScript("OnUpdate", function(_, dt)
     end
 end)
 
+-- Debug: varos lista pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("city", function(out)
+    out[#out + 1] = "In town: " .. InCityWhy()
+    local hu = HiddenUntil()
+    out[#out + 1] = ("City list: %s | shown %s | opened by you %s | closed here %s | auto open %s%s"):format(
+        QuestFocusDB.noCityMode and "off" or "on", tostring(city:IsShown()), tostring(city.forced == true),
+        tostring(city.closedHere == true), tostring(AutoOpen() and true or false),
+        hu and (" | hidden for %d more min"):format(math.ceil((hu - time()) / 60)) or "")
+    local free, total = BagSlots()
+    out[#out + 1] = ("Bags: %d free of %d | limits: bag %d%% / %d free, repair %d%%, ammo %d"):format(free, total,
+        NS.CityLimit("bagPct"), NS.CityLimit("bagFree"), NS.CityLimit("repair"), NS.CityLimit("ammo"))
+    local ok, needs = pcall(CityNeeds)
+    if ok then
+        out[#out + 1] = ("Errands: %d"):format(#needs)
+        for _, e in ipairs(needs) do
+            out[#out + 1] = ("  %s: %s%s"):format(e.kind, e.text, e.dist and (" | nearest %d yd"):format(e.dist) or " | no NPC known")
+        end
+    else
+        out[#out + 1] = "Errands: error " .. tostring(needs)
+    end
+end)

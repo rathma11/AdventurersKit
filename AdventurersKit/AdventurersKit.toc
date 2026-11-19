@@ -3,7 +3,7 @@
 ## IconTexture: Interface\AddOns\AdventurersKit\Media\icon
 ## Notes: Questing kit for WoW: Forever, built on Questie: one-key quest mob targeting (AKit macro), markers, route and travel planner, city errands, dungeon prep, buff reminder, farm session
 ## Author: kissd
-## Version: 0.10.1
+## Version: 0.11.0
 ## X-License: GPL-3.0-or-later
 ## X-Category: Quests & Leveling
 # X-Curse-Project-ID: fill in the CurseForge project ID, then remove the leading "#": ## X-Curse-Project-ID: 000000
@@ -13,6 +13,7 @@
 # Alap (core)
 Core\Locales.lua
 UI\Style.lua
+Core\DebugLog.lua
 Core\Init.lua
 Core\Prices.lua
 Core\Questie.lua
@@ -26,6 +27,7 @@ Core\Events.lua
 Core\ZoneFocus.lua
 Core\Debug.lua
 UI\Options.lua
+UI\DebugTab.lua
 UI\PingAsk.lua
 Core\Slash.lua
 

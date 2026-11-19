@@ -79,6 +79,7 @@ The same list is in game under Options > About. Changes per version: `Adventurer
 - **Per-character settings:** buffs, skipped quests, dungeon prep and the farm session are kept per character.
 - **Profile export / import:** your settings as text to share (`/ak export`, `/ak import`).
 - **Self test:** `/ak selftest` checks your live data and prints one summary line.
+- **Debug sections:** every feature has its own debug section (General, Targeting / AKit macro, Markers, Route & travel, Quest panel, City list, Dungeon prep, Escort, Buffs, Bags, Farm session, AH quest items, Zone focus): a snapshot of what it sees, plus an optional log of its decisions (last 200 lines, a switch per section). Options > Debug copies one section or all of them for a bug report.
 
 ## Main commands
 
@@ -95,4 +96,6 @@ The same list is in game under Options > About. Changes per version: `Adventurer
 | `/ak bags \| junk` | quest item list, destroy leftover quest items |
 | `/ak export \| import` | share settings |
 | `/ak notes` | release notes |
-| `/ak selftest \| debug \| copy` | self test and diagnostics |
+| `/ak selftest` | self test |
+| `/ak debug [section [on \| off]]` | debug snapshot in chat; a section's log on / off (`/ak debug list`: section keys) |
+| `/ak copy [section \| all]` | debug text to copy for a bug report |

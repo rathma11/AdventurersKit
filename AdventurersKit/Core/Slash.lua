@@ -29,8 +29,44 @@ local function SlashHandler(msg)
         OpenOptions()
     elseif msg == "debug" then
         for _, l in ipairs(DebugLines()) do Print(l) end
-    elseif msg == "copy" then
-        ShowCopy()
+    elseif msg:match("^debug%s") then
+        -- /ak debug <szekcio> [on | off | clear]; /ak debug list (Core\DebugLog.lua)
+        local word, sw = msg:match("^debug%s+(%S+)%s*(%S*)")
+        local key = NS.DebugKey(word)
+        if word == "list" or word == "help" or not key then
+            if word ~= "list" and word ~= "help" then Print(L["Unknown debug section: %s"], tostring(word)) end
+            Print(L["Debug sections: %s"], NS.DebugKeyList())
+            Print(L["  /ak debug <section> - snapshot + last log lines; /ak debug <section> on | off | clear - its log"])
+            return
+        end
+        local title = L[NS.DebugSection(key).title]
+        if sw == "on" or sw == "off" then
+            NS.SetDebugOn(key, sw == "on")
+            NS.Debug(key, "log switched on")
+            Print(L["Debug log %s: %s"], title, sw == "on" and L["on"] or L["off"])
+            return
+        elseif sw == "clear" then
+            NS.DebugClear(key)
+            Print(L["Debug log %s: cleared"], title)
+            return
+        end
+        Print("|cffffff00%s|r [%s]", title, key)
+        for _, l in ipairs(NS.DebugSnapshotLines(key)) do Print(l) end
+        local log = NS.DebugLogLines(key)
+        Print(L["Log: %s, %d lines%s"], NS.DebugOn(key) and L["on"] or L["off"], #log,
+            #log > 10 and L[" (last 10; /ak copy for all)"] or "")
+        for i = math.max(1, #log - 9), #log do Print("  " .. log[i]) end
+    elseif msg == "copy" or msg:match("^copy%s") then
+        -- /ak copy: targeting; /ak copy <szekcio> | all
+        local word = msg:match("^copy%s+(%S+)")
+        if word == "all" then ShowCopy("all") return end
+        local key = word and NS.DebugKey(word)
+        if word and not key then
+            Print(L["Unknown debug section: %s"], word)
+            Print(L["Debug sections: %s"], NS.DebugKeyList())
+            return
+        end
+        ShowCopy(key)
     elseif msg == "zone" then
         ToggleZoneFocus()
     elseif msg == "bags" then
@@ -134,7 +170,9 @@ local function SlashHandler(msg)
         Print(L["  /ak minimap - toggle minimap button"])
         Print(L["  /ak bags - toggle quest item list next to the bags"])
         Print(L["  /ak junk - destroy unsellable leftover quest items (asks one by one)"])
-        Print(L["  /ak debug - diagnostics to chat"])
+        Print(L["  /ak debug - targeting diagnostics to chat; /ak debug <section> [on | off] - a section's snapshot / log"])
+        Print(L["  /ak copy <section> | all - debug text to copy (Options > Debug)"])
+        Print(L["    sections: %s"], NS.DebugKeyList())
         Print(L["  /ak spell <name> - tag spell in the macro; /ak spell - clear; /ak spell off - disable"])
         Print(L["  /ak next - next objective (marker + macro)"])
         Print(L["  /ak all - macro for mobs of all remaining objectives"])

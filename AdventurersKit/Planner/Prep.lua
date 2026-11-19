@@ -235,6 +235,8 @@ local function MarkRow(r, quiet)
         return
     end
     local title = r.kind == "entrance" and (L["%s entrance"]):format(r.name or "?") or (r.giver or r.name)
+    NS.Debug("prep", "marker -> %s (%s%s)", tostring(title), r.kind == "entrance" and "entrance" or ("quest " .. tostring(r.qid)),
+        prep.sel and ", your pick" or "")
     NS.SetWaypoint(r.point, title)
     prep.markedKey = RowKey(r)
     if quiet then return end
@@ -683,6 +685,7 @@ NS.StartPrep = function(name, restoring)
     end
     lastBody = nil
     Build()
+    NS.Debug("prep", "start %s%s: %d row(s)", tostring(name), restoring and " (restored after login)" or "", #prep.rows)
     MarkRow(Target(), restoring)
     PrepMacro()
     if NS.Panel_Update then NS.Panel_Update() end
@@ -699,6 +702,7 @@ end
 NS.StopPrep = function(quiet, restore)
     if not prep.dungeon then return end
     local old = prep.dungeon
+    NS.Debug("prep", "stop %s%s", tostring(old), restore and " (back to the previous quest)" or "")
     local c1 = CharDB()
     local prev = c1 and rawget(c1, "prepPrev")
     if c1 and QuestFocusDB then c1.prepPrev = nil end
@@ -746,9 +750,11 @@ end
 NS.PrepBlocksSelect = function(mark)
     if not prep.dungeon then return false end
     if mark and GetTime() - acceptedAt > 2 then
+        NS.Debug("prep", "you clicked a quest: prep ends")
         NS.StopPrep(true)
         return false
     end
+    NS.Debug("prep", "automatic quest focus blocked (prep mode)%s", mark and ", quest just accepted" or "")
     return true
 end
 
@@ -791,4 +797,29 @@ login:SetScript("OnEvent", function()
     C_Timer.After(9, function()
         if prep.dungeon == name then NS.StartPrep(name, true) end
     end)
+end)
+
+-- Debug: dungeon prep pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("prep", function(out)
+    if not prep.dungeon then
+        out[#out + 1] = "Prep: off" .. (Saved() and (" (saved: " .. tostring(Saved()) .. ")") or "")
+        return
+    end
+    local t = Target()
+    out[#out + 1] = ("Prep: %s | target: %s | your pick: %s | marked: %s"):format(prep.dungeon,
+        t and (t.kind == "entrance" and "entrance" or tostring(t.name)) or "-", tostring(prep.sel or "-"), tostring(prep.markedKey or "-"))
+    for _, r in ipairs(prep.rows or {}) do
+        if r.kind == "note" then
+            out[#out + 1] = ("  note: %d quest(s) picked up inside"):format(#(r.list or {}))
+        else
+            out[#out + 1] = ("  %s %s (%s) lvl %s%s%s"):format(r.kind, tostring(r.name), tostring(r.qid), tostring(r.level or "?"),
+                r.giver and (" | giver " .. tostring(r.giver)) or "", r.dist and (" %d yd"):format(r.dist) or (r.point and "" or " | no location"))
+        end
+    end
+    local e = prep.entrance
+    if e then
+        out[#out + 1] = ("  entrance: %s%s"):format(e.point and ("map " .. tostring(e.point.map)) or "no location",
+            e.dist and (" %d yd"):format(e.dist) or "")
+    end
+    out[#out + 1] = "Prep macro: " .. tostring(lastBody and lastBody:gsub("\n", " | ") or "-")
 end)

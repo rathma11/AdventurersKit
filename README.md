@@ -58,7 +58,9 @@ which quest item is in your bags, and how well a farming spot pays.
 | `/ak bags \| junk` | quest item list, destroy leftover quest items |
 | `/ak export \| import` | share settings |
 | `/ak notes` | release notes |
-| `/ak selftest \| debug \| copy` | self test and diagnostics |
+| `/ak selftest` | self test |
+| `/ak debug [section [on \| off]]` | debug snapshot in chat; a section's log on / off |
+| `/ak copy [section \| all]` | debug text to copy for a bug report |
 
 `/qf` works as an alias of `/ak`.
 

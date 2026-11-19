@@ -57,6 +57,7 @@ A tisztább megoldás egy hordozható Lua 5.1: a LuaBinaries `lua-5.1.5_Win64_bi
     - az utazási útvonal (Dijkstra);
     - a TomTom opcionális;
     - egy sor eseményre és a slash parancsokra nincs Lua hiba;
+    - a debug szekciók: a gyűrű puffer (utolsó N sor, ismétlés összevonva), a szekció lista és minden pillanatkép hiba nélkül, a kapcsoló (kikapcsolva semmi nem kerül a naplóba, az argumentumokat se formázza), a `/ak debug` / `/ak copy` parancsok és a másoló ablak (`-v`: kiírja a „Copy all” szövegét is);
     - a tooltipek;
     - minden `L["..."]` kulcsnak van értéke.
 

@@ -552,6 +552,8 @@ local function Enter()
     NS.ClearWaypoint() -- a bejarat markere itt mar nem kell
     Build()
     local nx = NextRow()
+    NS.Debug("prep", "entered the instance (area %s): %d quest row(s), map arrow: %s", tostring(ins.areaId), #ins.rows,
+        tostring(ins.hasArrow and true or false))
     UpdateMarker(nx)
     NS.Loud(NS.Print, L["In %s: %d quest rows. %s"], NS.PrepActive() or "?", #ins.rows,
         ins.hasArrow and "" or L["No map position inside the instance: no arrow, follow the Next hint."])
@@ -565,6 +567,7 @@ local function Leave()
     ins.on = false
     if NS.PrepShareHide then NS.PrepShareHide() end
     NS.HidePrepInside()
+    NS.Debug("prep", "left the instance: %s", (ins.hadWork and not ins.active) and "all done, prep ends" or "back to the prep list")
     if ins.hadWork and not ins.active then
         NS.StopPrep(true, true)
     elseif NS.PrepRefresh then
@@ -610,3 +613,11 @@ if NS.OnQuestChange then
         if ins.on then C_Timer.After(1.5, Update) end
     end)
 end
+
+-- Debug: dungeon prep belso fazis (Core\DebugLog.lua; a kulso resz: Planner\Prep.lua)
+NS.DebugSnapshot("prep", function(out)
+    if not (NS.PrepActive and NS.PrepActive()) then return end
+    out[#out + 1] = ("Inside: %s | area %s | rows %d | map arrow %s | had work %s | work left %s"):format(tostring(ins.on),
+        tostring(ins.areaId), #(ins.rows or {}), tostring(ins.hasArrow and true or false), tostring(ins.hadWork),
+        tostring(ins.active and true or false))
+end)

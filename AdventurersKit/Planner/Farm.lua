@@ -264,6 +264,7 @@ function F.OnXP()
         d = cur - fd.lastXP
     end
     if not fd.paused and d > 0 then fd.xp = (fd.xp or 0) + d end
+    if d ~= 0 then NS.Debug("farm", "xp %+d%s (total %d)", d, fd.paused and " ignored: paused" or "", fd.xp or 0) end
     fd.lastXP, fd.lastMax = cur, max
 end
 
@@ -272,13 +273,18 @@ function F.OnMoneyMsg(msg)
     if not (fd and fd.running) or fd.paused then return end
     local c = F.ParseMoney(msg)
     if c > 0 then fd.money = (fd.money or 0) + c end
+    NS.Debug("farm", "money %s -> %d copper (looted total %d)", tostring(msg), c, fd.money or 0)
 end
 
 function F.OnLootMsg(msg)
     local fd = DB()
     if not (fd and fd.running) or fd.paused then return end
     local id, link, n = F.ParseLoot(msg)
-    if not id then return end
+    if not id then
+        if NS.DebugOn("farm") then NS.Debug("farm", "loot line not mine / not parsed: %s", NS.DebugPlain(tostring(msg))) end
+        return
+    end
+    NS.Debug("farm", "loot item %s x%d", tostring(id), n or 0)
     fd.items = fd.items or {}
     local rec = fd.items[id]
     if not rec then rec = {}; fd.items[id] = rec end
@@ -300,7 +306,8 @@ function F.OnKillMsg(msg)
     local fd = DB()
     if not (fd and fd.running) or fd.paused or type(msg) ~= "string" then return end
     local name = msg:match("^(.-) dies")
-    if not name or name == "" then return end
+    if not name or name == "" then NS.Debug("farm", "xp line, not a kill: %s", msg) return end
+    NS.Debug("farm", "kill %s: %s", name, msg)
     fd.kills = fd.kills or {}
     fd.kills[name] = (fd.kills[name] or 0) + 1
     fd.killCount = (fd.killCount or 0) + 1
@@ -987,6 +994,7 @@ function F.Start()
         moneyStart = GetMoney() or 0, started = time and time() or 0, startLevel = UnitLevel("player") or 1 }
     BaselineXP(fd)
     rawset(c, "farm", fd)
+    NS.Debug("farm", "session started (level %d, money %d)", fd.startLevel, fd.moneyStart)
     F.ResetSamples()
     lastTick = GetTime()
     if QuestFocusDB then QuestFocusDB.hidePanel = false end
@@ -1000,6 +1008,7 @@ function F.Stop()
     local fd = DB()
     if not (fd and fd.running) then NS.Print(L["No farm session is running."]) return end
     Accumulate()
+    NS.Debug("farm", "session stopped: %s", NS.DebugPlain(F.ChatLine(fd)))
     NS.Print(F.ChatLine(fd))
     fd.running, fd.view = false, nil
     EnsureTicker()
@@ -1013,6 +1022,7 @@ function F.TogglePause()
     if not (fd and fd.running) then return end
     Accumulate()
     fd.paused = not fd.paused or nil
+    NS.Debug("farm", "session %s at %d s", fd.paused and "paused" or "resumed", math.floor(fd.elapsed or 0))
     if not fd.paused then BaselineXP(fd) end -- szunet alatti XP nem szamit
     lastTick = GetTime()
     NS.Print(fd.paused and L["Farm session paused."] or L["Farm session resumed."])
@@ -1083,4 +1093,24 @@ ev:SetScript("OnEvent", function(_, event, a1)
     elseif event == "PLAYER_LOGOUT" then
         Accumulate()
     end
+end)
+
+-- Debug: farm session pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("farm", function(out)
+    local fd = DB()
+    if not fd then out[#out + 1] = "Farm session: none" return end
+    out[#out + 1] = ("Farm session: %s%s | view %s | elapsed %d s | started level %s"):format(fd.running and "running" or "stopped",
+        fd.paused and " (paused)" or "", tostring((F.Viewing())), math.floor(fd.elapsed or 0), tostring(fd.startLevel))
+    local t = F.Totals(fd)
+    if t then
+        out[#out + 1] = ("XP %d (rested %d, kills %d) | money %d | vendor %d | best %d | items %d (pending price %d, AH %d, vendor fallback %d)"):format(
+            t.xp, t.rested or 0, fd.killXP or 0, t.money, t.vendor, t.best, #t.items, t.pending, t.ahItems, t.fallback)
+        out[#out + 1] = ("Per hour: xp %s | gold %s | best %s | net money %s | price source %s"):format(tostring(t.xpH and math.floor(t.xpH) or "-"),
+            tostring(t.goldH and math.floor(t.goldH) or "-"), tostring(t.bestH and math.floor(t.bestH) or "-"), tostring(t.net), tostring((F.AHSource()) or "vendor only"))
+        for i, it in ipairs(t.items) do
+            if i > 10 then out[#out + 1] = "  ..." break end
+            out[#out + 1] = ("  %s x%d vendor %d best %d (%s)"):format(NS.DebugPlain(it.link), it.n or 0, it.vendor or 0, it.best or 0, tostring(it.src or "-"))
+        end
+    end
+    out[#out + 1] = ("Kills: %d | XP samples: %d"):format(fd.killCount or 0, #xpSamples)
 end)

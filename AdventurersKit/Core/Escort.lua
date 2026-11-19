@@ -198,8 +198,11 @@ local function TryMark(unit)
     local guid = UnitGUID(unit)
     if not guid or iconDone[guid] then return end
     if GetRaidTargetIndex(unit) then iconDone[guid] = true return end -- mar van rajta ikon
-    if not CanMark() then return end
-    if pcall(SetRaidTarget, unit, ICON_STAR) then iconDone[guid] = true end
+    if not CanMark() then NS.Debug("escort", "no star icon: not raid leader / assistant") return end
+    if pcall(SetRaidTarget, unit, ICON_STAR) then
+        iconDone[guid] = true
+        NS.Debug("escort", "star icon on %s (%s)", tostring(UnitName(unit)), unit)
+    end
 end
 
 local function Observe(unit, info)
@@ -242,6 +245,7 @@ ticker:SetScript("OnUpdate", function(_, dt)
     if live.dead then return end
     if live.hp and live.hp <= LOW_PCT and not warned then
         warned = true
+        NS.Debug("escort", "low health warning: %s at %d%%", tostring(info.name), live.hp)
         local msg = (L["Escort %s is low: %d%%!"]):format(info.name, live.hp)
         if UIErrorsFrame then UIErrorsFrame:AddMessage(msg, 1, 0.2, 0.2) end
         if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
@@ -272,8 +276,11 @@ local function Decorate(objectives)
     if prevQid ~= info.qid then
         live.hp, live.seen, live.guid, live.attacker, live.dead = nil, 0, nil, nil, false
         warned = false
+        NS.Debug("escort", "escort quest %s: NPC %s (id %s), giver %s, %d end point(s)", tostring(info.qid), tostring(info.name),
+            tostring(info.npcId or "?"), tostring(info.giver and info.giver.name), info.dest and #info.dest or 0)
     end
     local failed = QuestFailed(info.qid)
+    if failed and not prevFailed then NS.Debug("escort", "escort %s failed: macro + marker on the quest giver", tostring(info.qid)) end
     state.escortFailed = failed or nil
     if failed then
         local giver = info.giver
@@ -396,3 +403,21 @@ NS.Escort = {
     FooterText = FooterText, NameFromText = NameFromText, LooksEscort = LooksEscort,
     IsEscortUnit = IsEscortUnit, Observe = Observe,
 }
+
+-- Debug: escort pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("escort", function(out)
+    local qid = state.questId
+    local info = qid and EscortInfo(qid)
+    if not info then
+        out[#out + 1] = ("Escort: no (focused quest %s is not an escort%s)"):format(tostring(qid or "-"),
+            state.isComplete and ", or it is ready to turn in" or "")
+        return
+    end
+    out[#out + 1] = ("Escort quest %s: NPC %s (id %s) | failed: %s | star icon: %s"):format(tostring(info.qid), tostring(info.name),
+        tostring(info.npcId or "?"), tostring(state.escortFailed == true), (QuestFocusDB.noEscortIcon and "off") or (CanMark() and "on" or "no rights"))
+    out[#out + 1] = ("Giver: %s | end points: %d | text: %s"):format(tostring(info.giver and info.giver.name), info.dest and #info.dest or 0,
+        tostring(info.text or "-"))
+    out[#out + 1] = ("Seen: %s | hp %s%% | dead %s | attacker %s"):format(
+        live.seen > 0 and ("%.0f s ago"):format(GetTime() - live.seen) or "never", tostring(live.hp or "?"), tostring(live.dead),
+        tostring(live.attacker or "-"))
+end)

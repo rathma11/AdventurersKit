@@ -64,6 +64,12 @@ local function PickNameplate()
     -- Ha a kozelben csak tapolt/halott quest mob van: "busy" -> a macro nem targetel semmit
     if not pick and seenBad then pick = "busy" end
     if state.pick ~= pick then
+        if NS.DebugOn("target") then
+            NS.Debug("target", "pick %s -> %s%s", tostring(state.pick), tostring(pick),
+                (pick and pick ~= "busy") and (" (" .. tostring(UnitName(pick)) .. (UnitIsUnit(pick, "target") and ", current target"
+                    or UnitAffectingCombat(pick) and ", in combat" or ", idle") .. ")")
+                    or pick == "busy" and " (every visible quest mob is dead or tapped)" or " (no quest mob nameplate)")
+        end
         state.pick = pick
         if state.questId and UpdateMacro then UpdateMacro() end
     end
@@ -254,6 +260,7 @@ NS.MacroIconName, NS.MacroIconDefaults, NS.CurrentIconKind = MacroIconName, ICON
 
 local function ApplyMacro(body)
     if InCombatLockdown() then
+        NS.Debug("target", "macro write deferred: in combat")
         if not state.pendingBody then Print(L["You are in combat, the AKit macro will update after combat."]) end
         state.pendingBody = body
         return
@@ -283,7 +290,15 @@ end
 UpdateMacro = function()
     local body, n = BuildMacroBody(state.objectives, state.objIndex)
     state.macroCount = n
-    if body ~= state.lastBody or state.pendingBody or CurrentIcon() ~= state.lastIcon then ApplyMacro(body) end
+    if body ~= state.lastBody or state.pendingBody or CurrentIcon() ~= state.lastIcon then
+        if NS.DebugOn("target") then
+            local first = body:match("^[^\n]*")
+            NS.Debug("target", "macro rebuilt (%s): %d mob(s), first line '%s', ping: %s",
+                body ~= state.lastBody and "body changed" or state.pendingBody and "pending after combat" or "icon changed",
+                n or 0, first, tostring(state.pingWhy))
+        end
+        ApplyMacro(body)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -351,6 +366,8 @@ end
 ---------------------------------------------------------------------------
 local function SetWaypoint(p, title)
     state.waypoint = { map = p.map, x = p.x, y = p.y, title = title, wc = p.wc, wx = p.wx, wy = p.wy }
+    NS.Debug("marker", "set: %s at map %s %.1f, %.1f (%s)", tostring(title), tostring(p.map), p.x or 0, p.y or 0,
+        (TomTom and TomTom.AddWaypoint) and "TomTom" or UseOwnArrow() and "own arrow" or "map pin only")
 
     if TomTom and TomTom.AddWaypoint then
         if state.tomtomUid and TomTom.RemoveWaypoint then pcall(TomTom.RemoveWaypoint, TomTom, state.tomtomUid) end
@@ -377,6 +394,7 @@ end
 
 -- Minden altalunk lerakott marker torlese (TomTom, beepitett map pin, sajat nyil)
 local function ClearWaypoint()
+    if state.waypoint then NS.Debug("marker", "cleared (%s)", tostring(state.waypoint.title)) end
     state.waypoint = nil
     arrow:Hide()
     if state.tomtomUid and TomTom and TomTom.RemoveWaypoint then
@@ -408,16 +426,21 @@ local function MarkObjective(i, nextSpawn)
         for _, s in ipairs(o.sources) do sources[#sources + 1] = s end
     end
     if #sources == 0 then
+        NS.Debug("marker", "mark objective %s: no sources (%s)", tostring(i or "all"), tostring(state.title))
         Print(L["No known location for: %s"], state.title or "?")
         return
     end
     local p, dist, inArea = FindSpawnTarget(sources, nextSpawn)
     if not p then
+        NS.Debug("marker", "mark objective %s: %d sources, no coordinates", tostring(i or "all"), #sources)
         Print(L["No coordinates found (it may be inside an instance)."])
         return
     end
     -- Mob objective-nel, ha mar a teruleten vagy, nem kuldunk tovabb (leadasnal mindig jelolunk)
     local isTurnIn = list[1] and list[1].turnIn
+    NS.Debug("marker", "mark objective %s%s: %d sources -> %s %s yd%s%s", tostring(i or "all"),
+        nextSpawn and " (next spawn)" or "", #sources, tostring(p.name), tostring(dist and math.floor(dist) or "?"),
+        inArea and ", in the spawn area" or "", isTurnIn and ", turn-in" or "")
     if inArea and not isTurnIn then
         ClearWaypoint()
         Print(L["You are in the spawn area of |cffffff00%s|r, no marker needed (nearest spawn %d yd)."], p.name or "?", dist or 0)
@@ -467,6 +490,8 @@ hopper:SetScript("OnUpdate", function(_, dt)
     arriveAt = arriveAt or GetTime()
     if GetTime() - arriveAt < ARRIVE_T then return end
     arriveAt = nil
+    NS.Debug("marker", "spawn point %s: stood %d s within %d yd, no living %s nameplate -> visited, next spawn",
+        tostring(w.title), ARRIVE_T, ARRIVE_R, tostring(w.title))
     if NS.MarkSpawnVisited then NS.MarkSpawnVisited(w) end
     MarkObjective(w.objIndex, true)
 end)
@@ -541,6 +566,34 @@ local function ShowObjectiveOnMap(i)
     if wm.SetMapID then pcall(wm.SetMapID, wm, p.map) end
 end
 NS.ShowObjectiveOnMap = ShowObjectiveOnMap
+
+-- Debug: marker / nyil / spawn pillanatkep (Core\DebugLog.lua)
+NS.DebugSnapshot("marker", function(out)
+    local w = state.waypoint
+    if w then
+        out[#out + 1] = ("Marker: %s | map %s %.1f, %.1f | spawn point: %s (objective %s)"):format(tostring(w.title),
+            tostring(w.map), w.x or 0, w.y or 0, w.spawn and "yes" or "no", tostring(w.objIndex or "all"))
+        local pc, px, py = PlayerWorldPos()
+        if pc and w.wc == pc and w.wx then
+            out[#out + 1] = ("Distance: %d yd%s"):format(math.sqrt((w.wx - px) ^ 2 + (w.wy - py) ^ 2),
+                arriveAt and (" | standing here %.0f s"):format(GetTime() - arriveAt) or "")
+        else
+            out[#out + 1] = "Distance: other continent / unknown"
+        end
+    else
+        out[#out + 1] = "Marker: none"
+    end
+    out[#out + 1] = ("Arrow: %s | shown: %s | TomTom: %s (uid %s) | map pin ours: %s"):format(
+        QuestFocusDB.noArrow and "off" or "on", tostring(arrow:IsShown()),
+        (TomTom and TomTom.AddWaypoint) and "yes" or "no", tostring(state.tomtomUid ~= nil),
+        tostring(state.ownsUserWaypoint == true))
+    local objs = state.objectives or {}
+    out[#out + 1] = ("Objectives: %d | selected: %s"):format(#objs, tostring(state.objIndex or "all"))
+    for k, o in ipairs(objs) do
+        out[#out + 1] = ("  %d. %s%s | %d source(s)"):format(k, tostring(o.text or o.desc or "?"),
+            o.completed and " (done)" or "", o.sources and #o.sources or 0)
+    end
+end)
 
 
 -- belso exportok a tobbi core fajlnak

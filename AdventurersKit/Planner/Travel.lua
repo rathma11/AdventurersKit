@@ -31,6 +31,7 @@ local function SaveHearth()
     local wc, wx, wy = NS.PlayerWorldPos()
     if not wc then return end
     QuestFocusDB.hearth = { name = GetBindLocation and GetBindLocation() or "?", wc = wc, wx = wx, wy = wy }
+    NS.Debug("route", "hearthstone position learned: %s", tostring(QuestFocusDB.hearth.name))
 end
 
 local function HearthInfo()
@@ -356,6 +357,12 @@ local function AdviseTravel()
     local r = TravelAdvice(w)
     if not r then return end
     lastAdviceKey = key
+    if NS.DebugOn("route") then
+        NS.Debug("route", "travel advice for %s: best %s (%s) | walk %s | hs %s | fly %s | boat %s", tostring(w.title),
+            tostring(r.best), r.bestTime and FormatTime(r.bestTime) or "?", r.walk and FormatTime(r.walk) or "-",
+            r.hs and FormatTime(r.hs.time) or "-", r.fly and FormatTime(r.fly.time) or "-",
+            r.boat and FormatTime(r.boat.time) or "-")
+    end
     if r.best == "hs" then
         NS.Print(L["Faster: |cff33ff99Hearthstone|r to %s (~%s instead of ~%s on foot)%s"], r.hs.name,
             FormatTime(r.hs.time), r.walk and FormatTime(r.walk) or "?",
