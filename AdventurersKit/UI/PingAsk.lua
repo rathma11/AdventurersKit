@@ -27,125 +27,86 @@ local MODES = {
 }
 NS.PING_MODES = MODES
 
--- Kerdo ablak: ugyanaz a kinezet, mint a panel / buff reminder (sotet hatter, arany keret,
--- narancs csik balra, kis nagybetus fejlec), harom tagolt resz: kerdes, valasz, "legkozelebb".
-local GOLD = { 0.95, 0.78, 0.40 }
-local f = CreateFrame("Frame", "AdventurersKitPingAsk", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-f:SetSize(300, 164)
+-- Kerdo ablak (NS.Style, DESIGN.md): box hatter, narancs csik, kis nagybetus fejlec, X.
+-- Nagy kerdes sor, alatta ket egyforma szeles valasz gomb (Ping = primary), szurke magyarazat,
+-- majd "NEXT TIME I JOIN A GROUP" szekcio egy egyforma szeles, harom reszes valasztoval.
+local S = NS.Style
+local W, PAD = 300, 12
+local f = S.Box("AdventurersKitPingAsk", W, 200, L["AKIT PING"], "DIALOG")
 f:SetPoint("TOP", UIParent, "TOP", 0, -160)
-f:SetFrameStrata("DIALOG")
+f:SetBackdropColor(S.BOX_BG[1], S.BOX_BG[2], S.BOX_BG[3], 0.94) -- dialog: kicsit tomorebb
 f:EnableMouse(true)
 f:SetMovable(true)
 f:SetClampedToScreen(true)
 f:RegisterForDrag("LeftButton")
 f:SetScript("OnDragStart", f.StartMoving)
 f:SetScript("OnDragStop", f.StopMovingOrSizing)
-f:Hide()
-if f.SetBackdrop then
-    f:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    f:SetBackdropColor(0.04, 0.04, 0.06, 0.94)
-    f:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3], 0.9)
-end
-local accent = f:CreateTexture(nil, "ARTWORK")
-accent:SetPoint("TOPLEFT", 4, -4)
-accent:SetPoint("BOTTOMLEFT", 4, 4)
-accent:SetWidth(2)
-accent:SetColorTexture(1, 0.55, 0.25, 1)
 
-local head = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-head:SetPoint("TOPLEFT", 12, -8)
-head:SetTextColor(1, 0.6, 0.3)
-head:SetText(L["AKIT PING"])
-local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-close:SetSize(20, 20)
-close:SetPoint("TOPRIGHT", -2, -2)
-
-local question = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-question:SetPoint("TOPLEFT", 12, -26)
+local question = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+question:SetPoint("TOPLEFT", PAD, -28)
+question:SetWidth(W - 2 * PAD)
+question:SetJustifyH("LEFT")
 question:SetText(L["Ping your target in this group?"])
+
+-- (masik ablakokhoz is: pl. a dungeon quest megosztas; ugyanaz, mint S.FlatButton)
+NS.FlatButton = function(parent, text, w, h) return S.FlatButton(parent, text, w, h) end
+
+-- 1) valasz erre a csapatra: ket egyforma gomb, a ping a fo valasz
+local yes = S.ActionButton(f, L["Ping in this group"], "primary")
+local no = S.ActionButton(f, L["No ping"], "secondary")
+S.ButtonRow(f, { yes, no }, question, -10, 6)
+
 local sub = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-sub:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -3)
-sub:SetWidth(276)
+sub:SetPoint("TOPLEFT", yes, "BOTTOMLEFT", 0, -6)
+sub:SetWidth(W - 2 * PAD)
 sub:SetJustifyH("LEFT")
 sub:SetText(L["You joined a group: they see the AKit macro's pings. Solo it always pings."])
 
--- lapos gomb (mint a city listen): sotet hatter, vekony arany keret, hoverre vilagosabb
--- (parent: masik ablakhoz is, pl. a dungeon quest megosztas: NS.FlatButton)
-local function Flat(text, w, h, parent)
-    local b = CreateFrame("Button", nil, parent or f)
-    b:SetSize(w, h or 22)
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.bg:SetColorTexture(0.08, 0.06, 0.03, 0.9)
-    local function edge(p1, p2, ww, hh)
-        local t = b:CreateTexture(nil, "BORDER")
-        t:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.35)
-        t:SetPoint(p1); t:SetPoint(p2)
-        if ww then t:SetWidth(ww) else t:SetHeight(hh) end
-    end
-    edge("TOPLEFT", "TOPRIGHT", nil, 1); edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
-    edge("TOPLEFT", "BOTTOMLEFT", 1); edge("TOPRIGHT", "BOTTOMRIGHT", 1)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
-    hl:SetColorTexture(1, 0.82, 0, 0.15)
-    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    b.text:SetPoint("CENTER")
-    b.text:SetText(text)
-    return b
-end
-NS.FlatButton = function(parent, text, w, h) return Flat(text, w, h, parent) end
+local line = S.Divider(f)
+line:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -10)
+line:SetPoint("RIGHT", f, "RIGHT", -PAD, 0)
 
--- 1) valasz erre a csapatra
-local yes = Flat(L["Ping in this group"], 136, 24)
-yes:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -10)
-yes.text:SetFontObject("GameFontNormal")
-local no = Flat(L["No ping"], 136, 24)
-no:SetPoint("LEFT", yes, "RIGHT", 6, 0)
-no.text:SetFontObject("GameFontNormal")
-
--- elvalaszto vonal
-local line = f:CreateTexture(nil, "ARTWORK")
-line:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
-line:SetHeight(1)
-line:SetPoint("TOPLEFT", yes, "BOTTOMLEFT", 0, -10)
-line:SetPoint("RIGHT", f, "RIGHT", -12, 0)
-
--- 2) legkozelebb: harom reszes valaszto (egyszerre egy)
-local nextLbl = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-nextLbl:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -7)
-nextLbl:SetText(L["NEXT TIME I JOIN A GROUP"])
+-- 2) legkozelebb: harom reszes, egyforma szeles valaszto (egyszerre egy)
+local nextLbl = S.Section(f, L["NEXT TIME I JOIN A GROUP"])
+nextLbl:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -8)
 local SHORT = { ask = L["Ask"], on = L["Always ping"], off = L["Never ping"] }
-local radios = {}
-local function Select(mode)
-    for _, r in ipairs(radios) do
-        local on = r.mode == mode
-        r.bg:SetColorTexture(on and 0.30 or 0.08, on and 0.22 or 0.06, on and 0.05 or 0.03, 0.9)
-        r.text:SetFontObject(on and "GameFontHighlightSmall" or "GameFontDisableSmall")
-    end
+local items, DESC = {}, {}
+for _, m in ipairs(MODES) do
+    items[#items + 1] = { m[1], SHORT[m[1]] or m[2] }
+    DESC[m[1]] = m[2]
 end
-for i, m in ipairs(MODES) do
-    local r = Flat(SHORT[m[1]] or m[2], 90, 18)
-    r:SetPoint("TOPLEFT", nextLbl, "BOTTOMLEFT", (i - 1) * 93, -4)
-    r.mode = m[1]
-    r:SetScript("OnClick", function(self)
-        QuestFocusDB.pingMode = self.mode
-        QuestFocusDB.noPing = (self.mode == "off") or nil
-        Select(self.mode)
-        if NS.RefreshPingUI then NS.RefreshPingUI() end
-    end)
-    r:SetScript("OnEnter", function(self)
+local seg = S.Segmented(f, items, 90, 22, 4)
+S.ButtonRow(f, seg.buttons, nextLbl, -5, 4)
+local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+hint:SetPoint("TOPLEFT", seg.buttons[1], "BOTTOMLEFT", 0, -6)
+hint:SetWidth(W - 2 * PAD)
+hint:SetJustifyH("LEFT")
+local HINT = {
+    ask = L["Asks like this every time you join a group."],
+    on = L["Always pings in groups, no question."],
+    off = L["Never pings in groups, no question."],
+}
+local function Select(mode)
+    seg:Select(mode)
+    hint:SetText(HINT[mode] or "")
+end
+seg.onSelect = function(mode)
+    QuestFocusDB.pingMode = mode
+    QuestFocusDB.noPing = (mode == "off") or nil
+    Select(mode)
+    if NS.RefreshPingUI then NS.RefreshPingUI() end
+end
+for _, b in ipairs(seg.buttons) do
+    b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(m[2], 1, 1, 1)
+        GameTooltip:SetText(DESC[self.value] or "", 1, 1, 1)
         GameTooltip:Show()
     end)
-    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    radios[#radios + 1] = r
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
+-- magassag: fejlec 28 + kerdes ~18 + 10 + gomb 24 + 6 + magyarazat 2 sor ~22 + 10 + 1
+-- + 8 + szekcio 10 + 5 + valaszto 22 + 6 + hint 10 + also 12
+f:SetHeight(194)
 
 local function Answer(v)
     NS.pingSession = v
@@ -162,6 +123,9 @@ local function ShowAsk()
     f:Show()
 end
 NS.ShowPingAsk = ShowAsk
+f.yes, f.no, f.seg = yes, no, seg
+NS.PingAskFrame = f -- tesztekhez / debughoz
+
 
 -- Csapatba lepes figyelese
 local wasInGroup, pendingAsk = false, false

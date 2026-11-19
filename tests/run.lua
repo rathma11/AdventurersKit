@@ -1354,6 +1354,30 @@ test("style helpers (NS.Style, DESIGN.md)", function()
         "other helpers")
     S.Draggable(f, "styleTestPos")
     check(not S.RestorePos(f, "styleTestPos"), "no saved position yet")
+    -- dialog buttons: primary / secondary, equal-width row
+    local p = S.ActionButton(f, "Yes", "primary")
+    local s = S.ActionButton(f, "No")
+    eq(p.kind .. "/" .. s.kind, "primary/secondary", "action button kinds")
+    eq(#p.edges, 4, "1px edges kept for recolouring")
+    local w = S.ButtonRow(f, { p, s }, nil, -30, 6)
+    eq(w, math.floor((250 - 24 - 6) / 2), "button row: equal widths inside 12px padding")
+    eq(p:GetWidth(), s:GetWidth(), "both buttons the same width")
+end)
+
+test("ping ask dialog: big question, equal Yes / No, equal mode row", function()
+    local f = NS.PingAskFrame
+    if not check(f, "ping ask frame exported") then return end
+    QuestFocusDB.pingMode = "on"
+    NS.ShowPingAsk()
+    check(f:IsShown(), "shown")
+    eq(f.yes.kind .. "/" .. f.no.kind, "primary/secondary", "Ping = primary, No ping = secondary")
+    eq(f.yes:GetWidth(), f.no:GetWidth(), "Yes / No equal width")
+    eq(f.yes:GetWidth(), math.floor((300 - 24 - 6) / 2), "Yes / No fill the width")
+    eq(#f.seg.buttons, 3, "three mode buttons")
+    for _, m in ipairs(f.seg.buttons) do eq(m:GetWidth(), f.seg.buttons[1]:GetWidth(), "mode buttons equal width") end
+    eq(f.seg.value, "on", "current mode selected")
+    f:Hide()
+    QuestFocusDB.pingMode = nil
 end)
 
 test("events and timers smoke", function()

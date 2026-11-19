@@ -23,6 +23,12 @@ S.BTN_SEL = { 0.30, 0.22, 0.05, 0.9 }    -- valaszto kijelolt eleme
 S.BTN_EDGE_A = 0.35                      -- lapos gomb 1px arany szele
 S.BTN_HL = { 1, 0.82, 0, 0.15 }          -- lapos gomb / menusor hover
 S.ROW_HL = { 1, 1, 1, 0.08 }             -- kattinthato sor hover
+-- Fo gomb ("primary", pl. "Ping in this group"): sotet narancs kitoltes, vilagos narancs szel
+S.BTN_PRIMARY_BG = { 0.30, 0.13, 0.04, 0.95 }
+S.BTN_PRIMARY_EDGE = { 1, 0.55, 0.25, 0.9 }   -- = ACCENT
+S.BTN_PRIMARY_TEXT = { 1, 0.92, 0.82 }
+S.BTN_PRIMARY_HL = { 1, 0.55, 0.25, 0.20 }
+S.BTN_TEXT = { 0.92, 0.88, 0.80 }             -- masodlagos gomb szovege (ActionButton)
 S.DIVIDER_A = 0.25                       -- elvalaszto vonal
 S.SCROLL_TRACK_A, S.SCROLL_THUMB_A = 0.18, 0.75
 -- dungeon valtozat (dungeon lista): voros-narancs keret es cim
@@ -120,25 +126,73 @@ function S.FlatButton(parent, text, w, h)
     b.bg:SetAllPoints()
     b.bg:SetColorTexture(S.BTN_BG[1], S.BTN_BG[2], S.BTN_BG[3], S.BTN_BG[4])
     local g = S.GOLD
+    b.edges = {}
     local function edge(p1, p2, ww, hh)
         local t = b:CreateTexture(nil, "BORDER")
         t:SetColorTexture(g[1], g[2], g[3], S.BTN_EDGE_A)
         t:SetPoint(p1); t:SetPoint(p2)
         if ww then t:SetWidth(ww) else t:SetHeight(hh) end
+        b.edges[#b.edges + 1] = t
     end
     edge("TOPLEFT", "TOPRIGHT", nil, 1); edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
     edge("TOPLEFT", "BOTTOMLEFT", 1); edge("TOPRIGHT", "BOTTOMRIGHT", 1)
+    -- szel szine (r, g, b, a): pl. kijelolt / primary gomb
+    function b:SetEdgeColor(r, gg, bb, a)
+        for _, t in ipairs(self.edges) do t:SetColorTexture(r, gg, bb, a) end
+    end
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
     hl:SetColorTexture(S.BTN_HL[1], S.BTN_HL[2], S.BTN_HL[3], S.BTN_HL[4])
+    b.hl = hl
     b.text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     b.text:SetPoint("CENTER")
     b.text:SetText(text or "")
     return b
 end
 
+-- Dialog gomb (valasz egy kerdesre): 24px magas, kozepre igazitott GameFontNormal szoveg.
+-- kind "primary": a fo valasz (narancs kitoltes + vilagos narancs szel, feher szoveg);
+-- kind "secondary" (alap): lapos gomb, arany szel, vilagos szoveg. Egy sorban egy primary.
+function S.ActionButton(parent, text, kind, w, h)
+    local b = S.FlatButton(parent, text, w, h or 24)
+    b.text:SetFontObject("GameFontNormal")
+    if kind == "primary" then
+        local c, e, hl = S.BTN_PRIMARY_BG, S.BTN_PRIMARY_EDGE, S.BTN_PRIMARY_HL
+        b.bg:SetColorTexture(c[1], c[2], c[3], c[4])
+        b:SetEdgeColor(e[1], e[2], e[3], e[4])
+        b.hl:SetColorTexture(hl[1], hl[2], hl[3], hl[4])
+        local t = S.BTN_PRIMARY_TEXT
+        b.text:SetTextColor(t[1], t[2], t[3])
+    else
+        local t = S.BTN_TEXT
+        b.text:SetTextColor(t[1], t[2], t[3])
+    end
+    b.kind = kind or "secondary"
+    return b
+end
+
+-- Egyforma szelessegu gombsor a szulo teljes szelessegeben (12px beljebb mindket oldalon).
+-- buttons: S.FlatButton / S.ActionButton gombok; anchor + y: ez ala kerul a sor (TOPLEFT).
+-- A szelesseget a szulo GetWidth()-jebol szamolja, ezert a szulo merete legyen mar beallitva.
+function S.ButtonRow(parent, buttons, anchor, y, gap)
+    gap = gap or 6
+    local n = #buttons
+    local w = math.floor(((parent:GetWidth() or 0) - 24 - gap * (n - 1)) / n)
+    for i, b in ipairs(buttons) do
+        b:SetWidth(w)
+        b:ClearAllPoints()
+        if i == 1 then
+            b:SetPoint("TOPLEFT", anchor or parent, anchor and "BOTTOMLEFT" or "TOPLEFT", anchor and 0 or 12, y or 0)
+        else
+            b:SetPoint("LEFT", buttons[i - 1], "RIGHT", gap, 0)
+        end
+    end
+    return w
+end
+
 -- Tagolt valaszto (egyszerre egy, mint a ping ablak "Ask / Always / Never" sora).
 -- items = { { value, label }, ... }. seg:Select(value); seg.onSelect(value) kattintaskor.
+-- A kijelolt elem: BTN_SEL hatter + narancs (ACCENT) szel; egyforma szeles sor: S.ButtonRow(f, seg.buttons, ...)
 function S.Segmented(parent, items, w, h, gap)
     local seg = { buttons = {} }
     w, h, gap = w or 90, h or 18, gap or 3
@@ -148,6 +202,12 @@ function S.Segmented(parent, items, w, h, gap)
             local on = b.value == value
             local c = on and S.BTN_SEL or S.BTN_BG
             b.bg:SetColorTexture(c[1], c[2], c[3], c[4])
+            if on then
+                local e = S.BTN_PRIMARY_EDGE
+                b:SetEdgeColor(e[1], e[2], e[3], e[4])
+            else
+                b:SetEdgeColor(S.GOLD[1], S.GOLD[2], S.GOLD[3], S.BTN_EDGE_A)
+            end
             b.text:SetFontObject(on and "GameFontHighlightSmall" or "GameFontDisableSmall")
         end
     end

@@ -3,6 +3,10 @@
 All notable changes to Adventurer's Kit (formerly QuestFocus). The same notes are in game:
 Options > Release notes, or `/ak notes`. Generated from `AdventurersKit/UI/ReleaseNotes.lua`.
 
+## 0.9.2 (2026-11-19)
+
+- The ping question you get when joining a group has a new look: the question in big letters, two equal full-width answer buttons ("Ping in this group" highlighted in orange, "No ping" next to it) with a short grey explanation, and the next-time choice (Ask / Always ping / Never ping) as an even row with the selected one outlined in orange and a line saying what it does.
+
 ## 0.9.1 (2026-11-19)
 
 - AKit macro pings the next mob after a kill again. While you fight a quest mob the macro leaves out the ping (it already is your target); now it is rebuilt when that target dies and when combat ends, so the first press on the next mob targets and pings it.

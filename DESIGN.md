@@ -25,6 +25,8 @@ change a value in Style.lua, change the matching window too, or move that window
 | Option description | `0.62, 0.62, 0.62` | `DESC` |
 | Flat button background / selected segment | `0.08, 0.06, 0.03, 0.9` / `0.30, 0.22, 0.05, 0.9` | `BTN_BG` / `BTN_SEL` |
 | Flat button and menu row hover | `1, 0.82, 0, 0.15` | `BTN_HL` |
+| Primary dialog button: fill / edges / text / hover | `0.30, 0.13, 0.04, 0.95` / `1, 0.55, 0.25, 0.9` / `1, 0.92, 0.82` / `1, 0.55, 0.25, 0.20` | `BTN_PRIMARY_BG` / `_EDGE` / `_TEXT` / `_HL` |
+| Secondary dialog button text | `0.92, 0.88, 0.80` | `BTN_TEXT` |
 | Clickable row hover | `1, 1, 1, 0.08` (whole-popup hover 0.06) | `ROW_HL` |
 | Dungeon variant (dungeon list) | border `0.95, 0.45, 0.30`, title `1, 0.6, 0.45` | `DUNGEON_BORDER` / `DUNGEON_TITLE` |
 | Progress bar | `0.95, 0.75, 0.2` (done: `0.3, 0.85, 0.3`), bar bg `0.15, 0.15, 0.15, 0.9` | |
@@ -93,7 +95,8 @@ directions menu).
 | Box header, section header, flat button text | `GameFontNormalSmall` |
 | Body text, list rows | `GameFontHighlightSmall` |
 | Dim text: sub line, hints, footers, right column | `GameFontDisableSmall` |
-| Question / big value (ping question, stat value) | `GameFontHighlight` |
+| Question in a dialog (ping question) | `GameFontHighlightLarge` |
+| Big value (stat value) | `GameFontHighlight` |
 | Options page title / tab | `GameFontNormalLarge` / `GameFontNormal` |
 | Item count on an icon | `NumberFontNormalSmall` |
 
@@ -112,13 +115,31 @@ local b = S.FlatButton(f, L["Ping in this group"], 136, 24)
 b.text:SetFontObject("GameFontNormal")      -- bigger text for a main action
 ```
 
-**Segmented selector.** A row of flat buttons, one selected. The selected one has the `BTN_SEL`
-background and `GameFontHighlightSmall` text; the rest have `BTN_BG` and `GameFontDisableSmall`.
-Buttons are 90×18 with a 3px gap (ping dialog).
+**Dialog buttons (primary / secondary).** For the answers to a question in a small box (ping
+dialog). 24px high, centred `GameFontNormal` text, side by side with a 6px gap and the same width, filling
+the box between the 12px paddings (`S.ButtonRow`).
+- **Primary** (the main answer, at most one per row, on the left): fill `BTN_PRIMARY_BG`
+  `0.30, 0.13, 0.04, 0.95`, 1px edges `BTN_PRIMARY_EDGE` (the accent orange, 0.9), text
+  `BTN_PRIMARY_TEXT` `1, 0.92, 0.82`, hover `BTN_PRIMARY_HL` `1, 0.55, 0.25, 0.20`.
+- **Secondary**: the flat button (dark fill, gold edges 0.35), text `BTN_TEXT` `0.92, 0.88, 0.80`.
+- Under the row, a small grey explanation (`GameFontDisableSmall`, fixed width, word wrap), 6px below.
 
 ```lua
-local seg = S.Segmented(f, { { "ask", L["Ask"] }, { "on", L["Always ping"] } }, 90, 18)
-seg.first:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -4)
+local yes = S.ActionButton(f, L["Ping in this group"], "primary")
+local no = S.ActionButton(f, L["No ping"])                   -- "secondary"
+S.ButtonRow(f, { yes, no }, question, -10)                   -- equal widths under `question`
+```
+
+Every flat button keeps its edges in `b.edges` and its hover in `b.hl`; `b:SetEdgeColor(r, g, b, a)` recolours the edges.
+
+**Segmented selector.** A row of flat buttons, one selected. The selected one has the `BTN_SEL`
+background, accent-orange edges and `GameFontHighlightSmall` text; the rest have `BTN_BG`, gold edges
+and `GameFontDisableSmall`. In a dialog the row fills the width with equal buttons, 22px high with a
+4px gap (`S.ButtonRow(f, seg.buttons, ...)`), and a grey line under it explains the selected choice.
+
+```lua
+local seg = S.Segmented(f, { { "ask", L["Ask"] }, { "on", L["Always ping"] } }, 90, 22, 4)
+S.ButtonRow(f, seg.buttons, label, -5, 4)    -- or seg.first:SetPoint(...) for fixed-width buttons
 seg.onSelect = function(v) QuestFocusDB.pingMode = v end
 seg:Select(QuestFocusDB.pingMode)
 ```
@@ -230,7 +251,7 @@ distance, and `BTN_HL` hover. The menu is in `UISpecialFrames`.
 2. Header text in capitals through `L[...]`; every other string also through `L[...]`, in English.
 3. Make it draggable and clamped: `S.Draggable(f, "myPos")` + `S.RestorePos(f, "myPos")` on load; right click resets where it makes sense.
 4. Fixed size; long content scrolls with `NS.AttachScrollBar`, and rows use `S.RowHighlight`.
-5. Buttons: `S.FlatButton` / `S.Segmented` / `S.ClearButton` / `S.IconButton`, never the red `UIPanelButtonTemplate` inside our frames (the Blizzard Options page itself may use it).
+5. Buttons: `S.FlatButton` / `S.ActionButton` + `S.ButtonRow` (dialog answers) / `S.Segmented` / `S.ClearButton` / `S.IconButton`, never the red `UIPanelButtonTemplate` inside our frames (the Blizzard Options page itself may use it).
 6. Tooltips with `NS.TT` (or the simple white title + grey line), and an `OnLeave` that hides them.
 7. Nothing secure in combat; defer to `PLAYER_REGEN_ENABLED`.
 8. Add an Options switch for it. Save its position in `QuestFocusDB`, and per-character data in `NS.CharDB()`.
