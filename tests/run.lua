@@ -155,7 +155,7 @@ test("macro: first line keeps a living hostile target", function()
     W.units.target = { name = "Kobold Vermin", hostile = true }
     body = build()
     eq(firstLine(body), "/cleartarget [noharm][dead]", "living quest mob as target is kept")
-    check(not contains(body, "/ping"), "no ping when the target already is a quest mob")
+    check(contains(body, "/ping [nocombat,@target,harm,nodead] attack"), "already targeted quest mob: still pinged")
 
     W.units.target = { name = "Murloc Raider", hostile = true }
     eq(firstLine(build()), "/cleartarget", "living non-quest enemy is dropped")
@@ -739,8 +739,43 @@ test("macro ping: only out of combat (in combat it would ping any attacker)", fu
     NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
     W.units.target = nil
     local body = NS.C.BuildMacroBody(NS.state.objectives, nil)
-    check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack; [nocombat,@target,help,nodead] assist"),
-        "ping line has [nocombat]: " .. body)
+    check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack"), "attack ping has [nocombat]: " .. body)
+    check(hasLine(body, "/ping [@target,noharm,exists,nodead]"), "plain ping for a non-attackable target: " .. body)
+end)
+
+test("macro ping: neutral turn-in NPC, neutral attackable mob, already targeted (0.10.1 rules)", function()
+    W.Advance(1)
+    W.cvars.nameplateShowEnemies = "0"
+    local build = function() return NS.C.BuildMacroBody(NS.state.objectives, nil) end
+    -- turn-in to a neutral goblin (Drizzlik: neither harm nor help) - the old harm/help line pinged nothing
+    NS.SelectQuest(103, "Report to Goldshire", true, true)
+    W.units.target = { name = "Marshal McBride", hostile = false }
+    local body = build()
+    check(hasLine(body, "/ping [@target,noharm,exists,nodead]"), "turn-in: plain ping, no harm/help condition: " .. body)
+    check(not contains(body, "attack"), "turn-in: no attack ping")
+    check(not contains(body, "help"), "no [help] condition anywhere")
+    check(contains(NS.state.pingWhy or "", "turn-in"), "debug reason: " .. tostring(NS.state.pingWhy))
+    -- turn-in in nameplate mode: the NPC can't be tapped, ping stays
+    W.cvars.nameplateShowEnemies = "1"
+    check(contains(build(), "/ping [@target,noharm,exists,nodead]"), "turn-in, nameplate mode: ping stays")
+    W.cvars.nameplateShowEnemies = "0"
+    -- hunting: a neutral (yellow) attackable mob is [harm] -> attack ping, also when already targeted
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    W.units.target = { name = "Kobold Vermin", hostile = true }
+    body = build()
+    check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack"), "attackable target pinged: " .. body)
+    check(hasLine(body, "/ping [@target,noharm,exists,nodead]"), "plus the NPC ping line")
+    check(#body <= 255, "fits")
+    -- nameplate mode, no quest mob plate: only the NPC ping line (a by-name enemy could be tapped)
+    W.cvars.nameplateShowEnemies = "1"
+    NS.state.pick = nil
+    body = build()
+    check(not contains(body, "attack"), "no attack ping without a picked plate: " .. body)
+    check(hasLine(body, "/ping [@target,noharm,exists,nodead]"), "NPC ping stays")
+    local dbg = table.concat(NS.C.DebugLines(), "\n")
+    check(contains(dbg, "Ping in the macro: NPC ping only"), "debug says why: " .. dbg)
+    W.cvars.nameplateShowEnemies = "0"
+    W.units.target = nil
 end)
 
 test("macro ping: rebuilt after the target dies (next mob gets pinged)", function()
@@ -748,10 +783,10 @@ test("macro ping: rebuilt after the target dies (next mob gets pinged)", functio
     W.cvars.nameplateShowEnemies = "0"
     NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
     local body = function() return W.macros.AKit and W.macros.AKit.body or "" end
-    -- fighting a quest mob: no ping (it already is the target)
+    -- fighting a quest mob: pinged too (no "already on target" suppression since 0.10.1)
     W.units.target = { name = "Kobold Vermin", hostile = true }
     NS.C.UpdateMacro()
-    check(not contains(body(), "/ping"), "living quest target: no ping: " .. body())
+    check(contains(body(), "/ping"), "living quest target: ping: " .. body())
     -- combat, the mob dies, combat ends: no PLAYER_TARGET_CHANGED, the macro must still rebuild
     W.inCombat = true
     W.Fire("PLAYER_REGEN_DISABLED")
@@ -764,7 +799,7 @@ test("macro ping: rebuilt after the target dies (next mob gets pinged)", functio
     W.Advance(1)
     W.units.target = { name = "Kobold Vermin", hostile = true }
     NS.C.UpdateMacro()
-    check(not contains(body(), "/ping"), "living target again: no ping")
+    check(contains(body(), "/ping"), "living target again: ping")
     W.units.target.dead = true
     W.Fire("UNIT_HEALTH", "target")
     W.Advance(1)
@@ -794,7 +829,7 @@ test("macro ping: never a tapped or unpicked mob (nameplate mode)", function()
     NS.state.pick = nil
     body = build()
     check(hasLine(body, "/targetexact [noexists] Kobold Vermin"), "falls back to names: " .. body)
-    check(not contains(body, "/ping"), "unpicked by-name target: no ping: " .. body)
+    check(not contains(body, "attack"), "unpicked by-name target: no attack ping: " .. body)
     -- a real pick (living, untapped): ping it
     NS.state.pick = "nameplate3"
     W.units.nameplate3 = { name = "Kobold Vermin", hostile = true }

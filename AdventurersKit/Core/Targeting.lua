@@ -8,10 +8,16 @@ local PlayerWorldPos, Print, state, ZoneName = C.PlayerWorldPos, C.Print, C.stat
 ---------------------------------------------------------------------------
 -- Macro
 ---------------------------------------------------------------------------
--- Csak harcon kivul pingel: harcban a macro nem irhato at, a [noharm][dead] sor megtartja
--- barmelyik elo ellenseget (pl. egy rad tamado, questhez nem tartozo mobot), es azt pingelne.
--- Harcon kivul a target valtas utan a macro ujraepul, a nem quest mob targetet eldobja.
-local PING_LINE = "/ping [nocombat,@target,harm,nodead] attack; [nocombat,@target,help,nodead] assist"
+-- Ping szabalyok (0.10.1): a gomb megnyomasa = "pingeld ezt". Nincs "mar a targeted, ne
+-- pingelj" kivetel (a jatek maga fojtja a ping spamet).
+-- * Tamadhato target (piros / sarga mob): "attack" ping, csak harcon kivul - harcban a
+--   [noharm][dead] sor barmelyik elo ellenseget megtartja (pl. egy rad tamado, questhez nem
+--   tartozo mobot), azt nem pingeljuk.
+-- * Nem tamadhato target (leado NPC, semleges goblin, barat): sima kontextus ping, harm/help
+--   feltetel nelkul - a semleges NPC se nem harm, se nem help, a regi sor ezert nem pingelte.
+--   Kulon sorban, egyetlen feltetel-blokkal (mint a "/ping [@target]").
+local PING_HOSTILE = "/ping [nocombat,@target,harm,nodead] attack"
+local PING_OTHER = "/ping [@target,noharm,exists,nodead]"
 
 -- Macro feltetellel nem lehet "tapped"-et vizsgalni, ezert harcon kivul az addon a
 -- nameplate-ek kozul kivalasztja az elo, meg senki altal meg nem tapolt quest mobot, es a
@@ -79,6 +85,7 @@ local function BuildMacroBody(objectives, onlyIndex)
         local ok, body = pcall(NS.Escort.MacroBody, objectives, onlyIndex)
         if ok and body then
             wipe(targetNames)
+            state.pingWhy = L["none: escort macro (it targets the escort's attacker)"]
             return body, 1
         end
     end
@@ -121,21 +128,29 @@ local function BuildMacroBody(objectives, onlyIndex)
     if not turnIn and QuestFocusDB and QuestFocusDB.useSpell and spell and spell ~= "" then
         tail[#tail + 1] = "/cast [@target,harm,nodead] " .. spell
     end
-    -- Pingelni csak uj celpontra: ha a kivalasztott mob mar a targeted (vagy harcban a
-    -- mostani target jo quest mob), a ping kimarad, igy a macro spamelese nem pingel ujra
-    local onTarget
-    if pick and pick ~= "busy" then
-        onTarget = UnitIsUnit(pick, "target")
-    elseif not pick then
-        onTarget = GoodQuestUnit("target")
-    end
-    -- Tapoltat macro feltetel nem lat, ezert itt dontjuk el: nameplate modban csak a
-    -- kivalasztott (elo, nem tapolt) mobot pingeljuk. "busy" (minden kozeli quest mob tapolt):
-    -- a macro nem targetel, a @target barmi lehet (pl. a tapolt mob) -> nincs ping. Ha nincs
-    -- latszo quest mob nameplate, a nev szerinti /targetexact tapoltat is foghat -> nincs ping.
+    -- Mikor NINCS ping (a tapoltat macro feltetel nem latja, ezert itt dontjuk el):
+    -- * "busy": minden kozeli quest mob tapolt, a macro nem targetel, a @target barmi lehet.
+    -- * nameplate modban nincs latszo quest mob nameplate: a nev szerinti /targetexact tapolt
+    --   mobot is foghat -> a tamadhato targetre nincs ping. NPC-t (nem tamadhato) nem lehet
+    --   tapolni, arra a ping marad (pl. leadas: ott nameplate mod nincs is).
     -- Nameplate nelkul (enemy nameplate ki) nincs mibol eldonteni: ott marad a ping.
-    local pingOk = pick ~= "busy" and not (useNP and not pick)
-    if usePing and pingOk and not onTarget then tail[#tail + 1] = PING_LINE end
+    local hostileOk = pick ~= "busy" and not (useNP and not pick)
+    local otherOk = pick ~= "busy"
+    if not usePing then
+        state.pingWhy = (L["off (ping mode %s)"]):format(NS.PingMode and NS.PingMode() or "?")
+    elseif pick == "busy" then
+        state.pingWhy = L["left out: every nearby quest mob is tapped (the target can't be trusted)"]
+    else
+        if not turnIn and hostileOk then tail[#tail + 1] = PING_HOSTILE end
+        if otherOk then tail[#tail + 1] = PING_OTHER end
+        if turnIn then
+            state.pingWhy = L["NPC ping (turn-in: any living target, friendly or neutral)"]
+        elseif hostileOk then
+            state.pingWhy = L["attack ping on an attackable target (out of combat), plain ping on an NPC"]
+        else
+            state.pingWhy = L["NPC ping only: no quest mob nameplate, a by-name enemy could be tapped"]
+        end
+    end
     local lines, seen = { CLEAR }, {}
     local len = #CLEAR + 1
     -- Nameplate pick mellett is kell a nev szerinti tartalek: a nameplate (Classicban alapbol

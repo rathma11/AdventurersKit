@@ -25,6 +25,8 @@ local function DebugLines()
         or "not answered") or "solo") or nil
     out[#out + 1] = (L["Ping: %s%s -> %s"]):format(pm, answer and (" (" .. answer .. ")") or "",
         (NS.UsePing and NS.UsePing()) and L["pings"] or L["no ping"])
+    -- miert van / nincs ping sor a mostani macroban (Targeting.lua: BuildMacroBody)
+    out[#out + 1] = (L["Ping in the macro: %s"]):format(state.pingWhy or "-")
     if UnitExists("target") then
         out[#out + 1] = (L["Target: %s  dead=%s tapped=%s attackable=%s isPick=%s"]):format(UnitName("target") or "?",
             tostring(UnitIsDead("target")), tostring(TapDenied("target")), tostring(UnitCanAttack("player", "target")),

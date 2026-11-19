@@ -5,6 +5,14 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.10.1", date = "2026-11-19", items = {
+        "AKit macro pings are simpler: pressing the button pings your target. Turn-in NPCs and other neutral or "
+            .. "friendly NPCs are pinged too (a neutral goblin like Drizzlik got no ping before), and a quest mob you "
+            .. "already target is pinged again (the game limits ping spam itself).",
+        "Still no ping when every nearby quest mob is tapped, and no attack ping when the target was picked only by "
+            .. "name in nameplate mode (it could be tapped). Attack pings stay out of combat only.",
+        "/ak debug shows in one line why the macro has a ping or not.",
+    } },
     { version = "0.10.0", date = "2026-11-19", items = {
         "Release: everything since 0.9.0 in one download. Adventurer's Kit's own compass icon in game (addon list, "
             .. "minimap button, AH Quest items tab and window, About tab), the restyled ping question, and the AKit "
