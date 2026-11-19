@@ -1,5 +1,6 @@
 ## Interface: 16001
 ## Title: Adventurer's Kit - Bags
+## IconTexture: Interface\AddOns\AdventurersKit_Bags\Media\icon
 ## Notes: Adventurer's Kit module: quest item list, Bagnon highlight, use-item button and keybind
 ## Author: Dano_11
 ## Version: 0.11.1
