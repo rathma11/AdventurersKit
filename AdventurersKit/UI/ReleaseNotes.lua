@@ -11,6 +11,8 @@ local NOTES = {
             .. "it reads Disable all and turns them off). Same as /ak debug all on | off.",
         "The Bags and Buffs modules have their own icons in the addon list: the compass with a bag or a glowing "
             .. "up arrow in the corner.",
+        "AKit macro: a quest mob that is already your target (alive, not tapped) is always pinged, even when it is "
+            .. "behind you or off screen and its nameplate is not visible.",
     } },
     { version = "0.11.0", date = "2026-11-19", items = {
         "Options > Debug: a section for each feature with a snapshot of what it sees, an optional log of its "

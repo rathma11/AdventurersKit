@@ -769,11 +769,41 @@ test("macro ping: neutral turn-in NPC, neutral attackable mob, already targeted 
     -- nameplate mode, no quest mob plate: only the NPC ping line (a by-name enemy could be tapped)
     W.cvars.nameplateShowEnemies = "1"
     NS.state.pick = nil
+    W.units.target = nil
     body = build()
     check(not contains(body, "attack"), "no attack ping without a picked plate: " .. body)
     check(hasLine(body, "/ping [@target,noharm,exists,nodead]"), "NPC ping stays")
     local dbg = table.concat(NS.C.DebugLines(), "\n")
     check(contains(dbg, "Ping in the macro: NPC ping only"), "debug says why: " .. dbg)
+    W.cvars.nameplateShowEnemies = "0"
+    W.units.target = nil
+end)
+
+test("macro ping: a living untapped quest target is pinged even when its nameplate is not visible", function()
+    W.Advance(1)
+    W.cvars.nameplateShowEnemies = "1"
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    local build = function() return NS.C.BuildMacroBody(NS.state.objectives, nil) end
+    -- the mob is behind us: no plate -> no pick, but it is already our target
+    NS.state.pick = nil
+    W.units.target = { name = "Kobold Vermin", hostile = true }
+    local body = build()
+    check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack"), "off-screen target pinged: " .. body)
+    check(contains(body, "/cleartarget [noharm][dead]"), "the target is kept: " .. body)
+    check(contains(NS.state.pingWhy or "", "nameplate is not visible"), "debug reason: " .. tostring(NS.state.pingWhy))
+    -- nearby plates are all tapped ("busy"), our target is still good: ping it
+    NS.state.pick = "busy"
+    body = build()
+    check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack"), "busy, good target: pinged: " .. body)
+    -- the target is tapped by someone else: no attack ping, it gets dropped
+    NS.state.pick = nil
+    W.units.target.tapped = true
+    body = build()
+    check(not contains(body, "attack"), "tapped target: no attack ping: " .. body)
+    -- not a quest mob: no attack ping without a plate
+    W.units.target = { name = "Defias Thug", hostile = true }
+    body = build()
+    check(not contains(body, "attack"), "other mob: no attack ping: " .. body)
     W.cvars.nameplateShowEnemies = "0"
     W.units.target = nil
 end)

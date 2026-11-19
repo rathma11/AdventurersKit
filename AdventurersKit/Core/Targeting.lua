@@ -140,10 +140,17 @@ local function BuildMacroBody(objectives, onlyIndex)
     --   mobot is foghat -> a tamadhato targetre nincs ping. NPC-t (nem tamadhato) nem lehet
     --   tapolni, arra a ping marad (pl. leadas: ott nameplate mod nincs is).
     -- Nameplate nelkul (enemy nameplate ki) nincs mibol eldonteni: ott marad a ping.
-    local hostileOk = pick ~= "busy" and not (useNP and not pick)
+    -- Kivetel: ha a mostani target mar egy elo, nem tapolt quest mob (GoodQuestUnit), akkor a
+    -- macro megtartja ([noharm][dead]), es a ping mindig ra szol - akkor is, ha a nameplate-je
+    -- nem latszik (hata mogott / kepernyon kivul van), es akkor is, ha a kozelben "busy" van.
+    local targetGood = not turnIn and not dropTarget and GoodQuestUnit("target") and true or false
+    local hostileOk = targetGood or (pick ~= "busy" and not (useNP and not pick))
     local otherOk = pick ~= "busy"
     if not usePing then
         state.pingWhy = (L["off (ping mode %s)"]):format(NS.PingMode and NS.PingMode() or "?")
+    elseif pick == "busy" and targetGood then
+        tail[#tail + 1] = PING_HOSTILE
+        state.pingWhy = L["attack ping on your target (a living, untapped quest mob), nearby mobs are taken"]
     elseif pick == "busy" then
         state.pingWhy = L["left out: every nearby quest mob is tapped (the target can't be trusted)"]
     else
@@ -151,6 +158,8 @@ local function BuildMacroBody(objectives, onlyIndex)
         if otherOk then tail[#tail + 1] = PING_OTHER end
         if turnIn then
             state.pingWhy = L["NPC ping (turn-in: any living target, friendly or neutral)"]
+        elseif targetGood and useNP and not pick then
+            state.pingWhy = L["attack ping on your target (a living, untapped quest mob, its nameplate is not visible)"]
         elseif hostileOk then
             state.pingWhy = L["attack ping on an attackable target (out of combat), plain ping on an NPC"]
         else

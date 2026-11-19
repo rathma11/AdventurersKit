@@ -106,7 +106,10 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     if event == "UNIT_HEALTH" or event == "UNIT_FLAGS" then
         -- A target meghalt: PLAYER_TARGET_CHANGED ilyenkor nincs, de a macro a "mar a targeted"
         -- allapotra (ping nelkul) epult -> ujra kell, hogy a kovetkezo mobot pingelje
-        if arg1 == "target" and UnitIsDead("target") then ScheduleMacroRebuild("target died") end
+        if arg1 == "target" and UnitIsDead("target") then ScheduleMacroRebuild("target died")
+        -- a target flag-jei valtoztak (pl. mas tapolta): a "mostani target mindig pingelve" dontes
+        -- (Targeting.lua) ujra kell
+        elseif arg1 == "target" and event == "UNIT_FLAGS" then ScheduleMacroRebuild("target flags changed") end
         return
     elseif event == "CVAR_UPDATE" then
         -- nameplate ki/be: mas macro kell (click vs. targetexact)

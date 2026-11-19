@@ -6,6 +6,7 @@ Options > Release notes, or `/ak notes`. Generated from `AdventurersKit/UI/Relea
 ## 0.11.1 (2026-11-19)
 
 - Options > Debug: an Enable all button before Copy all turns on the log of every section (when all are on, it reads Disable all and turns them off). Same as /ak debug all on | off.
+- AKit macro: a quest mob that is already your target (alive, not tapped) is always pinged, even when it is behind you or off screen and its nameplate is not visible.
 
 ## 0.11.0 (2026-11-19)
 
