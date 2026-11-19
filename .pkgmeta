@@ -21,6 +21,7 @@ ignore:
   - LICENSE.md
   - "*.bak"
   - .gitignore
+  - .github
 
 manual-changelog:
   filename: CHANGELOG.md
