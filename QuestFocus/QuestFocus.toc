@@ -1,5 +1,0 @@
-## Interface: 16001
-## Title: Adventurer's Kit - old settings (QuestFocus)
-## Notes: Only carries your old QuestFocus / Adventurer's Kit settings over to the renamed AdventurersKit addon. No code. You can delete this folder after one login with the new version.
-## Version: 1.0
-## SavedVariables: QuestFocusDB

@@ -152,7 +152,7 @@ foreach ($file in $files) {
 }
 
 # 6. .toc file lists
-foreach ($f in $folders + @('QuestFocus')) {
+foreach ($f in $folders) {
     foreach ($toc in Get-ChildItem -Path (Join-Path $Root $f) -Filter *.toc) {
         $n = 0
         foreach ($l in [IO.File]::ReadAllLines($toc.FullName)) {

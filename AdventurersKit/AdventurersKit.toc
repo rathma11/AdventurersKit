@@ -7,7 +7,7 @@
 ## X-License: GPL-3.0-or-later
 ## X-Category: Quests & Leveling
 ## X-Curse-Project-ID: 1816789
-## OptionalDeps: QuestFocus, Questie, TomTom, Bagnon, Auctionator, TradeSkillMaster, Auc-Advanced, ForeverDungeonJournal
+## OptionalDeps: Questie, TomTom, Bagnon, Auctionator, TradeSkillMaster, Auc-Advanced, ForeverDungeonJournal
 ## SavedVariables: QuestFocusDB
 
 # Alap (core)

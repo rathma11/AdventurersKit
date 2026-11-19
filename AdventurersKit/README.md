@@ -1,21 +1,17 @@
 # Adventurer's Kit (WoW: Forever)
 
-Formerly **QuestFocus**. Since 0.6.0 the folders are `AdventurersKit*` too. The `QuestFocusDB` SavedVariables keep their old name, so settings and keybinds carry over. Since 0.8.0 the slash command is `/ak` (`/qf` still works) and the macro is called `AKit` (the old `QFocus` macro is renamed in place, so it stays on your action bar).
-
-**Upgrading from QuestFocus (before 0.6.0):** remove the old `QuestFocus_Bags` and `QuestFocus_Buffs` folders and replace the old `QuestFocus` folder with the small one from a 0.8.x release (no code, it only loads your old settings; since 0.9.0 the public download no longer has it). Restart the game, log in once, then that `QuestFocus` folder can be deleted. Safety net: `/ak export` before upgrading.
+The slash command is `/ak` (`/qf` also works) and the macro is called `AKit`.
 
 Requires **Questie**. TomTom is optional: if it is installed, its arrow is used. Bagnon is optional: if it is installed, the quest item features hook into its bag window.
 
 ## Addons (modules)
-Adventurer's Kit ships as three folders (older 0.8.x releases also had the `QuestFocus` settings bridge for upgrades). Copy them to `Interface\AddOns`; the two modules are optional and can be switched off in Options or disabled in the AddOns list.
+Adventurer's Kit ships as three folders. Copy them to `Interface\AddOns`; the two modules are optional and can be switched off in Options or disabled in the AddOns list.
 
 | Folder | What it does |
 |---|---|
 | `AdventurersKit` | Core (required): AKit macro, marker, panel, tooltips, pace/ETA, suggestions, travel, city mode, dungeons |
 | `AdventurersKit_Bags` | Quest item list, Bagnon highlight, use-item button and keybind |
 | `AdventurersKit_Buffs` | Buff reminder: sleeping bag, XP food, weapon enchant, class buffs, tracking switch keybind |
-| `QuestFocus` | Only for upgrades from QuestFocus (not in the public download): loads the old settings once (no code), delete it afterwards |
-
 Core layout: `Core\` (logic), `UI\` (panel, options, shared tooltip builder `UI\Tooltip.lua`), `Planner\` (pace, routes, popups, travel). All modules share the `QuestFocusDB` settings.
 
 ## First start
