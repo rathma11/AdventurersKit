@@ -3,7 +3,7 @@
 ## IconTexture: Interface\AddOns\AdventurersKit\Media\icon
 ## Notes: Questing kit for WoW: Forever, built on Questie: one-key quest mob targeting (AKit macro), markers, route and travel planner, city errands, dungeon prep, buff reminder, farm session
 ## Author: Dano_11
-## Version: 0.11.2
+## Version: 0.11.1
 ## X-License: GPL-3.0-or-later
 ## X-Category: Quests & Leveling
 ## X-Curse-Project-ID: 1816789

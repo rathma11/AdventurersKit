@@ -2,7 +2,7 @@
 ## Title: Adventurer's Kit - Buffs
 ## Notes: Adventurer's Kit module: buff reminder (sleeping bag, XP food, weapon enchant, class buffs, tracking)
 ## Author: Dano_11
-## Version: 0.11.2
+## Version: 0.11.1
 ## X-License: GPL-3.0-or-later
 ## X-Curse-Project-ID: 1816789
 ## Dependencies: AdventurersKit
