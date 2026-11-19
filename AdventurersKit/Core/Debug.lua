@@ -17,6 +17,21 @@ local function DebugLines()
     out[#out + 1] = (L["Wanted mobs: %s"]):format(#names > 0 and table.concat(names, ", ") or "-")
     out[#out + 1] = (L["Picked: %s"]):format(u == "busy" and L["all taken"] or
         (u and ((UnitName(u) or "?") .. " (" .. u .. ")") or L["none (fallback by name)"]))
+    -- Ping mod (ask / on / off, csapatban a valasz) es a mostani target: a "nem pingelt" /
+    -- "nem targetelt" bejelentesek ebbol azonnal olvashatok
+    local pm = NS.PingMode and NS.PingMode() or "?"
+    local grouped = IsInGroup and IsInGroup()
+    local answer = pm == "ask" and (grouped and (NS.pingSession == true and "yes" or NS.pingSession == false and "no"
+        or "not answered") or "solo") or nil
+    out[#out + 1] = (L["Ping: %s%s -> %s"]):format(pm, answer and (" (" .. answer .. ")") or "",
+        (NS.UsePing and NS.UsePing()) and L["pings"] or L["no ping"])
+    if UnitExists("target") then
+        out[#out + 1] = (L["Target: %s  dead=%s tapped=%s attackable=%s isPick=%s"]):format(UnitName("target") or "?",
+            tostring(UnitIsDead("target")), tostring(TapDenied("target")), tostring(UnitCanAttack("player", "target")),
+            tostring(u ~= nil and u ~= "busy" and UnitIsUnit(u, "target") or false))
+    else
+        out[#out + 1] = L["Target: none"]
+    end
     out[#out + 1] = (L["In combat: %s"]):format(InCombatLockdown() and L["yes (the macro can't update now)"] or L["no"])
     out[#out + 1] = (L["Zone focus: %s"]):format(QuestFocusDB.zoneFocus and (QuestFocusDB.zoneFocus.zone or "?") or L["off"])
     out[#out + 1] = L["Visible quest mob nameplates:"]

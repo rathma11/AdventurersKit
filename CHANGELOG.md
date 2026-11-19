@@ -3,6 +3,11 @@
 All notable changes to Adventurer's Kit (formerly QuestFocus). The same notes are in game:
 Options > Release notes, or `/ak notes`. Generated from `AdventurersKit/UI/ReleaseNotes.lua`.
 
+## 0.9.1 (2026-11-19)
+
+- AKit macro pings the next mob after a kill again. While you fight a quest mob the macro leaves out the ping (it already is your target); now it is rebuilt when that target dies and when combat ends, so the first press on the next mob targets and pings it.
+- /ak debug also shows the ping mode (ask / on / off, your group answer) and your current target (dead, tapped, attackable, whether it is the picked mob).
+
 ## 0.9.0 (2026-11-19)
 
 - First public release, ready for CurseForge (WoW: Forever). The download has the three addon folders (AdventurersKit, AdventurersKit_Bags, AdventurersKit_Buffs); the old QuestFocus settings bridge is no longer in it, keep your own copy only if you still upgrade from QuestFocus.

@@ -5,6 +5,13 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.9.1", date = "2026-11-19", items = {
+        "AKit macro pings the next mob after a kill again. While you fight a quest mob the macro leaves out the ping "
+            .. "(it already is your target); now it is rebuilt when that target dies and when combat ends, so the first "
+            .. "press on the next mob targets and pings it.",
+        "/ak debug also shows the ping mode (ask / on / off, your group answer) and your current target (dead, "
+            .. "tapped, attackable, whether it is the picked mob).",
+    } },
     { version = "0.9.0", date = "2026-11-19", items = {
         "First public release, ready for CurseForge (WoW: Forever). The download has the three addon folders "
             .. "(AdventurersKit, AdventurersKit_Bags, AdventurersKit_Buffs); the old QuestFocus settings bridge is no "

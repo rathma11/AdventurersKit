@@ -82,8 +82,28 @@ QF:RegisterEvent("PLAYER_REGEN_ENABLED")
 QF:RegisterEvent("CVAR_UPDATE")
 QF:RegisterEvent("PLAYER_REGEN_DISABLED")
 QF:RegisterEvent("PLAYER_TARGET_CHANGED")
+QF:RegisterEvent("UNIT_HEALTH")
+QF:RegisterEvent("UNIT_FLAGS")
+
+-- Kesleltetett macro ujraepites (target valtas / a target meghalt). Kesleltetve! A /target
+-- sor meg a macro futasa KOZBEN valtja ki a PLAYER_TARGET_CHANGED-et; ha azonnal atirnank
+-- a macrot, a hatralevo sorai (a ping) mar nem futnanak le.
+local function ScheduleMacroRebuild()
+    if not state.questId or state.targetRebuildPending then return end
+    state.targetRebuildPending = true
+    C_Timer.After(0.5, function()
+        state.targetRebuildPending = nil
+        if state.questId and not InCombatLockdown() then UpdateMacro() end
+    end)
+end
+
 QF:SetScript("OnEvent", function(self, event, arg1)
-    if event == "CVAR_UPDATE" then
+    if event == "UNIT_HEALTH" or event == "UNIT_FLAGS" then
+        -- A target meghalt: PLAYER_TARGET_CHANGED ilyenkor nincs, de a macro a "mar a targeted"
+        -- allapotra (ping nelkul) epult -> ujra kell, hogy a kovetkezo mobot pingelje
+        if arg1 == "target" and UnitIsDead("target") then ScheduleMacroRebuild() end
+        return
+    elseif event == "CVAR_UPDATE" then
         -- nameplate ki/be: mas macro kell (click vs. targetexact)
         if state.questId then C_Timer.After(0.1, UpdateMacro) end
         return
@@ -93,15 +113,7 @@ QF:SetScript("OnEvent", function(self, event, arg1)
             UIErrorsFrame:AddMessage(L["AKit: this mob is already tapped by someone else"], 1, 0.3, 0.3)
         end
         -- Target valtas: a ping sor ki/be (uj celpontra pingel, a mostanira nem)
-        -- Kesleltetve! A /target sor meg a macro futasa KOZBEN valtja ki ezt az esemenyt;
-        -- ha azonnal atirnank a macrot, a hatralevo sorai (a ping) mar nem futnanak le.
-        if state.questId and not state.targetRebuildPending then
-            state.targetRebuildPending = true
-            C_Timer.After(0.5, function()
-                state.targetRebuildPending = nil
-                if state.questId and not InCombatLockdown() then UpdateMacro() end
-            end)
-        end
+        ScheduleMacroRebuild()
         return
     end
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
@@ -137,6 +149,11 @@ QF:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_REGEN_ENABLED" then
         if state.pendingBody then ApplyMacro(state.pendingBody) end
         PickNameplate()
+        -- Mindig ujraepitjuk: a harc elott irt macro a regi (mar halott) targetre szolt, pl.
+        -- ping nelkul ("mar a targeted"); a pick valtozasa nelkul a fenti nem irja at.
+        if state.questId then UpdateMacro() end
+        -- a target halala nehol csak a harc vege utan latszik
+        if UnitExists("target") then ScheduleMacroRebuild() end
     end
 end)
 

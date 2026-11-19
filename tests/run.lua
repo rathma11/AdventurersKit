@@ -226,7 +226,9 @@ test("macro: combat defers the edit", function()
     eq(NS.state.pendingBody, "/say combat test", "pending body in combat")
     W.inCombat = false
     W.Fire("PLAYER_REGEN_ENABLED")
-    eq(W.macros.AKit.body, "/say combat test", "written after combat")
+    -- with a focused quest the macro is rebuilt fresh after combat (the deferred body may be stale)
+    check(NS.state.questId ~= nil, "a quest is focused here")
+    eq(W.macros.AKit.body, (NS.C.BuildMacroBody(NS.state.objectives, nil)), "fresh body after combat")
     eq(NS.state.pendingBody, nil, "pending cleared")
     NS.C.UpdateMacro()
 end)
@@ -739,6 +741,40 @@ test("macro ping: only out of combat (in combat it would ping any attacker)", fu
     local body = NS.C.BuildMacroBody(NS.state.objectives, nil)
     check(hasLine(body, "/ping [nocombat,@target,harm,nodead] attack; [nocombat,@target,help,nodead] assist"),
         "ping line has [nocombat]: " .. body)
+end)
+
+test("macro ping: rebuilt after the target dies (next mob gets pinged)", function()
+    W.Advance(1)
+    W.cvars.nameplateShowEnemies = "0"
+    NS.SelectQuest(100, "Kobold Camp Cleanup", false, true)
+    local body = function() return W.macros.AKit and W.macros.AKit.body or "" end
+    -- fighting a quest mob: no ping (it already is the target)
+    W.units.target = { name = "Kobold Vermin", hostile = true }
+    NS.C.UpdateMacro()
+    check(not contains(body(), "/ping"), "living quest target: no ping: " .. body())
+    -- combat, the mob dies, combat ends: no PLAYER_TARGET_CHANGED, the macro must still rebuild
+    W.inCombat = true
+    W.Fire("PLAYER_REGEN_DISABLED")
+    W.units.target.dead = true
+    W.Fire("UNIT_HEALTH", "target")
+    W.inCombat = false
+    W.Fire("PLAYER_REGEN_ENABLED")
+    check(contains(body(), "/ping"), "after the kill the next mob is pinged: " .. body())
+    -- out of combat (e.g. someone else killed it): the death alone rebuilds
+    W.Advance(1)
+    W.units.target = { name = "Kobold Vermin", hostile = true }
+    NS.C.UpdateMacro()
+    check(not contains(body(), "/ping"), "living target again: no ping")
+    W.units.target.dead = true
+    W.Fire("UNIT_HEALTH", "target")
+    W.Advance(1)
+    check(contains(body(), "/ping"), "dead target out of combat: ping back: " .. body())
+    -- /ak debug: ping mode + target lines
+    local dbg = table.concat(NS.C.DebugLines(), "\n")
+    check(contains(dbg, "Ping: "), "debug has the ping mode: " .. dbg)
+    check(contains(dbg, "Target: Kobold Vermin  dead=true"), "debug has the target")
+    W.units.target = nil
+    check(contains(table.concat(NS.C.DebugLines(), "\n"), "Target: none"), "debug: no target")
 end)
 
 test("macro ping: never a tapped or unpicked mob (nameplate mode)", function()
