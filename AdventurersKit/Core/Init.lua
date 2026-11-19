@@ -46,6 +46,9 @@ local ICON_HUNT = "Ability_Hunter_SniperShot"   -- celkereszt: mobok
 local ICON_TURNIN = "INV_Misc_Note_01"          -- level: leadas
 local ICON_IDLE = "INV_Misc_Map_01"             -- nincs kijelolt quest
 local MACRO_MAX = 255
+-- Az addon sajat ikonja (docs\make-icon-textures.ps1 kesziti a docs\curseforge-icon.png-bol; a macro nem hasznalhatja)
+NS.ICON = "Interface\\AddOns\\AdventurersKit\\Media\\icon"             -- teljes (sotet lekerekitett negyzet)
+NS.ICON_ROUND = "Interface\\AddOns\\AdventurersKit\\Media\\icon-round" -- csak a kerek iranytu (minimap gomb)
 local PREFIX = "|cff33ff99Adventurer's Kit|r: "
 
 local QF = CreateFrame("Frame", "QuestFocusEventFrame")

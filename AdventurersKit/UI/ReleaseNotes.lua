@@ -5,6 +5,11 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.9.3", date = "2026-11-19", items = {
+        "Adventurer's Kit has its own icon in game, the compass from the CurseForge page: in the addon list, on the "
+            .. "minimap button (the round compass under the minimap border), on the Quest items tab and window at the "
+            .. "auction house, and next to the name on the About tab. The AKit macro keeps its game icons.",
+    } },
     { version = "0.9.2", date = "2026-11-19", items = {
         "The ping question you get when joining a group has a new look: the question in big letters, two equal "
             .. "full-width answer buttons (\"Ping in this group\" highlighted in orange, \"No ping\" next to it) with a "

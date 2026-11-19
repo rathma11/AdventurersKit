@@ -1699,7 +1699,12 @@ end)
 -- Inside the AH the list uses the AH's own look (ButtonFrameTemplate, UIPanelButtonTemplate).
 test("AH quest items: tab above All The Things' button, vertical drag, AH look", function()
     local A = NS.AHQ
-    eq(A.AddonIcon(), "Interface\\Icons\\INV_Misc_Map_01", "addon icon from the .toc IconTexture")
+    eq(A.AddonIcon(), "Interface\\AddOns\\AdventurersKit\\Media\\icon", "addon icon from the .toc IconTexture")
+    eq(A.AddonIcon(), NS.ICON, ".toc IconTexture = NS.ICON (Media\\icon.tga)")
+    local mm = _G.QuestFocusMinimapButton
+    local mmTex = {}
+    if mm and mm.icon then mmTex[1] = mm.icon:GetTexture() end
+    eq(mmTex[1], NS.ICON_ROUND, "minimap button uses the round addon icon")
     local host = CreateFrame("Frame", "AuctionHouseFrame", UIParent)
     host:SetSize(800, 600)
     local sb = CreateFrame("Frame", "AuctionHouseFrameTabSideBar", host)

@@ -1383,7 +1383,7 @@ function A.ResetTabPos()
     if frame and frame:IsShown() then PlaceFrame() end
 end
 
--- Az addon ikonja: a .toc IconTexture-je, kulonben a panel / macro ikonja (terkep)
+-- Az addon ikonja: a .toc IconTexture-je, kulonben az addon sajat ikonja (Media\icon)
 function A.AddonIcon()
     local get = (C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" and C_AddOns.GetAddOnMetadata)
         or rawget(_G, "GetAddOnMetadata")
@@ -1391,7 +1391,7 @@ function A.AddonIcon()
         local ok, v = pcall(get, ADDON_NAME, "IconTexture")
         if ok and type(v) == "string" and v ~= "" then return v end
     end
-    return "Interface\\Icons\\INV_Misc_Map_01"
+    return NS.ICON or "Interface\\AddOns\\AdventurersKit\\Media\\icon"
 end
 
 -- Az idozito: a lekerdezesek az AH nyitvatartasa alatt

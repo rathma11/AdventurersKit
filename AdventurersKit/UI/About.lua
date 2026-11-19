@@ -97,11 +97,16 @@ local function Line(text, x, gap, font)
     return fs
 end
 
--- nev, verzio, leiras
+-- ikon, nev, verzio, leiras
+local logo = page:CreateTexture(nil, "ARTWORK")
+logo:SetSize(32, 32)
+logo:SetTexture(NS.ICON)
+fl:Place(logo, 2, 2)
+page.logo = logo
 local title = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetText("Adventurer's Kit")
 title:SetTextColor(S.TITLE[1], S.TITLE[2], S.TITLE[3])
-fl:Place(title, 2, 2)
+title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
 local ver = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 ver:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 6, 1)
 ver:SetText("v" .. (NS.Version and NS.Version() or "?"))

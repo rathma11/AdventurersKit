@@ -2,7 +2,7 @@ local ADDON_NAME, NS = ...
 local L = NS.L
 NS.C = NS.C or {}
 local C = NS.C
-local arrow, DebugLines, ICON_HUNT, Panel_Update, Print, state, ToggleZoneFocus, UpdateMacro = C.arrow, C.DebugLines, C.ICON_HUNT, C.Panel_Update, C.Print, C.state, C.ToggleZoneFocus, C.UpdateMacro
+local arrow, DebugLines, Panel_Update, Print, state, ToggleZoneFocus, UpdateMacro = C.arrow, C.DebugLines, C.Panel_Update, C.Print, C.state, C.ToggleZoneFocus, C.UpdateMacro
 local UseOwnArrow = C.UseOwnArrow
 local ApplyMacro, BuildMacroBody, IconId = C.ApplyMacro, C.BuildMacroBody, C.IconId
 
@@ -352,10 +352,9 @@ do
     bg:SetSize(20, 20)
     bg:SetPoint("TOPLEFT", 7, -5)
     local icon = mmBtn:CreateTexture(nil, "ARTWORK")
-    icon:SetTexture("Interface\\Icons\\" .. ICON_HUNT)
-    icon:SetSize(17, 17)
-    icon:SetPoint("TOPLEFT", 7, -6)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetTexture(NS.ICON_ROUND) -- kerek iranytu: a kerek keret ala pont belefer
+    icon:SetSize(19, 19)
+    icon:SetPoint("TOPLEFT", 6, -5)
     mmBtn.icon = icon
     local border = mmBtn:CreateTexture(nil, "OVERLAY")
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
