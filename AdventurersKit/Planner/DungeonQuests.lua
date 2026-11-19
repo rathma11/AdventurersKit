@@ -1,3 +1,4 @@
+-- Data credit: dungeon data from DungeonJournal (ForeverDungeonJournal) by Exehn; see AdventurersKit\CREDITS.txt.
 -- A WoW: Forever sajat dungeonjai (a Questie nem ismeri oket): szintsav es questek. Sajat
 -- masolat a ForeverDungeonJournal Data\Dungeons.lua-jabol, hogy ne fuggjunk mas addontol.
 -- A Questie dungeon tablaja (Zones\dungeons.lua) ezeket nem tartalmazza, a questjeik

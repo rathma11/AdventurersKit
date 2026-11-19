@@ -79,7 +79,8 @@ local function Dist(ax, ay, bx, by) return math.sqrt((ax - bx) ^ 2 + (ay - by) ^
 ---------------------------------------------------------------------------
 -- Hajok, zeppelinek, leghajok, villamos (WoW Forever, build 1.60.1).
 -- Kikotok vilag-yardban, kontinensenkent (0 Eastern Kingdoms, 1 Kalimdor, 2991 Zephras Isle):
--- a jatek sajat tablajabol (az OpenMap addon Places.lua adata), ugyanabban a rendszerben, amit
+-- a jatek sajat tablajabol (az OpenMap addon Places.lua adata, MIT, Copyright (c) 2026 OpenMap contributors;
+-- lasd AdventurersKit\CREDITS.txt), ugyanabban a rendszerben, amit
 -- a C_Map.GetWorldPosFromMapPos ad. ido = atlagos varakozas + ut (masodperc, becsles az
 -- ut hosszabol: 90 + yard / 25). oneway: csak A -> B (korjarat).
 -- faction: csak annak a frakcionak (nil = mindenki). Bovitheto: QuestFocusDB.customTransports

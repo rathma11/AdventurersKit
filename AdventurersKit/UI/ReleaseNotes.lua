@@ -5,6 +5,15 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.9.0", date = "2026-11-19", items = {
+        "First public release, ready for CurseForge (WoW: Forever). The download has the three addon folders "
+            .. "(AdventurersKit, AdventurersKit_Bags, AdventurersKit_Buffs); the old QuestFocus settings bridge is no "
+            .. "longer in it, keep your own copy only if you still upgrade from QuestFocus.",
+        "Adventurer's Kit is now free software under the GPL-3.0 license (LICENSE.txt). CREDITS.txt names the data "
+            .. "it carries from Questie, DungeonJournal (Exehn) and OpenMap.",
+        "The addon list shows the author, the license and a longer description; Auctionator, TradeSkillMaster and "
+            .. "Auctioneer load before it when installed.",
+    } },
     { version = "0.8.8", date = "2026-11-18", items = {
         "Farm session tooltips are easier to read: the gold one in sections (Coins, Items, Totals) and the XP one "
             .. "(XP gained, Pace, Level), with space between them. Per hour values are grey so the totals stand out, "

@@ -1,0 +1,29 @@
+# CurseForge / BigWigs packager (https://github.com/BigWigsMods/packager) recipe.
+# The repository root holds the three addon folders; the package is these folders at the zip root.
+# The QuestFocus folder is left out on purpose: it is only a settings bridge for old local
+# QuestFocus installs (before 0.6.0) and new players never need it.
+package-as: AdventurersKit
+
+move-folders:
+  AdventurersKit/AdventurersKit: AdventurersKit
+  AdventurersKit/AdventurersKit_Bags: AdventurersKit_Bags
+  AdventurersKit/AdventurersKit_Buffs: AdventurersKit_Buffs
+
+ignore:
+  - QuestFocus
+  - tests
+  - docs
+  - releases
+  - DESIGN.md
+  - FEATURES.md
+  - README.md
+  - CHANGELOG.md
+  - LICENSE.md
+  - "*.bak"
+  - .gitignore
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+enable-nolib-creation: no

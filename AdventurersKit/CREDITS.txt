@@ -1,0 +1,56 @@
+Adventurer's Kit - credits and third-party notices
+===================================================
+
+Adventurer's Kit is free software, licensed under the GNU General Public
+License version 3 or (at your option) any later version. See LICENSE.txt.
+
+Adventurer's Kit does not bundle code from other addons. It reads Questie's
+quest database while the game runs (Questie must be installed separately) and
+carries small copies of the following data so it does not depend on more
+addons:
+
+Questie (GPL-3.0) - https://github.com/Questie/Questie
+  The Questie team: Aero, Logon, Muehe, TheCrux (BreakBB), Drejjmit, Dyaxler,
+  Cheeq, TechnoHunter, Yttrium and all contributors.
+  Used: the quest, NPC, object and item database at runtime; a few dungeon
+  entrance coordinates (Zones\dungeons.lua, Forever) copied into
+  Planner\DungeonEntrances.lua.
+
+DungeonJournal (ForeverDungeonJournal) by Exehn
+  Used: dungeon bosses with NPC IDs (Planner\DungeonBosses.lua), WoW: Forever's
+  own dungeons with their quests and level ranges (Planner\DungeonQuests.lua)
+  and dungeon entrance coordinates (Planner\DungeonEntrances.lua), from its
+  Data\Dungeons.lua and Data\DungeonEntrances.lua. When DungeonJournal is
+  installed, Adventurer's Kit can open it (Shift+click a dungeon).
+
+OpenMap (MIT) - OpenMap contributors
+  Used: the boat, zeppelin and tram port positions of WoW: Forever, from its
+  Data\Places.lua (Planner\Travel.lua). Its license notice:
+
+  MIT License
+
+  Copyright (c) 2026 OpenMap contributors
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+Optional integrations (used only when installed, nothing copied): TomTom,
+Bagnon, Auctionator, TradeSkillMaster, Auctioneer.
+
+World of Warcraft and its game data, names and icons are trademarks or
+property of Blizzard Entertainment, Inc.

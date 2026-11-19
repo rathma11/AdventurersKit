@@ -1,3 +1,4 @@
+-- Data credit: dungeon data from DungeonJournal (ForeverDungeonJournal) by Exehn; see AdventurersKit\CREDITS.txt.
 -- Dungeon bejaratok (a dungeon prep modhoz, Planner\Prep.lua). Sajat masolat, hogy ne
 -- fuggjunk mas addontol: a ForeverDungeonJournal (Data\DungeonEntrances.lua) es a Questie
 -- (Forever Zones\dungeons.lua) bejarat koordinataibol. pts = { {uiMap, x, y} } (0-1),

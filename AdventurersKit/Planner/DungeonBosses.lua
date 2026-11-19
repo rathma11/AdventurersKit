@@ -1,3 +1,4 @@
+-- Data credit: dungeon data from DungeonJournal (ForeverDungeonJournal) by Exehn; see AdventurersKit\CREDITS.txt.
 -- Dungeon bossok sorrendben (a dungeonon beluli fazis sorrendjehez, Planner\Prep.lua).
 -- Sajat masolat a ForeverDungeonJournal adataibol (Data\Dungeons.lua bosses: nev, NPC ID), hogy ne
 -- fuggjunk tole. { nev, npcId (nil, ha ismeretlen), rare = true: ritka, nem mindig van ott }.
