@@ -1,0 +1,27 @@
+# Release: on a pushed version tag (v1.2.3) the BigWigs packager builds the zip from .pkgmeta
+# (the 3 addon folders at the zip root), makes a GitHub release with it, and uploads it to
+# CurseForge. CurseForge needs the CF_API_KEY repository secret (Settings > Secrets and variables >
+# Actions) and the project ID in AdventurersKit.toc (## X-Curse-Project-ID).
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package and upload
+        uses: BigWigsMods/packager@v2
