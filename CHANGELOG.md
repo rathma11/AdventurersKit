@@ -3,6 +3,10 @@
 All notable changes to Adventurer's Kit (formerly QuestFocus). The same notes are in game:
 Options > Release notes, or `/ak notes`. Generated from `AdventurersKit/UI/ReleaseNotes.lua`.
 
+## 0.10.0 (2026-11-19)
+
+- Release: everything since 0.9.0 in one download. Adventurer's Kit's own compass icon in game (addon list, minimap button, AH Quest items tab and window, About tab), the restyled ping question, and the AKit macro pinging the next mob after a kill again.
+
 ## 0.9.3 (2026-11-19)
 
 - Adventurer's Kit has its own icon in game, the compass from the CurseForge page: in the addon list, on the minimap button (the round compass under the minimap border), on the Quest items tab and window at the auction house, and next to the name on the About tab. The AKit macro keeps its game icons.

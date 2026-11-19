@@ -2,7 +2,7 @@
 ## Title: Adventurer's Kit - Bags
 ## Notes: Adventurer's Kit module: quest item list, Bagnon highlight, use-item button and keybind
 ## Author: kissd
-## Version: 0.9.3
+## Version: 0.10.0
 ## X-License: GPL-3.0-or-later
 # X-Curse-Project-ID: same project as Adventurer's Kit: ## X-Curse-Project-ID: 000000
 ## Dependencies: AdventurersKit
