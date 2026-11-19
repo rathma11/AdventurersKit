@@ -8,6 +8,8 @@ local NOTES = {
     { version = "0.11.2", date = "2026-11-19", items = {
         "Options > Debug: an Enable all button before Copy all turns on the log of every section (when all are on, "
             .. "it reads Disable all and turns them off). Same as /ak debug all on | off.",
+        "The addon list links the CurseForge project (X-Curse-Project-ID), and the source is on GitHub: "
+            .. "github.com/rathma11/AdventurersKit.",
     } },
     { version = "0.11.1", date = "2026-11-19", items = {
         "The addon list shows the author as Dano_11 (the CurseForge name).",

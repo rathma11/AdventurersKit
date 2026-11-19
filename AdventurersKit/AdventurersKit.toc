@@ -6,7 +6,7 @@
 ## Version: 0.11.2
 ## X-License: GPL-3.0-or-later
 ## X-Category: Quests & Leveling
-# X-Curse-Project-ID: fill in the CurseForge project ID, then remove the leading "#": ## X-Curse-Project-ID: 000000
+## X-Curse-Project-ID: 1816789
 ## OptionalDeps: QuestFocus, Questie, TomTom, Bagnon, Auctionator, TradeSkillMaster, Auc-Advanced, ForeverDungeonJournal
 ## SavedVariables: QuestFocusDB
 

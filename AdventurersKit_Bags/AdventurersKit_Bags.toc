@@ -4,7 +4,7 @@
 ## Author: Dano_11
 ## Version: 0.11.2
 ## X-License: GPL-3.0-or-later
-# X-Curse-Project-ID: same project as Adventurer's Kit: ## X-Curse-Project-ID: 000000
+## X-Curse-Project-ID: 1816789
 ## Dependencies: AdventurersKit
 ## OptionalDeps: Bagnon
 

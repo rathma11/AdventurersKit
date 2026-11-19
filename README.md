@@ -80,4 +80,5 @@ It carries small copies of data from **Questie** (GPL-3.0, the Questie team), **
 zeppelin and tram ports). Details are in `AdventurersKit/CREDITS.txt`.
 World of Warcraft is a trademark of Blizzard Entertainment, Inc.
 
+Download: [CurseForge](https://www.curseforge.com/projects/1816789). Source and issues: [GitHub](https://github.com/rathma11/AdventurersKit).
 Changes per version: [CHANGELOG.md](CHANGELOG.md).
