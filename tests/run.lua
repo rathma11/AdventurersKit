@@ -1536,6 +1536,17 @@ test("debug: toggle guard (off = nothing logged), saved account-wide", function(
 end)
 
 test("debug: slash commands and the copy window", function()
+    QuestFocusDB.debugLog = nil
+    eq(NS.DebugAllOn(), false, "all off at start")
+    NS.SetDebugAll(true)
+    eq(NS.DebugAllOn(), true, "Enable all turns every section on")
+    for _, s in ipairs(NS.DEBUG_SECTIONS) do eq(QuestFocusDB.debugLog[s.key], true, "enabled: " .. s.key) end
+    NS.SetDebugAll(false)
+    eq(next(QuestFocusDB.debugLog), nil, "Disable all clears every switch")
+    W.safecall("/ak debug all on", SlashCmdList.QUESTFOCUS, "debug all on")
+    eq(NS.DebugAllOn(), true, "/ak debug all on")
+    W.safecall("/ak debug all off", SlashCmdList.QUESTFOCUS, "debug all off")
+    eq(NS.DebugAllOn(), false, "/ak debug all off")
     for _, cmd in ipairs({ "debug list", "debug target", "debug farm on", "debug farm", "debug farm clear", "debug farm off",
         "debug nope", "copy", "copy ah", "copy all", "copy nope", "farm", "farm" }) do
         W.safecall("/ak " .. cmd, SlashCmdList.QUESTFOCUS, cmd)

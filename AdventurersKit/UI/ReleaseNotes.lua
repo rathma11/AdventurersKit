@@ -5,6 +5,10 @@ local L = NS.L
 
 -- Patch (x.y.Z): minden valtozas; minor (x.Y.0): release (git tag + zip a releases\ mappaba).
 local NOTES = {
+    { version = "0.11.2", date = "2026-11-19", items = {
+        "Options > Debug: an Enable all button before Copy all turns on the log of every section (when all are on, "
+            .. "it reads Disable all and turns them off). Same as /ak debug all on | off.",
+    } },
     { version = "0.11.1", date = "2026-11-19", items = {
         "The addon list shows the author as Dano_11 (the CurseForge name).",
     } },

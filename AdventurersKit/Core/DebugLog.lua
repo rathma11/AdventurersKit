@@ -105,6 +105,16 @@ NS.SetDebugOn = function(key, on)
     t[key] = on and true or nil
 end
 
+-- Minden szekcio naploja be / ki (Options > Debug: Enable all; /ak debug all on | off)
+NS.DebugAllOn = function()
+    for _, s in ipairs(SECTIONS) do if not DebugOn(s.key) then return false end end
+    return true
+end
+NS.SetDebugAll = function(on)
+    for _, s in ipairs(SECTIONS) do NS.SetDebugOn(s.key, on) end
+    if on then for _, s in ipairs(SECTIONS) do NS.Debug(s.key, "log switched on (all)") end end
+end
+
 local function Stamp()
     return date and date("%H:%M:%S") or "--:--:--"
 end

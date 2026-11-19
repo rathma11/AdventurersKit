@@ -109,11 +109,13 @@ o:Text(L["Every feature has its own debug section: a snapshot of what it sees no
     .. L["its switch is on (the last 200 lines, cleared by /reload). A switched off log costs nothing. "]
     .. L["Turn on the part that misbehaves, play until it happens, then Copy debug and paste it into the bug report."], 2)
 
--- felso gombsor: Copy all (fo gomb), naplok torlese, hibak torlese
-local copyAll = S.ActionButton(page, L["Copy all"], "primary", 130)
-local clearLogs = S.ActionButton(page, L["Clear logs"], nil, 130)
-local clearErr = S.ActionButton(page, L["Clear errors"], nil, 130)
-o:Place(copyAll, 2, 10)
+-- felso gombsor: minden naplo be / ki, Copy all (fo gomb), naplok torlese, hibak torlese
+local enableAll = S.ActionButton(page, L["Enable all"], nil, 110)
+local copyAll = S.ActionButton(page, L["Copy all"], "primary", 110)
+local clearLogs = S.ActionButton(page, L["Clear logs"], nil, 110)
+local clearErr = S.ActionButton(page, L["Clear errors"], nil, 110)
+o:Place(enableAll, 2, 10)
+copyAll:SetPoint("LEFT", enableAll, "RIGHT", 6, 0)
 clearLogs:SetPoint("LEFT", copyAll, "RIGHT", 6, 0)
 clearErr:SetPoint("LEFT", clearLogs, "RIGHT", 6, 0)
 local function Tip(b, title, desc)
@@ -125,6 +127,7 @@ local function Tip(b, title, desc)
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
+Tip(enableAll, L["Enable all"], L["Turns on the log of every section (when all are on, the button turns them all off). Same as /ak debug all on | off."])
 Tip(copyAll, L["Copy all"], L["Every section's snapshot and log in one text, ready to copy. Same as /ak copy all."])
 Tip(clearLogs, L["Clear logs"], L["Empties the log of every section (the switches stay as they are)."])
 Tip(clearErr, L["Clear errors"], L["Empties the Lua error list (General section)."])
@@ -188,6 +191,16 @@ for _, s in ipairs(NS.DEBUG_SECTIONS) do
 end
 o:Text(L["Chat: /ak debug <section> prints a snapshot; /ak debug <section> on | off switches its log; /ak copy <section> | all opens the copy window. Plain /ak debug: targeting."], 2)
 
+-- Enable all: mind be; ha mar mind be van, a gomb "Disable all" (mind ki)
+local function RefreshEnableAll()
+    enableAll.text:SetText(NS.DebugAllOn() and L["Disable all"] or L["Enable all"])
+end
+o:OnRefresh(RefreshEnableAll)
+enableAll:SetScript("OnClick", function()
+    NS.SetDebugAll(not NS.DebugAllOn())
+    o:Refresh()
+end)
+
 clearLogs:SetScript("OnClick", function()
     for _, s in ipairs(NS.DEBUG_SECTIONS) do NS.DebugClear(s.key) end
     o:Refresh()
@@ -202,4 +215,5 @@ page:HookScript("OnUpdate", function(_, dt)
     if el < 1 then return end
     el = 0
     for _, r in ipairs(rows) do r.refresh() end
+    RefreshEnableAll()
 end)

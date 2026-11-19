@@ -33,10 +33,16 @@ local function SlashHandler(msg)
         -- /ak debug <szekcio> [on | off | clear]; /ak debug list (Core\DebugLog.lua)
         local word, sw = msg:match("^debug%s+(%S+)%s*(%S*)")
         local key = NS.DebugKey(word)
+        if word == "all" and (sw == "on" or sw == "off") then
+            NS.SetDebugAll(sw == "on")
+            Print(L["Debug log %s: %s"], L["all sections"], sw == "on" and L["on"] or L["off"])
+            return
+        end
         if word == "list" or word == "help" or not key then
             if word ~= "list" and word ~= "help" then Print(L["Unknown debug section: %s"], tostring(word)) end
             Print(L["Debug sections: %s"], NS.DebugKeyList())
             Print(L["  /ak debug <section> - snapshot + last log lines; /ak debug <section> on | off | clear - its log"])
+            Print(L["  /ak debug all on | off - every section's log"])
             return
         end
         local title = L[NS.DebugSection(key).title]
