@@ -6,7 +6,7 @@ local L = NS.L
 -- A legfelso bejegyzes a kovetkezo kiadas. Csak jatekosnak szolo valtozasok, a felhasznalo jovahagyasaval;
 -- a kiadas elotti 0.x fejlesztoi verziok nem szerepelnek (az elso nyilvanos: 0.10.0 beta).
 local NOTES = {
-    { version = "0.11.1", date = "2026-11-19", items = {
+    { version = "0.11.1", date = "2026-11-21", items = {
         "Options > Debug: an Enable all button before Copy all turns on the log of every section (when all are on, "
             .. "it reads Disable all and turns them off). Same as /ak debug all on | off.",
         "The Bags and Buffs modules have their own icons in the addon list: the compass with a bag or a glowing "

@@ -73,11 +73,18 @@ which quest item is in your bags, and how well a farming spot pays.
 - **Required:** [Questie](https://www.curseforge.com/wow/addons/questie) (the quest database).
 - **Optional:** TomTom (arrow), Bagnon (bag highlight), Auctionator / TradeSkillMaster / Auctioneer (AH prices), DungeonJournal (opens a dungeon there on Shift+click).
 
-## Credits and license
+## Credits and original projects
 Adventurer's Kit is free software under the **GNU GPL v3** (or later), see `LICENSE.md`.
-It carries small copies of data from **Questie** (GPL-3.0, the Questie team), **DungeonJournal** by
-**Exehn** (dungeon bosses, quests and entrances) and **OpenMap** (MIT, OpenMap contributors: boat,
-zeppelin and tram ports). Details are in `AdventurersKit/CREDITS.txt`.
+It uses data from these original projects (thank you!):
+
+- **Questie** (GPL-3.0, the Questie team): the quest, NPC, object and item database at runtime, and a few dungeon entrance coordinates.
+  [Questie on CurseForge](https://www.curseforge.com/wow/addons/questie) · [Questie on GitHub](https://github.com/Questie/Questie)
+- **DungeonJournal** by Exehn: dungeon bosses, WoW: Forever's own dungeon quests and dungeon entrances.
+  [DungeonJournal on CurseForge](https://www.curseforge.com/wow/addons/dungeonmanager)
+- **OpenMap** (MIT, OpenMap contributors): boat, zeppelin and tram port positions.
+  [OpenMap on CurseForge](https://www.curseforge.com/projects/1735937) · [OpenMap on GitHub](https://github.com/openmap-world/openmap)
+
+Full details: `AdventurersKit/CREDITS.txt`.
 World of Warcraft is a trademark of Blizzard Entertainment, Inc.
 
 Download: [CurseForge](https://www.curseforge.com/projects/1816789). Source and issues: [GitHub](https://github.com/rathma11/AdventurersKit).

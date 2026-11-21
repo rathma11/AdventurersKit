@@ -9,7 +9,9 @@ quest database while the game runs (Questie must be installed separately) and
 carries small copies of the following data so it does not depend on more
 addons:
 
-Questie (GPL-3.0) - https://github.com/Questie/Questie
+Questie (GPL-3.0)
+  https://www.curseforge.com/wow/addons/questie
+  https://github.com/Questie/Questie
   The Questie team: Aero, Logon, Muehe, TheCrux (BreakBB), Drejjmit, Dyaxler,
   Cheeq, TechnoHunter, Yttrium and all contributors.
   Used: the quest, NPC, object and item database at runtime; a few dungeon
@@ -17,6 +19,7 @@ Questie (GPL-3.0) - https://github.com/Questie/Questie
   Planner\DungeonEntrances.lua.
 
 DungeonJournal (ForeverDungeonJournal) by Exehn
+  https://www.curseforge.com/wow/addons/dungeonmanager
   Used: dungeon bosses with NPC IDs (Planner\DungeonBosses.lua), WoW: Forever's
   own dungeons with their quests and level ranges (Planner\DungeonQuests.lua)
   and dungeon entrance coordinates (Planner\DungeonEntrances.lua), from its
@@ -24,6 +27,8 @@ DungeonJournal (ForeverDungeonJournal) by Exehn
   installed, Adventurer's Kit can open it (Shift+click a dungeon).
 
 OpenMap (MIT) - OpenMap contributors
+  https://www.curseforge.com/projects/1735937
+  https://github.com/openmap-world/openmap
   Used: the boat, zeppelin and tram port positions of WoW: Forever, from its
   Data\Places.lua (Planner\Travel.lua). Its license notice:
 
@@ -51,6 +56,8 @@ OpenMap (MIT) - OpenMap contributors
 
 Optional integrations (used only when installed, nothing copied): TomTom,
 Bagnon, Auctionator, TradeSkillMaster, Auctioneer.
+
+Source code and issues: https://github.com/rathma11/AdventurersKit
 
 World of Warcraft and its game data, names and icons are trademarks or
 property of Blizzard Entertainment, Inc.

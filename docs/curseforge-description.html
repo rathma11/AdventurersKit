@@ -1,0 +1,91 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Adventurer's Kit – CurseForge description</title></head>
+<body>
+<h1>Adventurer's Kit</h1>
+<p><strong>A questing kit for WoW: Forever, built on Questie.</strong> One key targets the mobs your quests need, a marker points the way, and a route plans the next quests, zones and boat rides for you. Around the questing it handles the errands: what to do in town, which dungeon to prepare for, which buff ran out, which quest item is in your bags, and how well a farming spot pays.</p>
+<p>Game flavor: <strong>WoW: Forever</strong>. Requires <strong>Questie</strong>.</p>
+
+<h2>Features</h2>
+<h3>Quest focus and targeting</h3>
+<ul>
+<li><strong>Quest panel:</strong> the focused quest with its objectives, time left and pace, the other quests nearby and your route.</li>
+<li><strong>AKit macro:</strong> one key targets a living quest mob of your objectives (and of quests nearby), and keeps a living enemy you clicked.</li>
+<li><strong>Nameplate mode:</strong> with enemy nameplates on, the macro picks a quest mob nobody has tapped.</li>
+<li><strong>Zone focus:</strong> only the current zone's quests in the tracker (/ak zone).</li>
+</ul>
+<h3>Markers, route and travel</h3>
+<ul>
+<li><strong>Markers:</strong> the built-in arrow or a TomTom waypoint to the nearest spot of the current objective; empty spawn points are skipped for 5 minutes.</li>
+<li><strong>◀ ▶ stepping</strong> through the route, with skip rules for quests you want to leave for later.</li>
+<li><strong>Route and next zone:</strong> your quests in nearest-next order, and where to go next ("Hearth back" when that is fastest).</li>
+<li><strong>Travel planning</strong> with boats, zeppelins, the tram and the Hearthstone, including WoW: Forever's own routes.</li>
+</ul>
+<h3>Pace, escorts and pickups</h3>
+<ul>
+<li><strong>Pace:</strong> your kill pace is learned (per group size) and every quest gets a time-left estimate.</li>
+<li><strong>Escort quests:</strong> the escort's health and destination, and the macro targets whatever attacks it.</li>
+<li><strong>Quest nearby popup:</strong> a quest you can pick up close by, with its estimated length.</li>
+</ul>
+<h3>Towns and dungeons</h3>
+<ul>
+<li><strong>City list:</strong> quests to pick up in town (XP, chain step, dungeon tags), errands (repair, ammo, XP food, full bags) and directions to the bank, auction house, flight master, inn, trainers.</li>
+<li><strong>Dungeon list and prep:</strong> the dungeons for your level (WoW: Forever's own dungeons included), a checklist of their quests, the entrance on the map, and every objective in boss order inside.</li>
+<li><strong>Share popup:</strong> offers to share your dungeon quests with the party.</li>
+</ul>
+<h3>Modules</h3>
+<ul>
+<li><strong>Buffs:</strong> reminder for sleeping bag, XP food, weapon enchants (stones, oils, poisons, imbues), class buffs and tracking; bag space, repair and "vendor nearby" warnings.</li>
+<li><strong>Bags:</strong> quest item list next to the bags (Bagnon highlight), use buttons with a key binding, /ak junk for leftovers.</li>
+<li><strong>Farm session:</strong> time, XP per hour and ETA to level (rested XP counted), kills, gold and item value (AH price when available), and a summary at the end.</li>
+<li><strong>Auction house:</strong> a Quest items tab with the items your quests still need and their cheapest price.</li>
+</ul>
+<h3>Settings</h3>
+<ul>
+<li>Per-character settings, profile export / import as text, and /ak selftest.</li>
+</ul>
+
+<h2>Commands</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td>/ak</td><td>show / hide the quest panel</td></tr>
+<tr><td>/ak options</td><td>settings</td></tr>
+<tr><td>/ak next | all | mark | unmark | clear</td><td>objectives, marker and focus</td></tr>
+<tr><td>/ak ping</td><td>ping mode (ask / always / never)</td></tr>
+<tr><td>/ak zone</td><td>zone focus on / off</td></tr>
+<tr><td>/ak city</td><td>city list</td></tr>
+<tr><td>/ak dungeon [name | off]</td><td>dungeon list, dungeon prep</td></tr>
+<tr><td>/ak farm [stop | pause | resume | reset]</td><td>farm session</td></tr>
+<tr><td>/ak bags | junk</td><td>quest item list, destroy leftover quest items</td></tr>
+<tr><td>/ak export | import</td><td>share settings</td></tr>
+<tr><td>/ak notes</td><td>release notes</td></tr>
+<tr><td>/ak selftest | debug | copy</td><td>self test and diagnostics</td></tr>
+</table>
+<p>/qf works as an alias of /ak.</p>
+
+<h2>Getting started</h2>
+<ol>
+<li>Install <strong>Questie</strong> and Adventurer's Kit (three folders: AdventurersKit, AdventurersKit_Bags, AdventurersKit_Buffs). The Bags and Buffs modules are optional.</li>
+<li>In game, open the quest log and click a quest. This creates the AKit macro.</li>
+<li>Type /macro, find AKit under General Macros and drag it to an action bar. Press it to target your quest mobs.</li>
+</ol>
+
+<h2>Requirements</h2>
+<ul>
+<li><strong>Required:</strong> <a href="https://www.curseforge.com/wow/addons/questie">Questie</a> (the quest database).</li>
+<li><strong>Optional:</strong> TomTom (arrow), Bagnon (bag highlight), Auctionator / TradeSkillMaster / Auctioneer (AH prices), DungeonJournal (opens a dungeon there on Shift+click).</li>
+</ul>
+
+<h2>Credits and original projects</h2>
+<p>Adventurer's Kit is free software under the GNU GPL v3 (or later), see LICENSE.md. It uses data from these original projects (thank you!):</p>
+<ul>
+<li><strong>Questie</strong> (GPL-3.0, the Questie team): the quest, NPC, object and item database at runtime, and a few dungeon entrance coordinates.<br>
+<a href="https://www.curseforge.com/wow/addons/questie">Questie on CurseForge</a> · <a href="https://github.com/Questie/Questie">Questie on GitHub</a></li>
+<li><strong>DungeonJournal</strong> by Exehn: dungeon bosses, WoW: Forever's own dungeon quests and dungeon entrances.<br>
+<a href="https://www.curseforge.com/wow/addons/dungeonmanager">DungeonJournal on CurseForge</a></li>
+<li><strong>OpenMap</strong> (MIT, OpenMap contributors): boat, zeppelin and tram port positions.<br>
+<a href="https://www.curseforge.com/projects/1735937">OpenMap on CurseForge</a> · <a href="https://github.com/openmap-world/openmap">OpenMap on GitHub</a></li>
+</ul>
+<p>Full details: AdventurersKit/CREDITS.txt. Source code and issues: <a href="https://github.com/rathma11/AdventurersKit">GitHub</a>.</p>
+<p>World of Warcraft is a trademark of Blizzard Entertainment, Inc.</p>
+<p>Changes per version: CHANGELOG.md.</p>
+</body></html>
